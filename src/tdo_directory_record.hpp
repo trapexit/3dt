@@ -20,6 +20,7 @@
 
 #include <cctype>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #define DR_FLAG_IS_DIRECTORY      0x00000001
