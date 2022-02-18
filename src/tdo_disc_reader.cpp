@@ -64,8 +64,10 @@ is_3do_iso(const uint8_t *buf_)
   if(buf_[6] != 0x01)
     return false;
 
-  if(buf_[7] != 0x00)
-    return false;
+  // Ignore for now as M2 disks were found to have non-zero
+  // here. Instead it as 0x0B.
+  // if(buf_[7] != 0x00)
+  //   return false;
 
   return true;
 }
