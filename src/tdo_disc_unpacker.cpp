@@ -26,6 +26,7 @@
 #include <fstream>
 #include <cctype>
 
+
 namespace fs = std::filesystem;
 
 class TDO::DiscUnpacker::Impl final : public TDO::DiscWalker::Callbacks
@@ -65,10 +66,25 @@ public:
     else
       {
         std::ofstream os;
+        uint32_t sector_start;
+        uint32_t sector_end;
+        uint32_t bytes_left;
 
-        reader_.disc_seek(record_.disc_avatar_offset());
-        os.open(fullpath,std::ios::binary);
-        util::copy_stream(reader_.istream(),os,record_.byte_count);
+        os.open(fullpath,std::ios::binary|std::ios::trunc);
+
+        bytes_left   = record_.byte_count;
+        sector_start = record_.avatar_list[0];
+        sector_end   = sector_start + record_.block_count;
+        for(uint32_t sector = sector_start; sector < sector_end; sector++)
+          {
+            uint32_t n;
+
+            reader_.sector_seek(sector);
+            n = std::min(record_.block_size,bytes_left);
+            util::copy_stream(reader_.istream(),os,n);
+            bytes_left -= n;
+          }
+
         os.close();
       }
     _cb.after(path_,record_,0);
