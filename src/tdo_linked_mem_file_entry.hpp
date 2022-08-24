@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2022, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,32 +18,10 @@
 
 #pragma once
 
-#include "tdo_disc_reader.hpp"
-
-#include <fstream>
-#include <filesystem>
-
-
 namespace TDO
 {
-  class DiscFileReader : public TDO::DiscReader
+  struct LinkedMemFileEntry
   {
-  public:
-    DiscFileReader();
-    ~DiscFileReader();
-
-  public:
-    void open(const std::filesystem::path &filepath);
-    void close();
-
-  public:
-    const std::filesystem::path& filepath() const;
-
-  public:
-    std::istream& istream();
-
-  private:
-    std::filesystem::path _filepath;
-    std::ifstream         _ifs;
+    
   };
 }

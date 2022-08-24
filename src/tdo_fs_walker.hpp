@@ -16,48 +16,51 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "tdo_disc_file_reader.hpp"
+#pragma once
+
+#include "error.hpp"
+#include "tdo_dev_stream.hpp"
+
+#include <filesystem>
+#include <functional>
+#include <istream>
+#include <memory>
 
 namespace TDO
 {
-  DiscFileReader::DiscFileReader()
-    : DiscReader(_ifs)
+  class FSWalker
   {
+  public:
+    struct Callbacks
+    {
+      virtual
+      void
+      operator()(const std::filesystem::path&,
+                 const TDO::DirectoryHeader&,
+                 DevStream&)
+      {
+      }
 
-  }
+      virtual
+      void
+      operator()(const std::filesystem::path&,
+                 const TDO::DirectoryRecord&,
+                 DevStream&)
+      {
+      }
+    };
 
-  DiscFileReader::~DiscFileReader()
-  {
-    close();
-  }
+  public:
+    FSWalker(std::istream &is,
+             Callbacks    &callbacks);
+    FSWalker(DevStream &stream,
+             Callbacks &callbacks);
 
-  void
-  DiscFileReader::open(const std::filesystem::path &filepath_)
-  {
-    close();
+  public:
+    Error walk();
 
-    _ifs.open(filepath_,std::ios::binary);
-
-    _filepath = filepath_;
-  }
-
-  const
-  std::filesystem::path&
-  DiscFileReader::filepath() const
-  {
-    return _filepath;
-  }
-
-  std::istream&
-  DiscFileReader::istream()
-  {
-    return _ifs;
-  }
-
-  void
-  DiscFileReader::close()
-  {
-    if(_ifs.is_open())
-      _ifs.close();
-  }
+  private:
+    Callbacks    &_callbacks;
+    std::istream &_is;
+  };
 }

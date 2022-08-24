@@ -19,11 +19,12 @@
 #include "error.hpp"
 #include "log.hpp"
 #include "options.hpp"
-#include "tdo_disc_file_reader.hpp"
+#include "tdo_file_stream.hpp"
 
 #include "fmt.hpp"
 
 #include <fstream>
+#include <filesystem>
 
 namespace fs = std::filesystem;
 
@@ -51,59 +52,45 @@ namespace Subcommand
   {
     Error err;
     std::int64_t i;
-    std::int64_t sectors;
+    std::uint64_t blocks;
     std::ofstream ofs;
     fs::path output_path;
-    TDO::DiscFileReader reader;
+    TDO::FileStream stream;
     std::array<char,2048> buf;
 
     output_path = get_output_path(options_);
     if(output_path == options_.input)
-      {
-        Log::error({"input == output"});
-        return;
-      }
+      return Log::error({"input == output"});
 
-    reader.open(options_.input);
-    if(reader.bad())
-      {
-        Log::error_stream_open(options_.input);
-        return;
-      }
-
-    ofs.open(output_path,std::ios::binary);
-    if(ofs.bad())
-      {
-        reader.close();
-        Log::error_stream_open(output_path);
-        return;
-      }
-
-    err = reader.discover_image_format();
+    err = stream.open(options_.input);
     if(err)
+      return Log::error(err);
+
+    if(!stream.good())
+      return  Log::error_stream_open(options_.input);
+
+    ofs.open(output_path,std::ios::binary|std::ios::trunc);
+    if(!ofs.good())
       {
-        Log::error(err);
-        return;
+        stream.close();
+        return Log::error_stream_open(output_path);
       }
 
     i = 0;
-    sectors = reader.sector_count() - 1;
-    while(reader.good() && !reader.eof())
+    blocks = stream.device_block_count() - 1;
+    while(stream.good() && !stream.eof())
       {
-        reader.sector_seek(i);
+        stream.data_block_seek(i);
 
-        reader.read(buf);
-        if(!reader.good())
+        stream.read(buf);
+        if(!stream.good())
           break;
 
         ofs.write(buf.data(),buf.size());
         if(ofs.bad())
-          {
-            Log::error({"write failed"});
-            break;
-          }
+          return Log::error({"write failed"});
 
-        fmt::print("\r{}: sector {} of {} written",output_path,i,sectors);
+        fmt::print("\r{}: block {} of {} written",output_path,i,blocks);
 
         i++;
       }

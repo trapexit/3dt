@@ -18,7 +18,7 @@
 
 #include "log.hpp"
 #include "options.hpp"
-#include "tdo_disc_walker.hpp"
+#include "tdo_fs_walker.hpp"
 
 #include "fmt.hpp"
 
@@ -48,13 +48,13 @@ starts_with(const fs::path &base_,
   return (biter == biter_end);
 }
 
-class ListCallbacks final : public TDO::DiscWalker::Callbacks
+class ListCallbacks final : public TDO::FSWalker::Callbacks
 {
 public:
   void
   operator()(const std::filesystem::path &filepath_,
              const TDO::DirectoryRecord  &record_,
-             TDO::DiscReader             &reader_)
+             TDO::DevStream              &stream_)
   {
     char dir_char;
     char readonly_char;
@@ -87,20 +87,20 @@ namespace Subcommand
   void
   list(const Options::List &options_)
   {
+    Error err;
     std::ifstream ifs;
     ListCallbacks callbacks;
-    TDO::DiscWalker walker(ifs,callbacks);
+    TDO::FSWalker walker(ifs,callbacks);
 
     callbacks.base_filter = options_.prefix_filter;
 
     ifs.open(options_.filepath,std::ios::binary);
     if(!ifs.good())
-      {
-        Log::error_stream_open(options_.filepath);
-        return;
-      }
+      return  Log::error_stream_open(options_.filepath);
 
-    walker.walk();
+    err = walker.walk();
+    if(err)
+      Log::error(err);
 
     ifs.close();
   }

@@ -26,18 +26,16 @@
 #include <iostream>
 #include <stack>
 
-
 namespace TDO
 {
-  class DiscReader
+  class DevStream
   {
   public:
-    DiscReader(std::istream &is);
+    DevStream(std::istream &is);
 
   public:
-    Error discover_image_format();
-    uint32_t sector_size() const { return _sector_size; }
-    uint32_t sector_data_offset() const { return _sector_data_offset; }
+    void find_label();
+    Error setup();
 
   public:
     bool good() const { return _is.good(); }
@@ -46,20 +44,29 @@ namespace TDO
     std::istream &istream() { return _is; }
 
   public:
-    void stream_seek(const std::int64_t pos);
-    void disc_seek(const std::int64_t pos);
-    void sector_seek(const std::int64_t sector);
-    std::int64_t disc_tell() const;
-    std::int64_t stream_tell() const;
+    void data_offset(const std::uint32_t);
+    std::uint32_t device_block_size() const;
+    std::uint32_t device_block_count();
+    std::uint32_t data_block_size() const;
 
   public:
-    std::int64_t sector_count() const;
+    void file_seek(const std::int64_t pos);
+    void data_byte_seek(const std::int64_t pos);
+    void data_byte_skip(const std::int64_t pos);
+    void data_block_seek(const std::int64_t pos);
+    void device_block_seek(const std::int64_t pos);
+
+  public:
+    std::int64_t file_tell() const;
+    std::int64_t data_byte_tell() const;
+    std::int64_t device_block_tell() const;
 
   public:
     void read(char *buf, uint32_t size);
     void read(char &c);
     void read(uint32_t &u32);
     void read(int32_t &i32);
+    void _read(TDO::DiscLabel &);    
     void read(TDO::DiscLabel &);
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);
@@ -86,27 +93,29 @@ namespace TDO
   private:
     typedef std::stack<std::size_t> PosStack;
 
-    std::uint32_t  _sector_size;
-    std::uint32_t  _sector_data_offset;
+    std::uint32_t  _device_block_data_size;
+    std::uint32_t  _device_block_header;
+    std::uint32_t  _device_block_footer;
+    std::uint32_t  _data_offset;
     std::istream  &_is;
-    PosStack       _pos_stack;
   };
 
   class PosGuard
   {
   public:
-    PosGuard(DiscReader &reader_)
-      : _reader(reader_)
+    PosGuard(DevStream &stream_)
+      : _stream(stream_)
     {
-      _reader.push_pos();
+      _pos = _stream.file_tell();
     }
 
     ~PosGuard()
     {
-      _reader.pop_pos();
+      _stream.file_seek(_pos);
     }
 
   private:
-    DiscReader &_reader;
+    DevStream      &_stream;
+    std::streampos  _pos;
   };
 }

@@ -16,51 +16,55 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#pragma once
-
-#include "error.hpp"
-#include "tdo_disc_reader.hpp"
-
-#include <filesystem>
-#include <functional>
-#include <istream>
-#include <memory>
+#include "tdo_file_stream.hpp"
 
 namespace TDO
 {
-  class DiscWalker
+  FileStream::FileStream()
+    : DevStream(_ifs)
   {
-  public:
-    struct Callbacks
-    {
-      virtual
-      void
-      operator()(const std::filesystem::path&,
-                 const TDO::DirectoryHeader&,
-                 TDO::DiscReader&)
-      {
-      }
 
-      virtual
-      void
-      operator()(const std::filesystem::path&,
-                 const TDO::DirectoryRecord&,
-                 TDO::DiscReader&)
-      {
-      }
-    };
+  }
 
-  public:
-    DiscWalker(std::istream &is,
-               Callbacks    &callbacks);
-    DiscWalker(TDO::DiscReader &reader,
-               Callbacks       &callbacks);
+  FileStream::~FileStream()
+  {
+    close();
+  }
 
-  public:
-    Error walk();
+  Error
+  FileStream::open(const std::filesystem::path &filepath_)
+  {
+    Error err;
 
-  private:
-    Callbacks    &_callbacks;
-    std::istream &_is;
-  };
+    close();
+
+    _ifs.open(filepath_,std::ios::binary);
+    err = setup();
+    if(err)
+      return err;
+
+    _filepath = filepath_;
+
+    return {};
+  }
+
+  const
+  std::filesystem::path&
+  FileStream::filepath() const
+  {
+    return _filepath;
+  }
+
+  std::istream&
+  FileStream::istream()
+  {
+    return _ifs;
+  }
+
+  void
+  FileStream::close()
+  {
+    if(_ifs.is_open())
+      _ifs.close();
+  }
 }

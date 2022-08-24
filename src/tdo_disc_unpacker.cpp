@@ -29,7 +29,7 @@
 
 namespace fs = std::filesystem;
 
-class TDO::DiscUnpacker::Impl final : public TDO::DiscWalker::Callbacks
+class TDO::DiscUnpacker::Impl final : public TDO::FSWalker::Callbacks
 {
 public:
   Impl(std::istream                &is_,
@@ -53,8 +53,8 @@ public:
 public:
   void
   operator()(const std::filesystem::path &path_,
-             const TDO::DirectoryRecord &record_,
-             TDO::DiscReader            &reader_)
+             const TDO::DirectoryRecord  &record_,
+             DevStream                   &stream_)
   {
     fs::path fullpath = dstpath / path_;
 
@@ -79,9 +79,9 @@ public:
           {
             uint32_t n;
 
-            reader_.sector_seek(sector);
+            stream_.data_block_seek(sector);
             n = std::min(record_.block_size,bytes_left);
-            util::copy_stream(reader_.istream(),os,n);
+            util::copy_stream(stream_.istream(),os,n);
             bytes_left -= n;
           }
 
@@ -95,7 +95,7 @@ public:
 
 private:
   TDO::DiscUnpacker::Callback &_cb;
-  TDO::DiscWalker              _walker;
+  TDO::FSWalker                _walker;
 };
 
 namespace TDO

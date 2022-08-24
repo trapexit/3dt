@@ -37,10 +37,13 @@ namespace util
     do
       {
         bytes_to_read = std::min(buf.size(),bytes_to_write);
+
         is_.read(&buf[0],bytes_to_read);
+
         os_.write(&buf[0],is_.gcount());
+
         bytes_to_write -= is_.gcount();
       }
-    while(bytes_to_write > 0);
+    while(is_ && os_ && (bytes_to_write > 0));
   }
 }
