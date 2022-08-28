@@ -44,11 +44,6 @@ namespace TDO
 
   struct DiscLabel
   {
-  public:
-    uint32_t file_offset;
-    uint32_t data_offset;
-
-  public:
     char     record_type;       /* Should equal 0x01 */
     VSBArray volume_sync_bytes; /* Synchronization bytes: 0x5A5A5A5A5A */
     char     volume_structure_version; /* Should equal 0x01 */

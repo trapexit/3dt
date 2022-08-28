@@ -37,7 +37,7 @@ namespace TDO
       void
       operator()(const std::filesystem::path&,
                  const TDO::DirectoryHeader&,
-                 DevStream&)
+                 TDO::DevStream&)
       {
       }
 
@@ -45,7 +45,7 @@ namespace TDO
       void
       operator()(const std::filesystem::path&,
                  const TDO::DirectoryRecord&,
-                 DevStream&)
+                 TDO::DevStream&)
       {
       }
     };

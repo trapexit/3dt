@@ -59,14 +59,12 @@ namespace TDO
   public:
     std::int64_t file_tell() const;
     std::int64_t data_byte_tell() const;
-    std::int64_t device_block_tell() const;
 
   public:
     void read(char *buf, uint32_t size);
     void read(char &c);
     void read(uint32_t &u32);
     void read(int32_t &i32);
-    void _read(TDO::DiscLabel &);    
     void read(TDO::DiscLabel &);
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);

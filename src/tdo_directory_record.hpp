@@ -42,10 +42,6 @@ namespace TDO
   struct DirectoryRecord
   {
   public:
-    uint32_t file_offset;
-    uint32_t data_offset;
-
-  public:
     uint32_t flags;
     uint32_t unique_identifier;
     uint32_t type;
