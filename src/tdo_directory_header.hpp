@@ -24,8 +24,8 @@ namespace TDO
 {
   struct DirectoryHeader
   {
-    uint32_t disc_offset;
     uint32_t file_offset;
+    uint32_t data_offset;
 
     int32_t  next_block;
     int32_t  prev_block;

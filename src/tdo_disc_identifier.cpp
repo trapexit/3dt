@@ -17,18 +17,19 @@
 */
 
 #include "tdo_disc_identifier.hpp"
-#include "tdo_disc_reader.hpp"
+
+#include "tdo_dev_stream.hpp"
 
 #include <string>
 
 static
 std::string
-get_ext_based_on_type(const TDO::DiscReader &reader_)
+get_ext_based_on_type(const TDO::DevStream &stream_)
 {
-  if((reader_.sector_size() == 2048) && (reader_.sector_data_offset() == 0))
-    return "iso";
-  if((reader_.sector_size() == 2352) && (reader_.sector_data_offset() == 16))
-    return "bin";
+  // if((reader_.sector_size() == 2048) && (reader_.sector_data_offset() == 0))
+  //   return "iso";
+  // if((reader_.sector_size() == 2352) && (reader_.sector_data_offset() == 16))
+  //   return "bin";
   return {"unknown"};
 }
 
@@ -61,21 +62,17 @@ Error
 TDO::DiscIdentifier::identify(std::istream &is_)
 {
   Error err;
-  TDO::DiscReader reader(is_);
+  DevStream stream(is_);
 
-  err = reader.discover_image_format();
-  if(err)
-    return err;
+  stream.data_byte_seek(0);
+  stream.read(label);
 
-  reader.disc_seek(0);
-  reader.read(label);
-
-  err = fsstats.collect(reader);
+  err = fsstats.collect(stream);
   if(err)
     return err;
 
   ::find_matches(label,fsstats,full_matches,partial_matches);
-  disc_image_ext = ::get_ext_based_on_type(reader);
+  disc_image_ext = ::get_ext_based_on_type(stream);
 
   return {};
 }

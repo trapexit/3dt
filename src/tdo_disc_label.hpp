@@ -45,8 +45,8 @@ namespace TDO
   struct DiscLabel
   {
   public:
-    uint32_t disc_offset;
     uint32_t file_offset;
+    uint32_t data_offset;
 
   public:
     char     record_type;       /* Should equal 0x01 */

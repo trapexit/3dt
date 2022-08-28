@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tdo_disc_reader.hpp"
+#include "tdo_dev_stream.hpp"
 
 #include <memory>
 
@@ -30,7 +30,7 @@ namespace TDO
     FilesystemStats();
 
   public:
-    Error collect(TDO::DiscReader &reader_);
+    Error collect(DevStream &reader_);
 
   public:
     uint32_t file_count;

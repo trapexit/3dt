@@ -18,10 +18,10 @@
 
 #include "tdo_filesystem_stats.hpp"
 
-#include "tdo_disc_walker.hpp"
+#include "tdo_fs_walker.hpp"
 
 
-class FSStatsCollector final : public TDO::DiscWalker::Callbacks
+class FSStatsCollector final : public TDO::FSWalker::Callbacks
 {
 public:
   FSStatsCollector()
@@ -34,7 +34,7 @@ public:
   void
   operator()(const std::filesystem::path &path_,
              const TDO::DirectoryRecord  &record_,
-             TDO::DiscReader             &reader_)
+             TDO::DevStream              &stream_)
   {
     file_count++;
     total_data_size += record_.byte_count;
@@ -42,9 +42,9 @@ public:
 
 public:
   Error
-  collect(TDO::DiscReader &reader_)
+  collect(TDO::DevStream &stream_)
   {
-    TDO::DiscWalker walker(reader_,*this);
+    TDO::FSWalker walker(stream_,*this);
 
     return walker.walk();
   }
@@ -63,12 +63,12 @@ namespace TDO
   }
 
   Error
-  FilesystemStats::collect(TDO::DiscReader &reader_)
+  FilesystemStats::collect(TDO::DevStream &stream_)
   {
     Error err;
     FSStatsCollector collector;
 
-    err = collector.collect(reader_);
+    err = collector.collect(stream_);
     if(err)
       return err;
 

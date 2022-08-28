@@ -18,42 +18,32 @@
 
 #pragma once
 
-#include "error.hpp"
-#include "tdo_fs_walker.hpp"
+#include "tdo_dev_stream.hpp"
 
+#include <fstream>
 #include <filesystem>
-#include <istream>
-#include <memory>
+
 
 namespace TDO
 {
-  class DiscUnpacker
+  class FileStream : public DevStream
   {
   public:
-    typedef std::unique_ptr<DiscUnpacker> Ptr;
+    FileStream();
+    ~FileStream();
 
   public:
-    struct Callback
-    {
-      typedef std::unique_ptr<Callback> Ptr;
-
-      virtual void before(const std::filesystem::path &path,
-                          const TDO::DirectoryRecord  &record) = 0;
-      virtual void after(const std::filesystem::path &path,
-                         const TDO::DirectoryRecord  &record,
-                         const int                    err) = 0;
-    };
+    Error open(const std::filesystem::path &filepath);
+    void  close();
 
   public:
-    DiscUnpacker(std::istream &is,
-                 Callback     &cb);
-    ~DiscUnpacker();
+    const std::filesystem::path& filepath() const;
 
   public:
-    Error unpack(const std::filesystem::path &dstpath);
+    std::istream& istream();
 
   private:
-    class Impl;
-    std::unique_ptr<Impl> _impl;
+    std::filesystem::path _filepath;
+    std::ifstream         _ifs;
   };
 }

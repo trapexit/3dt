@@ -22,6 +22,7 @@
 
 #include <locale>
 
+
 static
 void
 generate_version_argparser(CLI::App &app_)

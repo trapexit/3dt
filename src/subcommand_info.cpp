@@ -20,8 +20,7 @@
 #include "error_unknown_image_format.hpp"
 #include "log.hpp"
 #include "options.hpp"
-#include "tdo_disc_file_reader.hpp"
-#include "tdo_disc_walker.hpp"
+#include "tdo_file_stream.hpp"
 #include "tdo_filesystem_stats.hpp"
 
 #include "CSVWriter.h"
@@ -147,31 +146,27 @@ namespace
 
   static
   Error
-  get_label(TDO::DiscFileReader &reader_,
-            TDO::DiscLabel      &label_)
+  get_label(TDO::FileStream &stream_,
+            TDO::DiscLabel  &label_)
   {
     Error err;
 
-    err = reader_.discover_image_format();
-    if(err)
-      return UnknownImageFormatError(reader_.filepath(),err);
-
-    reader_.disc_seek(0);
-    reader_.read(label_);
+    stream_.data_byte_seek(0);
+    stream_.read(label_);
 
     return {};
   }
 
   static
   Error
-  get_extra_info(TDO::DiscFileReader &reader_,
-                 uint32_t            &file_count_,
-                 uint32_t            &total_data_size_)
+  get_extra_info(TDO::FileStream &stream_,
+                 uint32_t        &file_count_,
+                 uint32_t        &total_data_size_)
   {
     Error err;
     TDO::FilesystemStats fsstats;
 
-    err = fsstats.collect(reader_);
+    err = fsstats.collect(stream_);
     if(err)
       return err;
 
@@ -183,23 +178,23 @@ namespace
 
   static
   Error
-  info(const PrintFunc     &printfunc_,
-       TDO::DiscFileReader &reader_)
+  info(const PrintFunc &printfunc_,
+       TDO::FileStream &stream_)
   {
     Error err;
     uint32_t file_count;
     uint32_t total_data_size;
     TDO::DiscLabel label;
 
-    err = ::get_label(reader_,label);
+    err = ::get_label(stream_,label);
     if(err)
       return err;
 
-    err = ::get_extra_info(reader_,file_count,total_data_size);
+    err = ::get_extra_info(stream_,file_count,total_data_size);
     if(err)
       return err;
 
-    printfunc_(reader_.filepath(),label,file_count,total_data_size);
+    printfunc_(stream_.filepath(),label,file_count,total_data_size);
 
     return {};
   }
@@ -210,17 +205,20 @@ namespace
        const fs::path  &filepath_)
   {
     Error err;
-    TDO::DiscFileReader reader;
+    TDO::FileStream stream;
 
-    reader.open(filepath_);
-    if(!reader.good())
+    err = stream.open(filepath_);
+    if(err)
+      return Log::error(err);
+
+    if(!stream.good())
       return Log::error_stream_open(filepath_);
 
-    err = ::info(printfunc_,reader);
+    err = ::info(printfunc_,stream);
     if(err)
-      Log::error(err);
+      return Log::error(err);
 
-    reader.close();
+    stream.close();
   }
 
 }
