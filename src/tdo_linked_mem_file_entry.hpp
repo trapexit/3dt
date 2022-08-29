@@ -18,10 +18,26 @@
 
 #pragma once
 
+#include <cstdint>
+
+
+#define FINGERPRINT_FILEBLOCK   0xBE4F32A6
+#define FINGERPRINT_FREEBLOCK   0x7AA565BD
+#define FINGERPRINT_ANCHORBLOCK 0x855A02B6
+
+
 namespace TDO
 {
   struct LinkedMemFileEntry
   {
-    
+    uint32_t fingerprint;
+    uint32_t flink_offset;
+    uint32_t blink_offset;
+    uint32_t block_count;
+    uint32_t header_block_count;
+    uint32_t byte_count;
+    uint32_t unique_identifier;
+    uint32_t type;
+    char     filename[32];
   };
 }
