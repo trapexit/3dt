@@ -183,6 +183,29 @@ generate_to_iso_argparser(CLI::App       &app_,
 
 static
 void
+generate_romtags_argparser(CLI::App         &app_,
+                           Options::ROMTags &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("romtags","print out image romtags");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  subcmd->add_option("-f,--format",opts_.format)
+    ->description("output format")
+    ->type_name("TEXT")
+    ->default_val("human")
+    ->take_last()
+    ->check(CLI::IsMember({"human","csv"}));
+
+  subcmd->callback(std::bind(Subcommand::romtags,std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
@@ -197,6 +220,7 @@ generate_argparser(CLI::App &app_,
   //  generate_pack_argparser(app_,options_.pack);
   generate_rename_argparser(app_,options_.rename);
   generate_to_iso_argparser(app_,options_.to_iso);
+  generate_romtags_argparser(app_,options_.romtags);
 }
 
 static
