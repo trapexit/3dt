@@ -126,7 +126,7 @@ TDO::DevStream::setup()
 
   {
     PosGuard guard(*this);
-    _read(label);
+    read(label);
     _device_block_data_size = label.volume_block_size;
   }
 
@@ -262,7 +262,7 @@ TDO::DevStream::read(int32_t &i32_)
 }
 
 void
-TDO::DevStream::_read(TDO::DiscLabel &dl_)
+TDO::DevStream::read(TDO::DiscLabel &dl_)
 {
   read(dl_.record_type);
   read(dl_.volume_sync_bytes);
@@ -281,20 +281,8 @@ TDO::DevStream::_read(TDO::DiscLabel &dl_)
 }
 
 void
-TDO::DevStream::read(TDO::DiscLabel &dl_)
-{
-  dl_.file_offset = file_tell();
-  dl_.data_offset = data_byte_tell();
-
-  _read(dl_);
-}
-
-void
 TDO::DevStream::read(TDO::DirectoryHeader &dh_)
 {
-  dh_.file_offset = file_tell();
-  dh_.data_offset = data_byte_tell();
-
   read(dh_.next_block);
   read(dh_.prev_block);
   read(dh_.flags);
@@ -305,9 +293,6 @@ TDO::DevStream::read(TDO::DirectoryHeader &dh_)
 void
 TDO::DevStream::read(TDO::DirectoryRecord &dr_)
 {
-  dr_.file_offset = file_tell();
-  dr_.data_offset = data_byte_tell();
-
   read(dr_.flags);
   read(dr_.unique_identifier);
   read(dr_.type);

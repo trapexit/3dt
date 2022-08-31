@@ -40,8 +40,21 @@ public:
 public:
   Error
   walk_dir_block(const TDO::DiscLabel &label_,
+                 const std::int64_t    dir_hdr_pos_,
                  const fs::path       &path_)
   {
+    std::int64_t pos;
+    TDO::DirectoryHeader dh;
+
+    pos = dir_hdr_pos_;
+    _stream.data_byte_seek(pos);
+    _stream.read(dh);
+
+    _callbacks(path_,dh,_stream);
+
+    pos += dh.first_entry_offset;
+    _stream.data_byte_seek(pos);
+
     while(true)
       {
         TDO::DirectoryRecord dr;
@@ -60,6 +73,8 @@ public:
           break;
         if(dr.last_in_block())
           break;
+        if(_stream.data_byte_tell() >= (dir_hdr_pos_ + dh.first_free_byte))
+          break;
       }
 
     return {};
@@ -72,22 +87,13 @@ public:
            const std::uint32_t   dir_block_count_,
            const fs::path       &path_)
   {
-    TDO::PosGuard pos_guard(_stream);
     std::int64_t pos;
-    TDO::DirectoryHeader dh;
+    TDO::PosGuard pos_guard(_stream);
 
     pos = (dir_block_ * label_.volume_block_size);
-
-    _stream.data_byte_seek(pos);
-    _stream.read(dh);
-
-    _callbacks(path_,dh,_stream);
-
-    pos += dh.first_entry_offset;
     for(std::uint32_t block = 0; block < dir_block_count_; block++)
       {
-        _stream.data_byte_seek(pos);
-        walk_dir_block(label_,path_);
+        walk_dir_block(label_,pos,path_);
         pos += dir_block_size_;
       }
 
