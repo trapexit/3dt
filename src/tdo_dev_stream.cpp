@@ -175,6 +175,7 @@ TDO::DevStream::data_byte_tell() const
 
   pos  = (block * _device_block_data_size);
   pos += (extra - _device_block_header);
+  pos -= _data_offset;
 
   return pos;
 }
