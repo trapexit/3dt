@@ -24,6 +24,7 @@
 #include <cctype>
 #include <cstring>
 #include <ios>
+#include <cassert>
 
 
 static constexpr int TDO_SECTOR_SIZE   = 2048;
@@ -77,8 +78,10 @@ TDO::DevStream::DevStream(std::istream &is_)
     _device_block_header(0),
     _device_block_footer(0),
     _data_offset(0),
-    _is(is_)
+    _is(is_),
+    _initialized(false)
 {
+
 }
 
 void
@@ -130,9 +133,31 @@ TDO::DevStream::setup()
     _device_block_data_size = label.volume_block_size;
   }
 
+  _initialized = true;
+
   _data_offset = data_byte_tell();
 
   return {};
+}
+
+bool
+TDO::DevStream::is_romfs() const
+{
+  return ((_device_block_header    == 0) &&
+          (_device_block_data_size == 4) &&
+          (_device_block_footer    == 0));
+}
+
+std::uint32_t
+TDO::DevStream::device_block_header() const
+{
+  return _device_block_header;
+}
+
+std::uint32_t
+TDO::DevStream::device_block_footer() const
+{
+  return _device_block_footer;
 }
 
 std::uint32_t
@@ -146,6 +171,8 @@ TDO::DevStream::device_block_size() const
 std::uint32_t
 TDO::DevStream::device_block_count()
 {
+  assert(_initialized == true);
+
   PosGuard guard(*this);
   std::uint64_t pos;
 
@@ -165,6 +192,8 @@ TDO::DevStream::file_tell() const
 std::int64_t
 TDO::DevStream::data_byte_tell() const
 {
+  assert(_initialized == true);
+
   std::int64_t pos;
   std::int64_t block;
   std::int64_t extra;
@@ -189,6 +218,8 @@ TDO::DevStream::file_seek(const std::int64_t pos_)
 void
 TDO::DevStream::data_byte_seek(const std::int64_t pos_)
 {
+  assert(_initialized == true);
+
   std::int64_t pos;
   std::int64_t block;
   std::int64_t extra;
@@ -246,6 +277,12 @@ void
 TDO::DevStream::read(char &c_)
 {
   read(&c_,1);
+}
+
+void
+TDO::DevStream::read(uint8_t &u8_)
+{
+  read((char*)&u8_,1);
 }
 
 void
@@ -314,4 +351,23 @@ TDO::DevStream::read(TDO::DirectoryRecord &dr_)
       read(tmp);
       dr_.avatar_list.push_back(tmp);
     }
+}
+
+void
+TDO::DevStream::read(TDO::ROMTag &tag_)
+{
+  read(tag_.sub_systype);
+  read(tag_.type);
+  read(tag_.version);
+  read(tag_.revision);
+  read(tag_.flags);
+  read(tag_.type_specific);
+  read(tag_.reserved1);
+  read(tag_.reserved2);
+  read(tag_.offset);
+  read(tag_.size);
+  read(tag_.reserved3[0]);
+  read(tag_.reserved3[1]);
+  read(tag_.reserved3[2]);
+  read(tag_.reserved3[3]);
 }

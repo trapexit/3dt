@@ -19,6 +19,7 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <vector>
 
 struct Options
@@ -74,6 +75,12 @@ public:
     Path output;
   };
 
+  struct ROMTags
+  {
+    PathVec     filepaths;
+    std::string format;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
@@ -82,4 +89,5 @@ public:
   Rename   rename   = {};
   Crc32b   crc32b   = {};
   ToISO    to_iso   = {};
+  ROMTags  romtags  = {};
 };

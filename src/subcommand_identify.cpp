@@ -114,7 +114,7 @@ namespace
     csv << "no_match"
         << "file ticket at https://github.com/trapexit/3dt/issues";
 
-    fmt::format("{}\n",csv.toString());
+    fmt::print("{}\n",csv.toString());
   }
 
   static

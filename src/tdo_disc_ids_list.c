@@ -22,6 +22,25 @@ const
 tdoid_t
 TDOID_LIST[] =
   {
+   {"3do_arcade_saot","rom",0x0DAA96F5,30976,0x56651C2C,5,13499},
+   {"3do_devkit_1.0fc2","rom",0x0DAA96F5,549888,0x56651C2C,136,768942},
+   {"fz35s","rom",0x77091D50,4194304,0x36D55C5B,192,929037},
+   {"gdo202","rom",0x0DAA96F5,549888,0x56651C2C,213,802095},
+   {"goldstar","rom",0x0DAA96F5,549888,0x56651C2C,168,827118},
+   //   {"goldstar_fc1_enc","rom",0x0DAA96F5,549888,0x56651C2C,1,0},
+   {"panafz1","rom",0x0DAA96F5,216576,0x56651C2C,100,539475},
+   {"panafz10","rom",0x0DAA96F5,549888,0x56651C2C,165,824655},
+   {"panafz10e-anvil","rom",0x0DAA96F5,549888,0x56651C2C,186,781819},
+   {"panafz10j","rom",0x0DAA96F5,549888,0x56651C2C,165,824963},
+   {"panafz10ja-anvil-kanji","rom2",0x0DAA96F5,549888,0x56651C2C,5,926980},
+   {"panafz1_dev","rom",0x0DAA96F5,549888,0x56651C2C,185,876751},
+   {"panafz1_dev_0.9","rom",0x0DAA96F5,186368,0x56651C2C,98,519179},
+   {"panafz1j","rom",0x0DAA96F5,250368,0x56651C2C,159,849319},
+   {"panafz1j-kanji","rom2",0x0DAA96F5,260096,0x56651C2C,4,931456},
+   {"sanyo_hc21_alpha","rom",0x0DAA96F5,220160,0x56651C2C,156,706005},
+   {"sanyo_hc21_b3_unenc","rom",0x0DAA96F5,549888,0x56651C2C,151,821057},
+   {"sanyotry","rom",0x0DAA96F5,549888,0x56651C2C,151,793200},
+
    {"Orbatak (USA) (arcade)","CD-ROM",0x165425bd,58880,0x0ca7a8cc,253,98560173},
    {"Crime Patrol (USA) (arcade)","CD-ROM",0x38778c22,279040,0x36334545,197,304889083},
    {"Mad Dog II - The Lost Gold (USA) (arcade)","CD-ROM",0x124c4b90,274944,0x3f125bea,196,325730151},

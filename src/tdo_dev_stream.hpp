@@ -22,6 +22,7 @@
 #include "tdo_directory_header.hpp"
 #include "tdo_directory_record.hpp"
 #include "tdo_disc_label.hpp"
+#include "tdo_romtag.hpp"
 
 #include <iostream>
 #include <stack>
@@ -46,6 +47,9 @@ namespace TDO
   public:
     void data_offset(const std::uint32_t);
     std::uint32_t device_block_size() const;
+    std::uint32_t device_block_header() const;
+    std::uint32_t device_block_footer() const;
+
     std::uint32_t device_block_count();
     std::uint32_t data_block_size() const;
 
@@ -63,11 +67,13 @@ namespace TDO
   public:
     void read(char *buf, uint32_t size);
     void read(char &c);
+    void read(uint8_t &u8);
     void read(uint32_t &u32);
     void read(int32_t &i32);
     void read(TDO::DiscLabel &);
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);
+    void read(TDO::ROMTag &);
 
     template<std::size_t N>
     void
@@ -85,17 +91,15 @@ namespace TDO
     }
 
   public:
-    void push_pos();
-    void pop_pos();
+    bool is_romfs() const;
 
   private:
-    typedef std::stack<std::size_t> PosStack;
-
     std::uint32_t  _device_block_data_size;
     std::uint32_t  _device_block_header;
     std::uint32_t  _device_block_footer;
     std::uint32_t  _data_offset;
     std::istream  &_is;
+    bool           _initialized;
   };
 
   class PosGuard

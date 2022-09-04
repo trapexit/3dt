@@ -26,11 +26,14 @@ static
 std::string
 get_ext_based_on_type(const TDO::DevStream &stream_)
 {
-  // if((reader_.sector_size() == 2048) && (reader_.sector_data_offset() == 0))
-  //   return "iso";
-  // if((reader_.sector_size() == 2352) && (reader_.sector_data_offset() == 16))
-  //   return "bin";
-  return {"unknown"};
+  if((stream_.device_block_size() == 2048) && (stream_.device_block_header() == 0))
+    return "iso";
+  if((stream_.device_block_size() == 2352) && (stream_.device_block_header() == 16))
+    return "bin";
+  if((stream_.device_block_size() == 4) && (stream_.device_block_header() == 0))
+    return "bin";
+
+  return "unknown";
 }
 
 static
@@ -62,7 +65,11 @@ Error
 TDO::DiscIdentifier::identify(std::istream &is_)
 {
   Error err;
-  DevStream stream(is_);
+  TDO::DevStream stream(is_);
+
+  err = stream.setup();
+  if(err)
+    return err;
 
   stream.data_byte_seek(0);
   stream.read(label);

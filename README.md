@@ -2,11 +2,12 @@
 
 ## Features
 
-* list disc content
-* list lowlevel disc details
-* identify disc
+* list OperaFS content
+* list lowlevel disc/OperaFS details
+* list ROM tags
+* identify discs and ROMs
 * rename image based on identification
-* unpack disc contents
+* unpack disc and ROM OperaFS contents
 * convert raw disc images to .iso
 * supports reading CD-ROM Mode 1 images and 2048 byte/sector ISOs
 
@@ -159,3 +160,12 @@ PO'ed (USA, Europe).iso:
  - matches:
    - PO'ed (USA, Europe)
 ```
+
+
+## Links
+
+* https://3dodev.com
+* https://github.com/trapexit/3dt
+* https://github.com/trapexit/3it
+* https://github.com/trapexit/modbin
+* https://github.com/trapexit/3do-devkit

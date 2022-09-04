@@ -31,4 +31,5 @@ namespace Subcommand
   void rename(const Options::Rename &options);
   void crc32b(const Options::Crc32b &options);
   void to_iso(const Options::ToISO &options);
+  void romtags(const Options::ROMTags &options);
 }
