@@ -149,6 +149,12 @@ TDO::DevStream::is_romfs() const
 }
 
 std::uint32_t
+TDO::DevStream::data_offset() const
+{
+  return _data_offset;
+}
+
+std::uint32_t
 TDO::DevStream::device_block_header() const
 {
   return _device_block_header;
@@ -190,7 +196,7 @@ TDO::DevStream::file_tell() const
 }
 
 std::int64_t
-TDO::DevStream::data_byte_tell() const
+TDO::DevStream::data_byte_tell(const std::int64_t pos_) const
 {
   assert(_initialized == true);
 
@@ -198,7 +204,7 @@ TDO::DevStream::data_byte_tell() const
   std::int64_t block;
   std::int64_t extra;
 
-  pos   = file_tell();
+  pos   = pos_;
   block = (pos / device_block_size());
   extra = (pos % device_block_size());
 
@@ -207,6 +213,16 @@ TDO::DevStream::data_byte_tell() const
   pos -= _data_offset;
 
   return pos;
+}
+
+std::int64_t
+TDO::DevStream::data_byte_tell() const
+{
+  std::int64_t pos;
+
+  pos = file_tell();
+
+  return data_byte_tell(pos);
 }
 
 void

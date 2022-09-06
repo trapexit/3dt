@@ -35,6 +35,18 @@ namespace TDO
     {
       virtual
       void
+      begin()
+      {
+      }
+
+      virtual
+      void
+      end()
+      {
+      }
+
+      virtual
+      void
       operator()(const std::filesystem::path&,
                  const TDO::DirectoryHeader&,
                  TDO::DevStream&)
@@ -45,6 +57,7 @@ namespace TDO
       void
       operator()(const std::filesystem::path&,
                  const TDO::DirectoryRecord&,
+                 const uint32_t,
                  TDO::DevStream&)
       {
       }
