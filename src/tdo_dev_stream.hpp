@@ -45,7 +45,7 @@ namespace TDO
     std::istream &istream() { return _is; }
 
   public:
-    void data_offset(const std::uint32_t);
+    std::uint32_t data_offset() const;
     std::uint32_t device_block_size() const;
     std::uint32_t device_block_header() const;
     std::uint32_t device_block_footer() const;
@@ -62,7 +62,10 @@ namespace TDO
 
   public:
     std::int64_t file_tell() const;
+    std::int64_t data_byte_tell(std::int64_t) const;
     std::int64_t data_byte_tell() const;
+    std::int64_t data_block_tell(std::int64_t) const;
+    std::int64_t data_block_tell() const;
 
   public:
     void read(char *buf, uint32_t size);

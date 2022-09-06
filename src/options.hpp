@@ -33,6 +33,7 @@ public:
   {
     Path filepath;
     Path prefix_filter;
+    std::string format;
   };
 
   struct Info

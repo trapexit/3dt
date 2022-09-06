@@ -50,6 +50,12 @@ generate_list_argparser(CLI::App      &app_,
     ->required();
   subcmd->add_option("prefix-filter",options_.prefix_filter)
     ->description("filter out paths with shared starting path");
+  subcmd->add_option("-f,--format",options_.format)
+    ->description("output format")
+    ->type_name("TEXT")
+    ->default_val("default")
+    ->take_last()
+    ->check(CLI::IsMember({"default","file-offsets","block-offsets"}));
 
   subcmd->callback(std::bind(Subcommand::list,std::cref(options_)));
 }
