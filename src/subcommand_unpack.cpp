@@ -33,7 +33,9 @@ namespace
   {
     void
     before(const fs::path             &path_,
-           const TDO::DirectoryRecord &record_)
+           const TDO::DirectoryRecord &record_,
+           const uint32_t              record_pos_,
+           TDO::DevStream             &stream_)
     {
       CSVWriter csv(",");
 
@@ -58,25 +60,35 @@ namespace
 
   struct HumanPrinter final : public TDO::DiscUnpacker::Callback
   {
+    HumanPrinter()
+    {
+      fmt::print("Flags      Size         ID Type  RecOffset     Avatar Filename\n");
+    }
+
     void
     before(const fs::path             &filepath_,
-           const TDO::DirectoryRecord &record_)
+           const TDO::DirectoryRecord &record_,
+           const uint32_t              record_pos_,
+           TDO::DevStream             &stream_)
     {
       char dir_char;
       char readonly_char;
       char for_fs_char;
+      std::uint32_t avatar;
 
       dir_char      = (record_.is_directory() ? 'd' : '-');
       readonly_char = (record_.is_readonly() ? 'r' : '-');
       for_fs_char   = (record_.is_for_fs() ? 'f' : '-');
-      fmt::print("{}{}{} {:11L} {:#010x} {:#010x} ({:4s}) {}\n",
+      avatar = (stream_.data_offset() + (record_.avatar_list[0] * stream_.device_block_size()));
+      fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
                  dir_char,
                  readonly_char,
                  for_fs_char,
                  record_.byte_count,
                  record_.unique_identifier,
-                 record_.type,
                  record_.type_str(),
+                 record_pos_,
+                 avatar,
                  filepath_);
     }
 
@@ -92,8 +104,6 @@ namespace
   TDO::DiscUnpacker::Callback::Ptr
   get_printer(const std::string &format_)
   {
-    if(format_ == "human")
-      return std::make_unique<HumanPrinter>();
     if(format_ == "csv")
       return std::make_unique<CSVPrinter>();
 

@@ -54,11 +54,12 @@ public:
   void
   operator()(const std::filesystem::path &path_,
              const TDO::DirectoryRecord  &record_,
-             DevStream                   &stream_)
+             const uint32_t               dr_pos_,
+             TDO::DevStream              &stream_)
   {
     fs::path fullpath = dstpath / path_;
 
-    _cb.before(path_,record_);
+    _cb.before(path_,record_,dr_pos_,stream_);
     if(record_.is_directory())
       {
         fs::create_directories(fullpath);
