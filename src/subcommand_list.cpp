@@ -54,7 +54,7 @@ static
 void
 default_header()
 {
-    fmt::print("Flags      Size         ID Type Filename\n");
+  fmt::print("Flags      Size         ID Type Filename\n");
 }
 
 static
@@ -85,7 +85,7 @@ static
 void
 offset_header()
 {
-    fmt::print("Flags      Size         ID Type  RecOffset     Avatar Filename\n");
+  fmt::print("Flags      Size         ID Type  RecOffset     Avatar Filename\n");
 }
 
 static

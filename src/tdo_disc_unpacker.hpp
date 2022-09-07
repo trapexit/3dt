@@ -38,7 +38,9 @@ namespace TDO
       typedef std::unique_ptr<Callback> Ptr;
 
       virtual void before(const std::filesystem::path &path,
-                          const TDO::DirectoryRecord  &record) = 0;
+                          const TDO::DirectoryRecord  &record,
+                          const uint32_t               record_pos,
+                          TDO::DevStream              &stream) = 0;
       virtual void after(const std::filesystem::path &path,
                          const TDO::DirectoryRecord  &record,
                          const int                    err) = 0;
