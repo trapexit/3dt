@@ -22,6 +22,7 @@
 #include "tdo_directory_header.hpp"
 #include "tdo_directory_record.hpp"
 #include "tdo_disc_label.hpp"
+#include "tdo_linked_mem_file_entry.hpp"
 #include "tdo_romtag.hpp"
 
 #include <iostream>
@@ -77,6 +78,7 @@ namespace TDO
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);
     void read(TDO::ROMTag &);
+    void read(TDO::LinkedMemFileEntry &);
 
     template<std::size_t N>
     void

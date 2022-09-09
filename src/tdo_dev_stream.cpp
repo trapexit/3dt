@@ -18,6 +18,7 @@
 
 #include "error_unknown_image_format.hpp"
 #include "tdo_dev_stream.hpp"
+#include "tdo_linked_mem_file_entry.hpp"
 
 #include <array>
 
@@ -386,4 +387,18 @@ TDO::DevStream::read(TDO::ROMTag &tag_)
   read(tag_.reserved3[1]);
   read(tag_.reserved3[2]);
   read(tag_.reserved3[3]);
+}
+
+void
+TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
+{
+  read(lmfe_.fingerprint);
+  read(lmfe_.flink_offset);
+  read(lmfe_.blink_offset);
+  read(lmfe_.block_count);
+  read(lmfe_.header_block_count);
+  read(lmfe_.byte_count);
+  read(lmfe_.unique_identifier);
+  read(lmfe_.type);
+  read(lmfe_.filename,sizeof(lmfe_.filename));
 }
