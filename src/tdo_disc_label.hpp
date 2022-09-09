@@ -44,18 +44,18 @@ namespace TDO
 
   struct DiscLabel
   {
-    char     record_type;       /* Should equal 0x01 */
-    VSBArray volume_sync_bytes; /* Synchronization bytes: 0x5A5A5A5A5A */
-    char     volume_structure_version; /* Should equal 0x01 */
-    char     volume_flags;      /* Should equal 0x00 */
-    VCIArray volume_commentary; /* volume/disc description */
-    VCIArray volume_identifier; /* volume/disc name */
-    uint32_t volume_unique_identifier; /* Roll a billion-sided die */
-    uint32_t volume_block_size; /* Usually contains 2048 */
-    uint32_t volume_block_count; /* # of blocks on disc */
-    uint32_t root_unique_identifier; /* Roll a billion-sided die */
-    uint32_t root_directory_block_count; /* # of blocks in root */
-    uint32_t root_directory_block_size; /* usually same as vol blk size */
+    char     record_type;                      /* Should equal 0x01 */
+    VSBArray volume_sync_bytes;                /* Synchronization bytes: 0x5A5A5A5A5A */
+    char     volume_structure_version;         /* Should equal 0x01 */
+    char     volume_flags;                     /* Should equal 0x00 */
+    VCIArray volume_commentary;                /* volume/disc description */
+    VCIArray volume_identifier;                /* volume/disc name */
+    uint32_t volume_unique_identifier;         /* Roll a billion-sided die */
+    uint32_t volume_block_size;                /* Usually contains 2048 */
+    uint32_t volume_block_count;               /* # of blocks on disc */
+    uint32_t root_unique_identifier;           /* Roll a billion-sided die */
+    uint32_t root_directory_block_count;       /* # of blocks in root */
+    uint32_t root_directory_block_size;        /* usually same as vol blk size */
     uint32_t root_directory_last_avatar_index; /* should contain 7 */
     RDAArray root_directory_avatar_list;
   };

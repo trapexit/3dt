@@ -170,7 +170,19 @@ public:
     _header();
   }
 
+  void
+  end()
+  {
+  }
+
 public:
+  void
+  operator()(const std::filesystem::path&,
+             const TDO::DirectoryHeader&,
+             TDO::DevStream&)
+  {
+  }
+
   void
   operator()(const std::filesystem::path &filepath_,
              const TDO::DirectoryRecord  &record_,

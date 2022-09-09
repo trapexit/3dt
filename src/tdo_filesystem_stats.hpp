@@ -20,7 +20,6 @@
 
 #include "tdo_dev_stream.hpp"
 
-#include <memory>
 
 namespace TDO
 {
