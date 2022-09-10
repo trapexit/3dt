@@ -28,7 +28,7 @@ namespace Log
   error_stream_open(const fs::path &filepath_)
   {
     fprintf(stderr,"3dt: error opening file '%s'",
-            filepath_.filename().c_str());
+            filepath_.filename().string().c_str());
     if(!fs::exists(filepath_))
       fprintf(stderr,": No such file or directory");
     else if(!fs::is_regular_file(filepath_))
