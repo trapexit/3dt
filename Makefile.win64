@@ -2,42 +2,62 @@ COMPILER_PREFIX = x86_64-w64-mingw32
 PLATFORM = win64
 EXE = 3dt_win64.exe
 
+JOBS := $(shell nproc)
+
 OUTPUT = build/$(EXE)
 
 CC    = $(COMPILER_PREFIX)-gcc
 CXX   = $(COMPILER_PREFIX)-g++
 STRIP = $(COMPILER_PREFIX)-strip
 
-OPT = -Os -static
-CFLAGS = $(OPT) -MMD -MP
-CXXFLAGS = $(OPT) -std=c++17 -MMD -MP
+ifeq ($(DEBUG),1)
+OPT := -O0 -ggdb
+else
+OPT := -Os -static
+endif
 
-SRC_C   = $(wildcard src/*.c)
-SRC_CXX = $(wildcard src/*.cpp)
+ifeq ($(SANITIZE),1)
+OPT += -fsanitize=undefined
+endif
 
-OBJ += $(SRC_C:src/%.c=build/$(PLATFORM)/%.c.o)
-OBJ += $(SRC_CXX:src/%.cpp=build/$(PLATFORM)/%.cpp.o)
+CFLAGS = $(OPT) -Wall
+CXXFLAGS = $(OPT) -Wall -std=c++17
+CPPFLAGS ?= -MMD -MP
 
-DEPS = $(OBJS:.o=.d)
+SRCS_C   := $(wildcard src/*.c)
+SRCS_CXX := $(wildcard src/*.cpp)
+
+BUILDDIR = build/$(PLATFORM)
+OBJS := $(SRCS_C:src/%.c=$(BUILDDIR)/%.c.o)
+OBJS += $(SRCS_CXX:src/%.cpp=$(BUILDDIR)/%.cpp.o)
+DEPS  = $(OBJS:.o=.d)
+
 
 all: $(OUTPUT)
 
-$(OUTPUT): builddir $(OBJ)
-	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ)
+$(OUTPUT): builddir $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJS) $(LDFLAGS)
 
 strip: $(OUTPUT)
 	$(STRIP) --strip-all $(OUTPUT)
 
-builddir:
-	mkdir -p build/$(PLATFORM)/
+$(BUILDDIR)/%.c.o: src/%.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-build/$(PLATFORM)/%.c.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-build/$(PLATFORM)/%.cpp.o: src/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(BUILDDIR)/%.cpp.o: src/%.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -rfv build/
+
+builddir:
+	mkdir -p $(BUILDDIR)
+
+release:
+	$(MAKE) -f Makefile -j$(JOBS) strip
+	$(MAKE) -f Makefile.win32 -j$(JOBS) strip
+	$(MAKE) -f Makefile.win64 -j$(JOBS) strip
+
+.PHONY: clean builddir release
 
 -include $(DEPS)
