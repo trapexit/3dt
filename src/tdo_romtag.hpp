@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 namespace TDO
 {
@@ -36,6 +37,8 @@ namespace TDO
     uint32_t size;
     uint32_t reserved3[4];
   };
+
+  typedef std::vector<TDO::ROMTag> ROMTagVec;
 }
 
 
@@ -76,6 +79,38 @@ namespace TDO
 #define	RSA_DEV_PERMS		0x17	/* List of devices which we can use	*/
 #define	RSA_BOOT_OVERLAY	0x18	/* Overlay module for RSA_NEW*BOOT	*/
 
+
+/* rt_Type definitions for rt_SubSysType RSANODE (M2) */
+#define RSA_M2_OS               0x87            /* CD's copy of M2 OS */
+                                                /* Uses same field extensions as RSA_OS tag */
+#define RSA_M2_MISCCODE         0x90            /* M2 version of misc code */
+#define RSA_M2_DRIVER           0x92            /* M2 dipir device driver */
+                                                /* Uses rt_ComponentID from RSA_DRIVER tag */
+#define DDDID_LCCD              1               /* Component is LCCD driver */
+#define DDDID_MICROCARD_MEM     2               /* Component is microcard memory driver */
+#define DDDID_PCMCIA_MEM        3               /* Component is 3DO card memory driver */
+#define DDDID_HOST              4               /* Component is debugger host FS driver */
+#define DDDID_HOSTCD            5               /* Component is host CD-ROM emulator driver */
+#define DDDID_PCHOST            6               /* Component is PC debugger host FS driver */
+
+#define RSA_M2_DEVDIPIR         0x93            /* M2 device dipir */
+                                                /* Uses rt_ComponentID from RSA_DRIVER tag */
+#define DIPIRID_CD              2               /* Dipir to validate CD-ROM media */
+#define DIPIRID_ROMAPP          3               /* Dipir to validate non-bootable RomApp device */
+#define DIPIRID_SYSROMAPP       4               /* Dipir to load RomApp OS from system ROM */
+#define DIPIRID_HOST            5               /* Dipir to load OS from debugger host */
+#define DIPIRID_CART            6               /* Dipir to load OS from bootable cartridge */
+#define DIPIRID_BOOTROMAPP      7               /* Dipir to load RomApp OS from device */
+#define DIPIRID_MICROCARD       8               /* Dipir to validate generic Microcard */
+#define DIPIRID_VISA            9               /* Dipir to validate generic VISA card */
+#define DIPIRID_PC16550         10              /* Dipir to validate proto PC16550 card */
+#define DIPIRID_MEDIA_DEBUG     11              /* Dipir to do debug testing of RomApp media */
+#define DIPIRID_PCDEVCARD       12              /* Dipir to validate PC developer card */
+
+#define RSA_M2_APPBANNER        0x94            /* M2 application banner image */
+#define RSA_M2_APP_KEYS         0x95            /* 65 followed by 129 byte APP key */
+#define RSA_OPERA_CD_IMAGE      0x96            /* Opera CD image downloaded by Bridgit */
+#define RSA_M2_ICON             0x97            /* Device icon image */
 
 
 /********************************************************************************/

@@ -35,7 +35,8 @@ public:
   Impl(std::istream                &is_,
        TDO::DiscUnpacker::Callback &cb_)
     : _cb(cb_),
-      _walker(is_,*this)
+      _walker(is_,*this),
+      _dstpath()
   {
   }
 
@@ -45,8 +46,9 @@ public:
 
 public:
   Error
-  unpack()
+  unpack(const fs::path &dstpath_)
   {
+    _dstpath = dstpath_;
     return _walker.walk();
   }
 
@@ -76,7 +78,7 @@ public:
              const uint32_t               dr_pos_,
              TDO::DevStream              &stream_)
   {
-    fs::path fullpath = dstpath / path_;
+    fs::path fullpath = _dstpath / path_;
 
     _cb.before(path_,record_,dr_pos_,stream_);
     if(record_.is_directory())
@@ -110,12 +112,12 @@ public:
     _cb.after(path_,record_,0);
   }
 
-public:
-  fs::path dstpath;
-
 private:
   TDO::DiscUnpacker::Callback &_cb;
   TDO::FSWalker                _walker;
+
+private:
+  fs::path _dstpath;
 };
 
 namespace TDO
@@ -135,8 +137,6 @@ namespace TDO
   {
     fs::create_directories(dstpath_);
 
-    _impl->dstpath = dstpath_;
-
-    return _impl->unpack();
+    return _impl->unpack(dstpath_);
   }
 }

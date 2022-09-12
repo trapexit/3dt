@@ -27,6 +27,7 @@
 
 #include <array>
 
+
 static
 void
 print_romtags_csv_header(void)
@@ -37,43 +38,13 @@ print_romtags_csv_header(void)
   csv << "File"
       << "SubSysType"
       << "Type"
+      << "TypeName"
       << "Version"
       << "Revision"
       << "Flags"
       << "TypeSpecific"
       << "Offset"
       << "Size";
-  fmt::print("{}\n",csv.toString());
-}
-
-static
-void
-romtags_csv(const std::filesystem::path &filepath_,
-            TDO::DevStream              &stream_)
-{
-  Error err;
-  TDO::ROMTag tag;
-  CSVWriter csv(",");
-
-  stream_.data_block_seek(1);
-
-  stream_.read(tag);
-  while(tag.sub_systype || tag.type)
-    {
-      csv.newRow();
-      csv << filepath_.string()
-          << fmt::format("{:#04x}",tag.sub_systype)
-          << fmt::format("{:#04x}",tag.type)
-          << fmt::format("{}",tag.version)
-          << fmt::format("{}",tag.revision)
-          << fmt::format("{:x}",tag.flags)
-          << fmt::format("{}",tag.type_specific)
-          << fmt::format("{}",tag.offset)
-          << fmt::format("{}",tag.size);
-
-      stream_.read(tag);
-    }
-
   fmt::print("{}\n",csv.toString());
 }
 
@@ -99,9 +70,34 @@ rsanode_type(const uint8_t type_)
       return "SIGNATURE_BLOCK";
     case RSA_APPSPLASH:
       return "APPSPLASH";
+    case RSA_DEPOTCONFIG:
+      return "DEPOTCONFIG";
+    case RSA_DEVICE_INFO:
+      return "DEVICE_INFO";
+    case RSA_DEV_PERMS:
+      return "DEV_PERMS";
+    case RSA_BOOT_OVERLAY:
+      return "BOOT_OVERLAY";
+
+    case RSA_M2_OS:
+      return "M2_OS";
+    case RSA_M2_MISCCODE:
+      return "M2_MISCCODE";
+    case RSA_M2_DRIVER:
+      return "M2_DRIVER";
+    case RSA_M2_DEVDIPIR:
+      return "M2_DEVDIPIR";
+    case RSA_M2_APPBANNER:
+      return "M2_APPBANNER";
+    case RSA_M2_APP_KEYS:
+      return "M2_APP_KEYS";
+    case RSA_OPERA_CD_IMAGE:
+      return "OPERA_CD_IMAGE";
+    case RSA_M2_ICON:
+      return "M2_ICON";
     }
 
-  return fmt::format("{:04x}",type_);
+  return fmt::format("{:#04x}",type_);
 }
 
 static
@@ -109,18 +105,16 @@ void
 romtags_human(const std::filesystem::path &filepath_,
               TDO::DevStream              &stream_)
 {
-  Error err;
-  TDO::ROMTag tag;
+  TDO::ROMTagVec tags;
   CSVWriter csv(",");
 
-  stream_.data_block_seek(1);
-
-  stream_.read(tag);
-  while(tag.sub_systype || tag.type)
+  tags = stream_.romtags();
+  for(const auto &tag : tags)
     {
       csv.newRow();
       csv << filepath_.string()
           << fmt::format("{:#04x}",tag.sub_systype)
+          << fmt::format("{:#04x}",tag.type)
           << fmt::format("{}",rsanode_type(tag.type))
           << fmt::format("{}",tag.version)
           << fmt::format("{}",tag.revision)
@@ -128,8 +122,6 @@ romtags_human(const std::filesystem::path &filepath_,
           << fmt::format("{}",tag.type_specific)
           << fmt::format("{}",tag.offset)
           << fmt::format("{}",tag.size);
-
-      stream_.read(tag);
     }
 
   fmt::print("{}\n",csv.toString());
@@ -138,7 +130,8 @@ romtags_human(const std::filesystem::path &filepath_,
 void
 Subcommand::romtags(const Options::ROMTags &opts_)
 {
-  print_romtags_csv_header();
+  bool printed_header = false;
+
   for(const auto &filepath : opts_.filepaths)
     {
       Error err;
@@ -151,15 +144,18 @@ Subcommand::romtags(const Options::ROMTags &opts_)
           break;
         }
 
-      if(stream.is_romfs())
+      if(!stream.has_romtags())
         {
           fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
           break;
         }
 
-      if(opts_.format == "csv")
-        ::romtags_csv(filepath,stream);
-      else
-        ::romtags_human(filepath,stream);
+      if(printed_header == false)
+        {
+          print_romtags_csv_header();
+          printed_header = true;
+        }
+
+      ::romtags_human(filepath,stream);
     }
 }
