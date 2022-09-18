@@ -78,6 +78,11 @@ namespace
                label_.root_directory_last_avatar_index);
     for(unsigned int i = 0; i <= label_.root_directory_last_avatar_index; i++)
       fmt::print("   - {}\n",label_.root_directory_avatar_list[i]);
+    if(label_.volume_flags & VOLUME_FLAG_M2)
+      fmt::print(" - num_rom_tags: {}\n"
+                 " - application_id: {}\n",
+                 label_.num_rom_tags,
+                 label_.application_id);
     fmt::print(" - file_count: {}\n"
 
                " - total_data_size: {}\n",
@@ -190,6 +195,8 @@ namespace
     if(err)
       return err;
 
+    file_count = 0;
+    total_data_size = 0;
     err = ::get_extra_info(stream_,file_count,total_data_size);
     if(err)
       return err;

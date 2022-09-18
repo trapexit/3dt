@@ -74,6 +74,29 @@ is_mode1_2352(std::istream &is_)
   return true;
 }
 
+static
+std::uint32_t
+count_m1_romtags(TDO::DevStream     &stream_,
+                 const std::int64_t  pos_)
+{
+  uint32_t count;
+  TDO::ROMTag tag;
+  TDO::PosGuard guard(stream_);
+
+  stream_.data_block_seek(pos_);
+
+  count = 0;
+  while(true)
+    {
+      stream_.read(tag);
+      if((tag.sub_systype == 0) || (tag.type == 0))
+        break;
+      count++;
+    }
+
+  return count;
+}
+
 TDO::DevStream::DevStream(std::istream &is_)
   : _device_block_data_size(0),
     _device_block_header(0),
@@ -95,13 +118,13 @@ TDO::DevStream::find_label()
   while(_is && !_is.eof())
     {
       _is.read(&v,1);
-      if(v != 0x01)
+      if(v != RECORD_STD_VOLUME)
         continue;
 
-      for(i = 0; i < 5; i++)
+      for(i = 0; i < VOLUME_SYNC_BYTE_LEN; i++)
         {
           _is.read(&v,1);
-          if(v == 0x5A)
+          if(v == VOLUME_SYNC_BYTE)
             continue;
           break;
         }
@@ -125,7 +148,7 @@ TDO::DevStream::setup()
     }
 
   find_label();
-  if(_is.eof())
+  if(eof())
     return {"unable to find OperaFS in image"};
 
   {
@@ -141,12 +164,75 @@ TDO::DevStream::setup()
   return {};
 }
 
+static
 bool
-TDO::DevStream::is_romfs() const
+is_romfs(TDO::DevStream &stream_)
 {
-  return ((_device_block_header    == 0) &&
-          (_device_block_data_size == 4) &&
-          (_device_block_footer    == 0));
+  return ((stream_.device_block_header()    == 0) &&
+          (stream_.device_block_data_size() == 4) &&
+          (stream_.device_block_footer()    == 0));
+}
+
+static
+bool
+is_konami_m2(TDO::DevStream &stream_)
+{
+  TDO::DiscLabel dl;
+
+  stream_.find_label();
+  if(stream_.eof())
+    return false;
+  stream_.read(dl);
+
+  if(dl.volume_flags != (VOLUME_FLAG_M2 | VOLUME_FLAG_BLESSED))
+    return false;
+  if(strcmp(&dl.volume_identifier[0],"cd-rom") != 0)
+    return false;
+  if(dl.num_rom_tags != 9)
+    return false;
+
+  return true;
+}
+
+bool
+TDO::DevStream::has_romtags()
+{
+  TDO::PosGuard pos_guard(*this);
+
+  if(::is_romfs(*this))
+    return false;
+  if(::is_konami_m2(*this))
+    return false;
+
+  return true;
+}
+
+TDO::ROMTagVec
+TDO::DevStream::romtags()
+{
+  std::int64_t pos;
+  TDO::DiscLabel dl;
+  TDO::ROMTagVec tags;
+
+  if(!has_romtags())
+    return tags;
+
+  find_label();
+  pos = data_block_tell();
+  read(dl);
+
+  if(dl.num_rom_tags == 0)
+    dl.num_rom_tags = ::count_m1_romtags(*this,pos+1);
+
+  data_block_seek(pos+1);
+  for(uint32_t i = 0; i < dl.num_rom_tags; i++)
+    {
+      TDO::ROMTag tag;
+      read(tag);
+      tags.push_back(tag);
+    }
+
+  return tags;
 }
 
 std::uint32_t
@@ -159,6 +245,12 @@ std::uint32_t
 TDO::DevStream::device_block_header() const
 {
   return _device_block_header;
+}
+
+std::uint32_t
+TDO::DevStream::device_block_data_size() const
+{
+  return _device_block_data_size;
 }
 
 std::uint32_t
@@ -226,6 +318,54 @@ TDO::DevStream::data_byte_tell() const
   return data_byte_tell(pos);
 }
 
+std::int64_t
+TDO::DevStream::data_block_tell(const std::int64_t pos_) const
+{
+  assert(_initialized == true);
+
+  std::int64_t pos;
+  std::int64_t block;
+  std::int64_t extra;
+
+  pos   = pos_;
+  block = (pos / device_block_size());
+  extra = (pos % device_block_size());
+
+  pos  = (block * _device_block_data_size);
+  pos += (extra - _device_block_header);
+  pos -= _data_offset;
+
+  return (pos / _device_block_data_size);
+}
+
+std::int64_t
+TDO::DevStream::data_block_tell() const
+{
+  std::int64_t pos;
+
+  pos = file_tell();
+
+  return data_block_tell(pos);
+}
+
+std::int64_t
+TDO::DevStream::device_block_tell(const std::int64_t pos_) const
+{
+  assert(_initialized == true);
+
+  return (pos_ / device_block_size());
+}
+
+std::int64_t
+TDO::DevStream::device_block_tell() const
+{
+  std::int64_t pos;
+
+  pos = file_tell();
+
+  return device_block_tell(pos);
+}
+
 void
 TDO::DevStream::file_seek(const std::int64_t pos_)
 {
@@ -274,6 +414,17 @@ TDO::DevStream::data_block_seek(const std::int64_t pos_)
 }
 
 void
+TDO::DevStream::data_block_skip(const std::int64_t count_)
+{
+  std::int64_t pos;
+
+  pos  = data_block_tell();
+  pos += count_;
+
+  data_block_seek(pos);
+}
+
+void
 TDO::DevStream::device_block_seek(const std::int64_t pos_)
 {
   std::int64_t pos;
@@ -281,6 +432,17 @@ TDO::DevStream::device_block_seek(const std::int64_t pos_)
   pos = (pos_ * device_block_size());
 
   file_seek(pos);
+}
+
+void
+TDO::DevStream::device_block_skip(const std::int64_t count_)
+{
+  std::int64_t pos;
+
+  pos  = device_block_tell();
+  pos += count_;
+
+  device_block_seek(pos);
 }
 
 void
@@ -333,6 +495,12 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
   read(dl_.root_directory_block_size);
   read(dl_.root_directory_last_avatar_index);
   read(dl_.root_directory_avatar_list);
+
+  if(dl_.volume_flags & VOLUME_FLAG_M2)
+    {
+      read(dl_.num_rom_tags);
+      read(dl_.application_id);
+    }
 }
 
 void

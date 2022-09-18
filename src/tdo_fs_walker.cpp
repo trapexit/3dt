@@ -27,15 +27,13 @@
 
 namespace fs = std::filesystem;
 typedef TDO::FSWalker::Callbacks Callbacks;
-typedef std::vector<TDO::ROMTag> ROMTags;
 
 
 static
 void
-update_record(const ROMTags        &tags_,
+update_record(const TDO::ROMTagVec &tags_,
               TDO::DirectoryRecord &dr_)
 {
-
   for(const auto &tag : tags_)
     {
       for(uint32_t i = 0; i <= dr_.last_avatar_index; i++)
@@ -48,7 +46,6 @@ update_record(const ROMTags        &tags_,
         }
     }
 }
-
 
 class Impl
 {
@@ -65,7 +62,7 @@ public:
 public:
   Error
   walk_v1_dir_block(const TDO::DiscLabel &label_,
-                    const ROMTags        &romtags_,
+                    const TDO::ROMTagVec &romtags_,
                     const std::int64_t    dir_hdr_pos_,
                     const fs::path       &path_)
   {
@@ -111,7 +108,7 @@ public:
 
   Error
   walk_v1_dir(const TDO::DiscLabel &label_,
-              const ROMTags        &romtags_,
+              const TDO::ROMTagVec &romtags_,
               const std::uint32_t   dir_block_,
               const std::uint32_t   dir_block_size_,
               const std::uint32_t   dir_block_count_,
@@ -132,7 +129,7 @@ public:
 
   Error
   walk_v1_dir(const TDO::DiscLabel       &label_,
-              const ROMTags              &romtags_,
+              const TDO::ROMTagVec       &romtags_,
               const TDO::DirectoryRecord &parent_,
               const fs::path             &path_)
   {
@@ -146,7 +143,7 @@ public:
 
   Error
   walk_v1_root_dir(const TDO::DiscLabel &label_,
-                   const ROMTags        &romtags_,
+                   const TDO::ROMTagVec &romtags_,
                    const fs::path       &path_)
   {
     return walk_v1_dir(label_,
@@ -202,36 +199,24 @@ public:
   {
     Error err;
     fs::path path;
-    ROMTags romtags;
-    TDO::DiscLabel label;
+    TDO::DiscLabel dl;
+    TDO::ROMTagVec romtags;
 
     err = _stream.setup();
     if(err)
       return err;
 
-    _stream.read(label);
-
-    if(!_stream.is_romfs())
-      {
-        TDO::ROMTag tag;
-        _stream.data_block_seek(1);
-        while(true)
-          {
-            _stream.read(tag);
-            if(!tag.sub_systype && !tag.type)
-              break;
-            romtags.push_back(tag);
-          }
-      }
+    _stream.read(dl);
+    romtags = _stream.romtags();
 
     _callbacks.begin();
-    switch(label.volume_structure_version)
+    switch(dl.volume_structure_version)
       {
       case VOLUME_STRUCTURE_OPERA_READONLY:
-        err = walk_v1_root_dir(label,romtags,path);
+        err = walk_v1_root_dir(dl,romtags,path);
         break;
       case VOLUME_STRUCTURE_LINKED_MEM:
-        err = walk_v2(label,path);
+        err = walk_v2(dl,path);
         break;
       default:
         break;

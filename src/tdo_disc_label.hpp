@@ -23,6 +23,10 @@
 
 #define VOLUME_STRUCTURE_OPERA_READONLY 1
 #define VOLUME_STRUCTURE_LINKED_MEM     2
+#define VOLUME_STRUCTURE_ACROBAT        4
+
+#define RECORD_STD_VOLUME  0x01
+#define RECORD_TINY_VOLUME 0xC2
 
 #define VOLUME_SYNC_BYTE     0x5A
 #define VOLUME_SYNC_BYTE_LEN 5
@@ -34,7 +38,20 @@
   advisory ONLY. Only by checking with cdromdipir can you be really sure.
   Place in dl_VolumeFlags.  Note: the first volume gets this flag also.
 */
-#define	VOLUME_FLAGS_DATADISC 0x01
+#define VOLUME_FLAG_M1_DATADISC 0x01
+
+/*
+  VF_DATADISC used to be 0x01, and which put it into conflict with the
+  new M2 flags.  Fortunately, we never shipped any Opera discs with this
+  flag set, so we can move it.  What VF_DATADISC is intended to mean is
+  "This disc won't necessarily cause a reboot when inserted."  This flag is
+  advisory ONLY. Only by checking with cdromdipir can you be really sure.
+  Note: the first volume gets this flag also.
+*/
+#define VOLUME_FLAG_M2       0x01
+#define VOLUME_FLAG_M2ONLY   0x02
+#define VOLUME_FLAG_DATADISC 0x04
+#define VOLUME_FLAG_BLESSED  0x08
 
 namespace TDO
 {
@@ -58,5 +75,10 @@ namespace TDO
     uint32_t root_directory_block_size;        /* usually same as vol blk size */
     uint32_t root_directory_last_avatar_index; /* should contain 7 */
     RDAArray root_directory_avatar_list;
+
+    // Extended Volume Data
+    uint32_t num_rom_tags;
+    uint32_t application_id;
+    uint32_t reserved[9];
   };
 }

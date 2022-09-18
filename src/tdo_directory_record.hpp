@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "fmt.hpp"
+
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -80,6 +82,12 @@ namespace TDO
       str.push_back(std::isprint(type_buf[0]) ? type_buf[0] : ' ');
 
       return str;
+    }
+
+    std::string
+    type_hex() const
+    {
+      return fmt::format("{:08x}",type);
     }
   };
 }

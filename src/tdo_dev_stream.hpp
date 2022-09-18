@@ -36,7 +36,7 @@ namespace TDO
     DevStream(std::istream &is);
 
   public:
-    void find_label();
+    void  find_label();
     Error setup();
 
   public:
@@ -49,6 +49,7 @@ namespace TDO
     std::uint32_t data_offset() const;
     std::uint32_t device_block_size() const;
     std::uint32_t device_block_header() const;
+    std::uint32_t device_block_data_size() const;
     std::uint32_t device_block_footer() const;
 
     std::uint32_t device_block_count();
@@ -59,7 +60,9 @@ namespace TDO
     void data_byte_seek(const std::int64_t pos);
     void data_byte_skip(const std::int64_t pos);
     void data_block_seek(const std::int64_t pos);
+    void data_block_skip(const std::int64_t pos);
     void device_block_seek(const std::int64_t pos);
+    void device_block_skip(const std::int64_t pos);
 
   public:
     std::int64_t file_tell() const;
@@ -67,6 +70,12 @@ namespace TDO
     std::int64_t data_byte_tell() const;
     std::int64_t data_block_tell(std::int64_t) const;
     std::int64_t data_block_tell() const;
+    std::int64_t device_block_tell(std::int64_t) const;
+    std::int64_t device_block_tell() const;
+
+  public:
+    bool has_romtags();
+    TDO::ROMTagVec romtags();
 
   public:
     void read(char *buf, uint32_t size);
@@ -94,9 +103,6 @@ namespace TDO
       for(std::size_t i = 0; i < arr_.size(); i++)
         read(arr_[i]);
     }
-
-  public:
-    bool is_romfs() const;
 
   private:
     std::uint32_t  _device_block_data_size;
