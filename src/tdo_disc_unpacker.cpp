@@ -75,12 +75,12 @@ public:
   void
   operator()(const std::filesystem::path &path_,
              const TDO::DirectoryRecord  &record_,
-             const uint32_t               dr_pos_,
+             const std::uint32_t          dr_file_pos_,
              TDO::DevStream              &stream_)
   {
     fs::path fullpath = _dstpath / path_;
 
-    _cb.before(path_,record_,dr_pos_,stream_);
+    _cb.before(path_,record_,dr_file_pos_,stream_);
     if(record_.is_directory())
       {
         fs::create_directories(fullpath);
@@ -88,9 +88,9 @@ public:
     else
       {
         std::ofstream os;
-        uint32_t sector_start;
-        uint32_t sector_end;
-        uint32_t bytes_left;
+        std::uint32_t sector_start;
+        std::uint32_t sector_end;
+        std::uint32_t bytes_left;
 
         os.open(fullpath,std::ios::binary|std::ios::trunc);
 
@@ -99,7 +99,7 @@ public:
         sector_end   = sector_start + record_.block_count;
         for(uint32_t sector = sector_start; sector < sector_end; sector++)
           {
-            uint32_t n;
+            std::uint32_t n;
 
             stream_.data_block_seek(sector);
             n = std::min(record_.block_size,bytes_left);

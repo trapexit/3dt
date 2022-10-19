@@ -74,6 +74,10 @@ namespace TDO
     std::int64_t device_block_tell() const;
 
   public:
+    std::int64_t file_offset_to_data_block(const std::int64_t) const;
+    std::int64_t data_block_to_file_offset(const std::int64_t) const;
+
+  public:
     bool has_romtags();
     TDO::ROMTagVec romtags();
 
