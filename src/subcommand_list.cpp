@@ -103,7 +103,7 @@ file_offset_printer(const fs::path             &filepath_,
   dir_char      = (record_.is_directory() ? 'd' : '-');
   readonly_char = (record_.is_readonly() ? 'r' : '-');
   for_fs_char   = (record_.is_for_fs() ? 'f' : '-');
-  avatar = (stream_.data_offset() + (record_.avatar_list[0] * stream_.device_block_size()));
+  avatar        = stream_.data_block_to_file_offset(record_.avatar_list[0]);
   fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
              dir_char,
              readonly_char,

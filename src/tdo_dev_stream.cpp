@@ -283,6 +283,40 @@ TDO::DevStream::device_block_count()
 }
 
 std::int64_t
+TDO::DevStream::data_block_to_file_offset(std::int64_t data_block_) const
+{
+  assert(_initialized == true);
+
+  std::int64_t file_offset;
+
+  file_offset = _data_offset;
+  file_offset += (data_block_ * device_block_size());
+  file_offset += _device_block_header;
+
+  return file_offset;
+}
+
+std::int64_t
+TDO::DevStream::file_offset_to_data_block(const std::int64_t file_offset_) const
+{
+  assert(_initialized == true);
+
+  std::int64_t block;
+  std::int64_t extra;
+  std::int64_t file_offset;
+
+  file_offset = file_offset_;
+  block       = (file_offset / device_block_size());
+  extra       = (file_offset % device_block_size());
+
+  file_offset  = (block * _device_block_data_size);
+  file_offset += (extra - _device_block_header);
+  file_offset -= _data_offset;
+
+  return (file_offset / _device_block_data_size);
+}
+
+std::int64_t
 TDO::DevStream::file_tell() const
 {
   return _is.tellg();
@@ -404,13 +438,13 @@ TDO::DevStream::data_byte_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::data_block_seek(const std::int64_t pos_)
+TDO::DevStream::data_block_seek(const std::int64_t block_)
 {
-  std::int64_t pos;
+  std::int64_t file_offset;
 
-  pos = (pos_ * _device_block_data_size);
+  file_offset = data_block_to_file_offset(block_);
 
-  return data_byte_seek(pos);
+  return file_seek(file_offset);
 }
 
 void

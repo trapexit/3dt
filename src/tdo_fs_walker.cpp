@@ -63,24 +63,24 @@ public:
   Error
   walk_v1_dir_block(const TDO::DiscLabel &label_,
                     const TDO::ROMTagVec &romtags_,
-                    const std::int64_t    dir_hdr_pos_,
+                    const std::int64_t    dh_data_byte_pos_,
                     const fs::path       &path_)
   {
-    std::int64_t pos;
     TDO::DirectoryHeader dh;
+    std::int64_t data_byte_pos;
 
-    pos = dir_hdr_pos_;
-    _stream.data_byte_seek(pos);
+    data_byte_pos = dh_data_byte_pos_;
+    _stream.data_byte_seek(data_byte_pos);
     _stream.read(dh);
 
     _callbacks(path_,dh,_stream);
 
-    pos += dh.first_entry_offset;
-    _stream.data_byte_seek(pos);
+    data_byte_pos += dh.first_entry_offset;
+    _stream.data_byte_seek(data_byte_pos);
 
     while(true)
       {
-        uint32_t dr_pos;
+        std::uint32_t dr_pos;
         TDO::DirectoryRecord dr;
 
         dr_pos = _stream.file_tell();
@@ -99,7 +99,7 @@ public:
           break;
         if(dr.last_in_block())
           break;
-        if(_stream.data_byte_tell() >= (dir_hdr_pos_ + dh.first_free_byte))
+        if(_stream.data_byte_tell() >= (dh_data_byte_pos_ + dh.first_free_byte))
           break;
       }
 
@@ -114,14 +114,14 @@ public:
               const std::uint32_t   dir_block_count_,
               const fs::path       &path_)
   {
-    std::int64_t pos;
+    std::int64_t  dh_data_byte_pos;
     TDO::PosGuard pos_guard(_stream);
 
-    pos = (dir_block_ * label_.volume_block_size);
+    dh_data_byte_pos = (dir_block_ * label_.volume_block_size);
     for(std::uint32_t block = 0; block < dir_block_count_; block++)
       {
-        walk_v1_dir_block(label_,romtags_,pos,path_);
-        pos += dir_block_size_;
+        walk_v1_dir_block(label_,romtags_,dh_data_byte_pos,path_);
+        dh_data_byte_pos += dir_block_size_;
       }
 
     return {};
