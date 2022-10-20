@@ -501,6 +501,11 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
       read(dl_.num_rom_tags);
       read(dl_.application_id);
     }
+  else
+    {
+      dl_.num_rom_tags = 0;
+      dl_.application_id = 0;
+    }
 }
 
 void
