@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2020, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,19 +18,16 @@
 
 #pragma once
 
-#include "options.hpp"
+#include "bigd.h"
+#include "md5.h"
 
-namespace Subcommand
-{
-  void version();
-  void info(const Options::Info &options);
-  void list(const Options::List &options);
-  void identify(const Options::Identify &options);
-  void unpack(const Options::Unpack &options);
-  void pack(const Options::Pack &options);
-  void rename(const Options::Rename &options);
-  void crc32b(const Options::Crc32b &options);
-  void to_iso(const Options::ToISO &options);
-  void romtags(const Options::ROMTags &options);
-  void verify(const Options::Verify &options);
-}
+BIGD tdo_keys_m1_retail_3do_n(void);
+BIGD tdo_keys_m1_retail_3do_d(void);
+BIGD tdo_keys_m1_retail_app_n(void);
+BIGD tdo_keys_m1_retail_app_d(void);
+
+BIGD tdo_keys_m1_retail_message(md5_digest_t digest);
+
+BIGD tdo_keys_n(const char *key);
+BIGD tdo_keys_d(const char *key);
+BIGD tdo_keys_m(const char *key, md5_digest_t digest);

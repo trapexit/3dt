@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -16,16 +16,19 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "CLI11.hpp"
 #include "error_unknown_image_format.hpp"
 #include "tdo_dev_stream.hpp"
+#include "tdo_disc_label.hpp"
 #include "tdo_linked_mem_file_entry.hpp"
+#include "types_ints.h"
 
 #include <array>
 
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <ios>
-#include <cassert>
 
 
 static constexpr int TDO_SECTOR_SIZE   = 2048;
@@ -35,15 +38,15 @@ typedef std::array<uint8_t,CDROM_SECTOR_SIZE> CDROMSectorBuf;
 typedef std::array<uint8_t,SYNC_PATTERN_SIZE> CDROMSyncPatternBuf;
 typedef std::array<uint8_t,VOLUME_SYNC_BYTE_LEN> VolumeSyncByteBuf;
 static constexpr CDROMSyncPatternBuf MODE1_SYNC_PATTERN = {0x00,0xFF,0xFF,0xFF,
-  0xFF,0xFF,0xFF,0xFF,
-  0xFF,0xFF,0xFF,0x00};
+                                                           0xFF,0xFF,0xFF,0xFF,
+                                                           0xFF,0xFF,0xFF,0x00};
 static constexpr VolumeSyncByteBuf VOLUME_SYNC_BYTES = {0x5A,0x5A,0x5A,0x5A,0x5A};
 static constexpr std::array<uint8_t,4> ARM_NOOP = {0xE1,0xA0,0x10,01};
 
 static
 inline
 void
-swap(uint32_t &u32_)
+swap(u32 &u32_)
 {
   u32_ = __builtin_bswap32(u32_);
 }
@@ -51,9 +54,9 @@ swap(uint32_t &u32_)
 static
 inline
 void
-swap(int32_t &i32_)
+swap(s32 &s32_)
 {
-  i32_ = __builtin_bswap32(i32_);
+  s32_ = __builtin_bswap32(s32_);
 }
 
 static
@@ -74,38 +77,16 @@ is_mode1_2352(std::istream &is_)
   return true;
 }
 
-static
-std::uint32_t
-count_m1_romtags(TDO::DevStream     &stream_,
-                 const std::int64_t  pos_)
-{
-  uint32_t count;
-  TDO::ROMTag tag;
-  TDO::PosGuard guard(stream_);
-
-  stream_.data_block_seek(pos_);
-
-  count = 0;
-  while(true)
-    {
-      stream_.read(tag);
-      if((tag.sub_systype == 0) || (tag.type == 0))
-        break;
-      count++;
-    }
-
-  return count;
-}
-
 TDO::DevStream::DevStream(std::istream &is_)
-  : _device_block_data_size(0),
-    _device_block_header(0),
+  : _device_block_header(0),
+    _device_block_data_size(0),
     _device_block_footer(0),
-    _data_offset(0),
-    _is(is_),
-    _initialized(false)
+    _disc_label_block(0),
+    _romtags_block(0),
+    _data_start_offset(0),
+    _is(is_)
 {
-
+  
 }
 
 void
@@ -139,28 +120,50 @@ Error
 TDO::DevStream::setup()
 {
   Error err;
-  TDO::DiscLabel label;
 
   if(::is_mode1_2352(_is))
     {
-      _device_block_header = 16;
-      _device_block_footer = 288;
+      _device_block_header    = 16;
+      _device_block_data_size = 2048;
+      _device_block_footer    = 288;
+    }
+  else
+    {
+      find_label();
+      if(eof())
+        return {"unable to find OperaFS in image"};
+
+      read(_disc_label);
+      
+      _device_block_header    = 0;
+      _device_block_data_size = _disc_label.volume_block_size;
+      _device_block_footer    = 0;
     }
 
   find_label();
-  if(eof())
-    return {"unable to find OperaFS in image"};
+  _data_start_offset = file_tell();    
+  _disc_label_block  = data_block_tell();  
+  _romtags_block     = _disc_label_block + 1;      
 
-  {
-    PosGuard guard(*this);
-    read(label);
-    _device_block_data_size = label.volume_block_size;
-  }
+  // if(_disc_label.num_rom_tags == 0)
+  //   _disc_label.num_rom_tags = ::count_m1_romtags(*this,_romtags_block);
 
-  _initialized = true;
+  data_block_seek(_romtags_block);
+  while(true)
+    {
+      TDO::ROMTag romtag;
 
-  _data_offset = data_byte_tell();
+      read(romtag);
+      if((romtag.sub_systype == 0) || (romtag.type == 0))
+        break;
+            
+      _romtags.emplace_back(romtag);
+    }
 
+  _is.seekg(0,_is.end);
+  _device_block_count = (_is.tellg() / device_block_size());
+  _is.seekg(0);
+  
   return {};
 }
 
@@ -179,17 +182,14 @@ is_konami_m2(TDO::DevStream &stream_)
 {
   TDO::DiscLabel dl;
 
-  stream_.find_label();
-  if(stream_.eof())
-    return false;
-  stream_.read(dl);
+  dl = stream_.disc_label();
 
   if(dl.volume_flags != (VOLUME_FLAG_M2 | VOLUME_FLAG_BLESSED))
     return false;
   if(strcmp(&dl.volume_identifier[0],"cd-rom") != 0)
     return false;
-  if(dl.num_rom_tags != 9)
-    return false;
+  // if(dl.num_rom_tags != 9)
+  //   return false;
 
   return true;
 }
@@ -207,59 +207,89 @@ TDO::DevStream::has_romtags()
   return true;
 }
 
-TDO::ROMTagVec
-TDO::DevStream::romtags()
+TDO::DiscLabel
+TDO::DevStream::disc_label() const
 {
-  std::int64_t pos;
-  TDO::DiscLabel dl;
-  TDO::ROMTagVec tags;
+  return _disc_label;
+}
 
-  if(!has_romtags())
-    return tags;
+u64
+TDO::DevStream::disc_label_size_in_bytes() const
+{
+  return sizeof(TDO::DiscLabel);
+}
 
-  find_label();
-  pos = data_block_tell();
-  read(dl);
+u64
+TDO::DevStream::disc_label_block() const
+{
+  return _disc_label_block;
+}
 
-  if(dl.num_rom_tags == 0)
-    dl.num_rom_tags = ::count_m1_romtags(*this,pos+1);
+const
+TDO::ROMTagVec&
+TDO::DevStream::romtags() const
+{
+  return _romtags;
+}
 
-  data_block_seek(pos+1);
-  for(uint32_t i = 0; i < dl.num_rom_tags; i++)
+const
+std::optional<TDO::ROMTag>
+TDO::DevStream::romtag(const int type_) const
+{
+  for(const auto& romtag : _romtags)
     {
-      TDO::ROMTag tag;
-      read(tag);
-      tags.push_back(tag);
+      if(romtag.type != type_)
+        continue;
+
+      return romtag;
     }
 
-  return tags;
+  return {};
 }
 
-std::uint32_t
-TDO::DevStream::data_offset() const
+u64
+TDO::DevStream::romtags_block() const
 {
-  return _data_offset;
+  return _romtags_block;
 }
 
-std::uint32_t
+u64
+TDO::DevStream::romtags_count() const
+{
+  return _romtags.size();
+}
+
+u64
+TDO::DevStream::romtags_size_in_bytes() const
+{
+  return ((_romtags.size() + 1) * sizeof(TDO::ROMTag));
+}
+
+u64
+TDO::DevStream::data_start_offset() const
+{
+  return _data_start_offset;
+}
+
+u64
 TDO::DevStream::device_block_header() const
 {
   return _device_block_header;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_data_size() const
 {
   return _device_block_data_size;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_footer() const
 {
   return _device_block_footer;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_size() const
 {
   return (_device_block_header +
@@ -267,43 +297,30 @@ TDO::DevStream::device_block_size() const
           _device_block_footer);
 }
 
-std::uint32_t
-TDO::DevStream::device_block_count()
+u64
+TDO::DevStream::device_block_count() const
 {
-  assert(_initialized == true);
-
-  PosGuard guard(*this);
-  std::uint64_t pos;
-
-  _is.seekg(0,_is.end);
-  pos = _is.tellg();
-  pos /= device_block_size();
-
-  return pos;
+  return _device_block_count;
 }
 
-std::int64_t
-TDO::DevStream::data_block_to_file_offset(std::int64_t data_block_) const
+s64
+TDO::DevStream::data_block_to_file_offset(s64 data_block_) const
 {
-  assert(_initialized == true);
+  s64 file_offset;
 
-  std::int64_t file_offset;
-
-  file_offset = _data_offset;
+  file_offset = _data_start_offset;
   file_offset += (data_block_ * device_block_size());
   file_offset += _device_block_header;
 
   return file_offset;
 }
 
-std::int64_t
-TDO::DevStream::file_offset_to_data_block(const std::int64_t file_offset_) const
+s64
+TDO::DevStream::file_offset_to_data_block(const s64 file_offset_) const
 {
-  assert(_initialized == true);
-
-  std::int64_t block;
-  std::int64_t extra;
-  std::int64_t file_offset;
+  s64 block;
+  s64 extra;
+  s64 file_offset;
 
   file_offset = file_offset_;
   block       = (file_offset / device_block_size());
@@ -311,25 +328,23 @@ TDO::DevStream::file_offset_to_data_block(const std::int64_t file_offset_) const
 
   file_offset  = (block * _device_block_data_size);
   file_offset += (extra - _device_block_header);
-  file_offset -= _data_offset;
+  file_offset -= _data_start_offset;
 
   return (file_offset / _device_block_data_size);
 }
 
-std::int64_t
+s64
 TDO::DevStream::file_tell() const
 {
   return _is.tellg();
 }
 
-std::int64_t
-TDO::DevStream::data_byte_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::data_byte_tell(const s64 pos_) const
 {
-  assert(_initialized == true);
-
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
+  s64 pos;
+  s64 block;
+  s64 extra;
 
   pos   = pos_;
   block = (pos / device_block_size());
@@ -337,29 +352,27 @@ TDO::DevStream::data_byte_tell(const std::int64_t pos_) const
 
   pos  = (block * _device_block_data_size);
   pos += (extra - _device_block_header);
-  pos -= _data_offset;
+  pos -= _data_start_offset;
 
   return pos;
 }
 
-std::int64_t
+s64
 TDO::DevStream::data_byte_tell() const
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = file_tell();
 
   return data_byte_tell(pos);
 }
 
-std::int64_t
-TDO::DevStream::data_block_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::data_block_tell(const s64 pos_) const
 {
-  assert(_initialized == true);
-
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
+  s64 pos;
+  s64 block;
+  s64 extra;
 
   pos   = pos_;
   block = (pos / device_block_size());
@@ -367,33 +380,31 @@ TDO::DevStream::data_block_tell(const std::int64_t pos_) const
 
   pos  = (block * _device_block_data_size);
   pos += (extra - _device_block_header);
-  pos -= _data_offset;
+  pos -= _data_start_offset;
 
   return (pos / _device_block_data_size);
 }
 
-std::int64_t
+s64
 TDO::DevStream::data_block_tell() const
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = file_tell();
 
   return data_block_tell(pos);
 }
 
-std::int64_t
-TDO::DevStream::device_block_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::device_block_tell(const s64 pos_) const
 {
-  assert(_initialized == true);
-
   return (pos_ / device_block_size());
 }
 
-std::int64_t
+s64
 TDO::DevStream::device_block_tell() const
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = file_tell();
 
@@ -401,21 +412,19 @@ TDO::DevStream::device_block_tell() const
 }
 
 void
-TDO::DevStream::file_seek(const std::int64_t pos_)
+TDO::DevStream::file_seek(const s64 pos_)
 {
   _is.seekg(pos_);
 }
 
 void
-TDO::DevStream::data_byte_seek(const std::int64_t pos_)
+TDO::DevStream::data_byte_seek(const s64 pos_)
 {
-  assert(_initialized == true);
+  s64 pos;
+  s64 block;
+  s64 extra;
 
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
-
-  pos   = (pos_ + _data_offset);
+  pos   = (pos_ + _data_start_offset);
   block = (pos / _device_block_data_size);
   extra = (pos % _device_block_data_size);
 
@@ -427,9 +436,9 @@ TDO::DevStream::data_byte_seek(const std::int64_t pos_)
 }
 
 void
-TDO::DevStream::data_byte_skip(const std::int64_t count_)
+TDO::DevStream::data_byte_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = data_byte_tell();
   pos += count_;
@@ -438,9 +447,9 @@ TDO::DevStream::data_byte_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::data_block_seek(const std::int64_t block_)
+TDO::DevStream::data_block_seek(const s64 block_)
 {
-  std::int64_t file_offset;
+  s64 file_offset;
 
   file_offset = data_block_to_file_offset(block_);
 
@@ -448,9 +457,9 @@ TDO::DevStream::data_block_seek(const std::int64_t block_)
 }
 
 void
-TDO::DevStream::data_block_skip(const std::int64_t count_)
+TDO::DevStream::data_block_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = data_block_tell();
   pos += count_;
@@ -459,9 +468,9 @@ TDO::DevStream::data_block_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::device_block_seek(const std::int64_t pos_)
+TDO::DevStream::device_block_seek(const s64 pos_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = (pos_ * device_block_size());
 
@@ -469,9 +478,9 @@ TDO::DevStream::device_block_seek(const std::int64_t pos_)
 }
 
 void
-TDO::DevStream::device_block_skip(const std::int64_t count_)
+TDO::DevStream::device_block_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = device_block_tell();
   pos += count_;
@@ -480,10 +489,67 @@ TDO::DevStream::device_block_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::read(char     *buf_,
-                     uint32_t  size_)
+TDO::DevStream::read(char      *buf_,
+                     const u64  size_)
 {
   _is.read(buf_,size_);
+}
+
+void
+TDO::DevStream::read_data_blocks(std::vector<char> &v_,
+                                 const s64          pos_,
+                                 const s64          blocks_)
+{
+  size_t end;
+
+  end = v_.size();
+  data_block_seek(pos_);
+  v_.resize(end + (device_block_data_size() * blocks_));
+  for(s64 i = 0; i < blocks_; i++)
+    {
+      read(&v_[end],device_block_data_size());
+      end += device_block_data_size();
+    }
+}
+
+void
+TDO::DevStream::read_data_bytes_from_block(std::vector<char> &v_,
+                                           const s64          block_pos_,
+                                           const s64          bytes_)
+{
+  read_data_bytes(v_,
+                  (block_pos_ * device_block_data_size()),
+                  bytes_);
+}
+
+void
+TDO::DevStream::read_data_bytes(std::vector<char> &v_,
+                                const s64          pos_,
+                                const s64          bytes_)
+{
+  s64 pos;
+  s64 vec_end;
+  s64 bytes_to_read;
+  s64 block_size;
+
+  vec_end = v_.size();
+  v_.resize(v_.size() + bytes_);
+  block_size = device_block_data_size();
+
+  pos = pos_;
+  for(s64 bytes_left = bytes_; bytes_left > 0;)
+    {
+      data_byte_seek(pos);
+
+      bytes_to_read = (block_size - (pos % block_size));
+      bytes_to_read = std::min(bytes_to_read, bytes_left);
+
+      read(&v_[vec_end],bytes_to_read);
+
+      pos        += bytes_to_read;
+      bytes_left -= bytes_to_read;
+      vec_end    += bytes_to_read;
+    }
 }
 
 void
@@ -493,23 +559,23 @@ TDO::DevStream::read(char &c_)
 }
 
 void
-TDO::DevStream::read(uint8_t &u8_)
+TDO::DevStream::read(u8 &u8_)
 {
   read((char*)&u8_,1);
 }
 
 void
-TDO::DevStream::read(uint32_t &u32_)
+TDO::DevStream::read(u32 &u32_)
 {
-  read((char*)&u32_,sizeof(uint32_t));
+  read((char*)&u32_,sizeof(u32));
   swap(u32_);
 }
 
 void
-TDO::DevStream::read(int32_t &i32_)
+TDO::DevStream::read(s32 &s32_)
 {
-  read((char*)&i32_,sizeof(int32_t));
-  swap(i32_);
+  read((char*)&s32_,sizeof(s32));
+  swap(s32_);
 }
 
 void
@@ -530,16 +596,16 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
   read(dl_.root_directory_last_avatar_index);
   read(dl_.root_directory_avatar_list);
 
-  if(dl_.volume_flags & VOLUME_FLAG_M2)
-    {
-      read(dl_.num_rom_tags);
-      read(dl_.application_id);
-    }
-  else
-    {
-      dl_.num_rom_tags = 0;
-      dl_.application_id = 0;
-    }
+  // if(dl_.volume_flags & VOLUME_FLAG_M2)
+  //   {
+  //     read(dl_.num_rom_tags);
+  //     read(dl_.application_id);
+  //   }
+  // else
+  //   {
+  //     dl_.num_rom_tags = 0;
+  //     dl_.application_id = 0;
+  //   }
 }
 
 void

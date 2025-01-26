@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -25,18 +25,34 @@
 #include "tdo_linked_mem_file_entry.hpp"
 #include "tdo_romtag.hpp"
 
+#include "types_ints.h"
+
 #include <iostream>
-#include <stack>
+#include <optional>
 
 namespace TDO
 {
   class DevStream
   {
+  private:
+    u64 _device_block_header;
+    u64 _device_block_data_size;
+    u64 _device_block_footer;
+    u64 _device_block_count;
+    u64 _data_start_offset;
+
+  private:
+    TDO::DiscLabel _disc_label;
+    u64 _disc_label_block;
+    TDO::ROMTagVec _romtags;
+    u64 _romtags_block;
+    std::istream &_is;
+
   public:
     DevStream(std::istream &is);
 
   public:
-    void  find_label();
+    void find_label();
     Error setup();
 
   public:
@@ -46,75 +62,86 @@ namespace TDO
     std::istream &istream() { return _is; }
 
   public:
-    std::uint32_t data_offset() const;
-    std::uint32_t device_block_size() const;
-    std::uint32_t device_block_header() const;
-    std::uint32_t device_block_data_size() const;
-    std::uint32_t device_block_footer() const;
-
-    std::uint32_t device_block_count();
-    std::uint32_t data_block_size() const;
+    u64 data_start_offset() const;
 
   public:
-    void file_seek(const std::int64_t pos);
-    void data_byte_seek(const std::int64_t pos);
-    void data_byte_skip(const std::int64_t pos);
-    void data_block_seek(const std::int64_t pos);
-    void data_block_skip(const std::int64_t pos);
-    void device_block_seek(const std::int64_t pos);
-    void device_block_skip(const std::int64_t pos);
+    u64 device_block_size() const;
+    u64 device_block_header() const;
+    u64 device_block_data_size() const;
+    u64 device_block_footer() const;
+    u64 device_block_count() const;
 
   public:
-    std::int64_t file_tell() const;
-    std::int64_t data_byte_tell(std::int64_t) const;
-    std::int64_t data_byte_tell() const;
-    std::int64_t data_block_tell(std::int64_t) const;
-    std::int64_t data_block_tell() const;
-    std::int64_t device_block_tell(std::int64_t) const;
-    std::int64_t device_block_tell() const;
+    void file_seek(const s64 pos);
+    void data_byte_seek(const s64 pos);
+    void data_byte_skip(const s64 pos);
+    void data_block_seek(const s64 pos);
+    void data_block_skip(const s64 pos);
+    void device_block_seek(const s64 pos);
+    void device_block_skip(const s64 pos);
 
   public:
-    std::int64_t file_offset_to_data_block(const std::int64_t) const;
-    std::int64_t data_block_to_file_offset(const std::int64_t) const;
+    s64 file_tell() const;
+    s64 data_byte_tell(s64) const;
+    s64 data_byte_tell() const;
+    s64 data_block_tell(s64) const;
+    s64 data_block_tell() const;
+    s64 device_block_tell(s64) const;
+    s64 device_block_tell() const;
+
+  public:
+    s64 file_offset_to_data_block(const s64) const;
+    s64 data_block_to_file_offset(const s64) const;
+
+  public:
+    TDO::DiscLabel disc_label() const;
+    u64 disc_label_size_in_bytes() const;
+    u64 disc_label_block() const;
 
   public:
     bool has_romtags();
-    TDO::ROMTagVec romtags();
+    const TDO::ROMTagVec& romtags() const;
+    const std::optional<TDO::ROMTag> romtag(const int type) const;
+    u64 romtags_block() const;
+    u64 romtags_count() const;
+    u64 romtags_size_in_bytes() const;
 
   public:
-    void read(char *buf, uint32_t size);
-    void read(char &c);
-    void read(uint8_t &u8);
-    void read(uint32_t &u32);
-    void read(int32_t &i32);
+    void read(char *buf, const u64 size);
+    void read(char &);
+    void read(u8 &);
+    void read(u32 &);
+    void read(s32 &);
     void read(TDO::DiscLabel &);
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);
     void read(TDO::ROMTag &);
     void read(TDO::LinkedMemFileEntry &);
+    void read_data_blocks(std::vector<char> &v,
+                          const s64          block_pos,
+                          const s64          blocks);
+    void read_data_bytes_from_block(std::vector<char> &v,
+                                    const s64          block_pos,
+                                    const s64          bytes);
+    void read_data_bytes(std::vector<char> &v,
+                         const s64          byte_pos,
+                         const s64          bytes);
 
-    template<std::size_t N>
+
+    template<u64 N>
     void
     read(std::array<char,N> &arr_)
     {
       read(&arr_[0],arr_.size());
     }
 
-    template<std::size_t N>
+    template<u64 N>
     void
-    read(std::array<uint32_t,N> &arr_)
+    read(std::array<u32,N> &arr_)
     {
-      for(std::size_t i = 0; i < arr_.size(); i++)
+      for(u64 i = 0; i < arr_.size(); i++)
         read(arr_[i]);
     }
-
-  private:
-    std::uint32_t  _device_block_data_size;
-    std::uint32_t  _device_block_header;
-    std::uint32_t  _device_block_footer;
-    std::uint32_t  _data_offset;
-    std::istream  &_is;
-    bool           _initialized;
   };
 
   class PosGuard

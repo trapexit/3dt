@@ -212,6 +212,24 @@ generate_romtags_argparser(CLI::App         &app_,
 
 static
 void
+generate_verify_argparser(CLI::App        &app_,
+                          Options::Verify &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("verify","verify RSA sigs");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  
+  subcmd->callback(std::bind(Subcommand::verify,
+                             std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
@@ -227,6 +245,7 @@ generate_argparser(CLI::App &app_,
   generate_rename_argparser(app_,options_.rename);
   generate_to_iso_argparser(app_,options_.to_iso);
   generate_romtags_argparser(app_,options_.romtags);
+  generate_verify_argparser(app_,options_.verify);
 }
 
 static

@@ -82,6 +82,11 @@ public:
     std::string format;
   };
 
+  struct Verify
+  {
+    PathVec filepaths;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
@@ -91,4 +96,5 @@ public:
   Crc32b   crc32b   = {};
   ToISO    to_iso   = {};
   ROMTags  romtags  = {};
+  Verify   verify   = {};
 };
