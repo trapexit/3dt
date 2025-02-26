@@ -102,4 +102,5 @@ public:
   ToISO    to_iso   = {};
   ROMTags  romtags  = {};
   Verify   verify   = {};
+  Sign     sign     = {};
 };
