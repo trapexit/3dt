@@ -87,6 +87,11 @@ public:
     PathVec filepaths;
   };
 
+  struct Sign
+  {
+    PathVec filepaths;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
