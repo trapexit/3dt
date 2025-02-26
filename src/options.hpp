@@ -90,7 +90,6 @@ public:
   struct Sign
   {
     PathVec filepaths;
-    std::string type;
   };
 
   List     list     = {};
