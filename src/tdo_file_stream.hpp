@@ -20,6 +20,7 @@
 
 #include "tdo_dev_stream.hpp"
 
+#include <string>
 #include <fstream>
 #include <filesystem>
 
