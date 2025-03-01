@@ -16,7 +16,6 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "CLI11.hpp"
 #include "md5.h"
 #include "subcommand.hpp"
 
