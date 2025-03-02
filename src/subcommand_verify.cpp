@@ -142,8 +142,8 @@ _verify_signature_file(TDO::DevStream    &s_,
   sigfile_block_count = sigfile_block_end - sigfile_block_start;
 
   s_.read_data_bytes_from_block(signatures,
-                                 sigfile_block_start,
-                                 sigfile_size);
+                                sigfile_block_start,
+                                sigfile_size);
 
   fmt::print("   - start block: {}\n"
              "   - start byte: {}\n"
