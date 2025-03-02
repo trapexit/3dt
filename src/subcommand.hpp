@@ -33,4 +33,5 @@ namespace Subcommand
   void to_iso(const Options::ToISO &options);
   void romtags(const Options::ROMTags &options);
   void verify(const Options::Verify &options);
+  void sign(const Options::Sign &options);
 }
