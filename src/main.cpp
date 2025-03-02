@@ -230,6 +230,24 @@ generate_verify_argparser(CLI::App        &app_,
 
 static
 void
+generate_verify_argparser(CLI::App        &app_,
+                          Options::Sign &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("verify","verify RSA sigs");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  
+  subcmd->callback(std::bind(Subcommand::verify,
+                             std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
