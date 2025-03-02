@@ -242,7 +242,7 @@ generate_sign_argparser(CLI::App      &app_,
     ->check(CLI::ExistingFile)
     ->required();
   
-  subcmd->callback(std::bind(Subcommand::verify,
+  subcmd->callback(std::bind(Subcommand::sign,
                              std::cref(opts_)));
 }
 
