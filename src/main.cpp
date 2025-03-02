@@ -235,7 +235,7 @@ generate_sign_argparser(CLI::App      &app_,
 {
   CLI::App *subcmd;
 
-  subcmd = app_.add_subcommand("verify","verify RSA sigs");
+  subcmd = app_.add_subcommand("sign","sign 3DO ISO for retail system use");
   subcmd->add_option("filepaths",opts_.filepaths)
     ->description("path to disc images")
     ->type_name("PATH")
