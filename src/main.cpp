@@ -230,7 +230,7 @@ generate_verify_argparser(CLI::App        &app_,
 
 static
 void
-generate_verify_argparser(CLI::App        &app_,
+generate_verify_argparser(CLI::App      &app_,
                           Options::Sign &opts_)
 {
   CLI::App *subcmd;
