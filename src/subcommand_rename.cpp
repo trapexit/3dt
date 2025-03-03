@@ -87,14 +87,14 @@ namespace l
     Error err;
     std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
+    fs.open(filepath_,std::ios::binary);
+    if(!fs.good())
       {
         Log::error_stream_open(filepath_);
         return;
       }
 
-    err = l::rename(filepath_,take_first_,ifs);
+    err = l::rename(filepath_,take_first_,fs);
     if(err)
       Log::error(err);
 
