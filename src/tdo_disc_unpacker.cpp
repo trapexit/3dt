@@ -35,7 +35,7 @@ public:
   Impl(std::iostream               &ios_,
        TDO::DiscUnpacker::Callback &cb_)
     : _cb(cb_),
-      _walker(is_,*this),
+      _walker(ios_,*this),
       _dstpath()
   {
   }
