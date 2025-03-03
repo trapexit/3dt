@@ -250,7 +250,7 @@ namespace TDO
   Error
   FSWalker::walk()
   {
-    Impl impl(_is,_callbacks);
+    Impl impl(_ios,_callbacks);
 
     return impl.walk();
   }
