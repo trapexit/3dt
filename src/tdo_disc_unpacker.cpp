@@ -103,7 +103,7 @@ public:
 
             stream_.data_block_seek(sector);
             n = std::min(record_.block_size,bytes_left);
-            util::copy_stream(stream_.istream(),os,n);
+            util::copy_stream(stream_.iostream(),os,n);
             bytes_left -= n;
           }
 
