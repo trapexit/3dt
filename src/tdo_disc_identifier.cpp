@@ -65,7 +65,7 @@ Error
 TDO::DiscIdentifier::identify(std::iostream &ios_)
 {
   Error err;
-  TDO::DevStream stream(is_);
+  TDO::DevStream stream(ios_);
 
   err = stream.setup();
   if(err)
