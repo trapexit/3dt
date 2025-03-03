@@ -236,7 +236,7 @@ namespace TDO
   FSWalker::FSWalker(std::iostream &ios_,
                      Callbacks     &callbacks_)
     : _callbacks(callbacks_),
-      _is(is_)
+      _ios(ios_)
   {
   }
 
