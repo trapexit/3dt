@@ -163,7 +163,7 @@ namespace
     PrintData data;
     TDO::DiscIdentifier identifier;
 
-    err = identifier.identify(is_);
+    err = identifier.identify(ios_);
     if(err)
       return err;
 
