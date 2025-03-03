@@ -85,7 +85,7 @@ namespace l
          const bool      take_first_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream ifs;
 
     ifs.open(filepath_,std::ios::binary);
     if(!ifs.good())
