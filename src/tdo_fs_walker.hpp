@@ -54,7 +54,7 @@ namespace TDO
     Error walk();
 
   private:
-    Callbacks    &_callbacks;
-    std::istream &_is;
+    Callbacks     &_callbacks;
+    std::iostream &_ios;
   };
 }
