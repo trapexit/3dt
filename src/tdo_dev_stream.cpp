@@ -84,7 +84,7 @@ TDO::DevStream::DevStream(std::iostream &ios_)
     _disc_label_block(0),
     _romtags_block(0),
     _data_start_offset(0),
-    _is(ios_)
+    _ios(ios_)
 {
   
 }
