@@ -185,17 +185,17 @@ namespace
            const fs::path  &filepath_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
+    fs.open(filepath_,std::ios::binary);
+    if(!fs.good())
       return Log::error_stream_open(filepath_);
 
-    err = ::identify(printfunc_,filepath_,ifs);
+    err = ::identify(printfunc_,filepath_,fs);
     if(err)
       Log::error(err);
 
-    ifs.close();
+    fs.close();
   }
 
   static
