@@ -50,7 +50,7 @@ update_record(const TDO::ROMTagVec &tags_,
 class Impl
 {
 public:
-  Impl(std::oistream &ios_,
+  Impl(std::iostream &ios_,
        Callbacks     &callbacks_)
 
     : _callbacks(callbacks_),
