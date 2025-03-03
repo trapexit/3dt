@@ -123,12 +123,12 @@ namespace Subcommand
     TDO::DiscUnpacker::Callback::Ptr printer;
 
     printer  = get_printer(options_.format);
-    unpacker = std::make_unique<TDO::DiscUnpacker>(ifs,*printer);
+    unpacker = std::make_unique<TDO::DiscUnpacker>(fs,*printer);
 
     for(auto &srcpath : options_.filepaths)
       {
-        ifs.open(srcpath,std::ios::binary);
-        if(ifs.bad())
+        fs.open(srcpath,std::ios::binary);
+        if(fs.bad())
           {
             Log::error_stream_open(srcpath);
             continue;
@@ -140,7 +140,7 @@ namespace Subcommand
         if(err)
           Log::error(err);
 
-        ifs.close();
+        fs.close();
       }
   }
 }
