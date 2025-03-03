@@ -58,7 +58,7 @@ namespace TDO
   std::iostream&
   FileStream::iostream()
   {
-    return _ifs;
+    return _fs;
   }
 
   void
