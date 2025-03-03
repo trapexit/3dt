@@ -40,7 +40,7 @@ namespace TDO
     const std::filesystem::path& filepath() const;
 
   public:
-    std::istream& istream();
+    std::iostream& istream();
 
   private:
     std::filesystem::path _filepath;
