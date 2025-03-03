@@ -41,6 +41,7 @@ namespace TDO
     _fs.open(filepath_,std::ios::binary|std::ios::in|std::ios::out);
     if(!_fs)
       return "failed to open";
+    
     err = setup();
     if(err)
       return err;
