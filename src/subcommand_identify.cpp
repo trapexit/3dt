@@ -157,7 +157,7 @@ namespace
   Error
   identify(const PrintFunc &printfunc_,
            const fs::path  &filepath_,
-           std::istream    &is_)
+           std::iostream   &ios_)
   {
     Error err;
     PrintData data;
