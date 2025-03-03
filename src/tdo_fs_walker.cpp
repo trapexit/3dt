@@ -233,8 +233,8 @@ private:
 
 namespace TDO
 {
-  FSWalker::FSWalker(std::istream &is_,
-                     Callbacks    &callbacks_)
+  FSWalker::FSWalker(std::iostream &ios_,
+                     Callbacks     &callbacks_)
     : _callbacks(callbacks_),
       _is(is_)
   {
