@@ -45,8 +45,8 @@ namespace TDO
     };
 
   public:
-    FSWalker(std::istream &is,
-             Callbacks    &callbacks);
+    FSWalker(std::iostream &ios,
+             Callbacks     &callbacks);
     FSWalker(DevStream &stream,
              Callbacks &callbacks);
 
