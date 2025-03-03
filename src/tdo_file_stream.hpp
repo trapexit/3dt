@@ -44,6 +44,6 @@ namespace TDO
 
   private:
     std::filesystem::path _filepath;
-    std::fstream          _fs;
+    std::ofstream         _fs;
   };
 }
