@@ -38,7 +38,7 @@ namespace TDO
 
     close();
 
-    _ifs.open(filepath_,std::ios::binary);
+    _fs.open(filepath_,std::ios::binary);
     err = setup();
     if(err)
       return err;
@@ -58,13 +58,13 @@ namespace TDO
   std::iostream&
   FileStream::iostream()
   {
-    return _iofs;
+    return _fs;
   }
 
   void
   FileStream::close()
   {
-    if(_iofs.is_open())
-      _iofs.close();
+    if(_fs.is_open())
+      _fs.close();
   }
 }
