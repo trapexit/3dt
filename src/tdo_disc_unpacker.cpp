@@ -125,7 +125,7 @@ namespace TDO
   DiscUnpacker::DiscUnpacker(std::iostream &s_,
                              Callback      &cb_)
   {
-    _impl = std::make_unique<Impl>(is_,cb_);
+    _impl = std::make_unique<Impl>(s_,cb_);
   }
 
   DiscUnpacker::~DiscUnpacker()
