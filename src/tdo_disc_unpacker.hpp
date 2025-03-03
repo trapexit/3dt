@@ -49,8 +49,8 @@ namespace TDO
     };
 
   public:
-    DiscUnpacker(std::istream &is,
-                 Callback     &cb);
+    DiscUnpacker(std::iostream &s,
+                 Callback      &cb);
     ~DiscUnpacker();
 
   public:
