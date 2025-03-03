@@ -118,7 +118,7 @@ namespace Subcommand
   {
     Error err;
     fs::path dstpath;
-    std::fstream ifs;
+    std::fstream fs;
     TDO::DiscUnpacker::Ptr unpacker;
     TDO::DiscUnpacker::Callback::Ptr printer;
 
