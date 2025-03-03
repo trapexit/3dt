@@ -77,7 +77,7 @@ is_mode1_2352(std::iostream &ios_)
   return true;
 }
 
-TDO::DevStream::DevStream(std::istream &ios_)
+TDO::DevStream::DevStream(std::iostream &ios_)
   : _device_block_header(0),
     _device_block_data_size(0),
     _device_block_footer(0),
