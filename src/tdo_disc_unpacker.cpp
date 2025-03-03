@@ -122,8 +122,8 @@ private:
 
 namespace TDO
 {
-  DiscUnpacker::DiscUnpacker(std::istream &is_,
-                             Callback     &cb_)
+  DiscUnpacker::DiscUnpacker(std::iostream &s_,
+                             Callback      &cb_)
   {
     _impl = std::make_unique<Impl>(is_,cb_);
   }
