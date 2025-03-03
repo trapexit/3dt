@@ -95,7 +95,7 @@ TDO::DevStream::find_label()
   int i;
   char v;
 
-  _is.seekg(0);
+  _ios.seekg(0);
   while(_is && !_is.eof())
     {
       _is.read(&v,1);
