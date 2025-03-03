@@ -55,8 +55,8 @@ namespace TDO
     return _filepath;
   }
 
-  std::istream&
-  FileStream::istream()
+  std::iostream&
+  FileStream::iostream()
   {
     return _ifs;
   }
