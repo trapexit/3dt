@@ -210,7 +210,7 @@ namespace Subcommand
     Error err;
     std::fstream fs;
     ListCallbacks callbacks(opts_);
-    TDO::FSWalker walker(ifs,callbacks);
+    TDO::FSWalker walker(fs,callbacks);
 
     ifs.open(opts_.filepath,std::ios::binary);
     if(!ifs.good())
