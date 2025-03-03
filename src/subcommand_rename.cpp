@@ -56,7 +56,7 @@ namespace l
   Error
   rename(const fs::path &filepath_,
          const bool      take_first_,
-         std::istream   &is_)
+         std::iostream  &ios_)
   {
     Error err;
     TDO::DiscIdentifier identifier;
