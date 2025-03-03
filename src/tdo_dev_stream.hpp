@@ -56,9 +56,9 @@ namespace TDO
     Error setup();
 
   public:
-    bool good() const { return _is.good(); }
-    bool bad() const { return _is.bad(); }
-    bool eof() const { return _is.eof(); }
+    bool good() const { return _ios.good(); }
+    bool bad() const { return _ios.bad(); }
+    bool eof() const { return _ios.eof(); }
     std::iostream &iostream() { return _ios; }
 
   public:
