@@ -243,7 +243,7 @@ namespace TDO
   FSWalker::FSWalker(DevStream &stream_,
                      Callbacks &callbacks_)
     : _callbacks(callbacks_),
-      _is(stream_.istream())
+      _is(stream_.iostream())
   {
   }
 
