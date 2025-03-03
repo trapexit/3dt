@@ -65,8 +65,8 @@ is_mode1_2352(std::iostream &ios_)
 {
   CDROMSectorBuf buf;
 
-  is_.seekg(0);
-  is_.read((char*)&buf[0],buf.size());
+  ios_.seekg(0);
+  ios_.read((char*)&buf[0],buf.size());
 
   if(memcmp(&buf[0],&MODE1_SYNC_PATTERN[0],MODE1_SYNC_PATTERN.size()) != 0)
     return false;
@@ -77,14 +77,14 @@ is_mode1_2352(std::iostream &ios_)
   return true;
 }
 
-TDO::DevStream::DevStream(std::istream &is_)
+TDO::DevStream::DevStream(std::istream &ios_)
   : _device_block_header(0),
     _device_block_data_size(0),
     _device_block_footer(0),
     _disc_label_block(0),
     _romtags_block(0),
     _data_start_offset(0),
-    _is(is_)
+    _is(ios_)
 {
   
 }
