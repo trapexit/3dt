@@ -21,7 +21,7 @@
 namespace TDO
 {
   FileStream::FileStream()
-    : DevStream(_ifs)
+    : DevStream(_fs)
   {
 
   }
