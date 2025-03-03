@@ -208,7 +208,7 @@ namespace Subcommand
   list(const Options::List &opts_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream fs;
     ListCallbacks callbacks(opts_);
     TDO::FSWalker walker(ifs,callbacks);
 
