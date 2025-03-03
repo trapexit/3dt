@@ -212,14 +212,14 @@ namespace Subcommand
     ListCallbacks callbacks(opts_);
     TDO::FSWalker walker(fs,callbacks);
 
-    ifs.open(opts_.filepath,std::ios::binary);
-    if(!ifs.good())
+    fs.open(opts_.filepath,std::ios::binary);
+    if(!fs.good())
       return  Log::error_stream_open(opts_.filepath);
 
     err = walker.walk();
     if(err)
       Log::error(err);
 
-    ifs.close();
+    fs.close();
   }
 }
