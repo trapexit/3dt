@@ -33,7 +33,7 @@ namespace TDO
     DiscIdentifier();
 
   public:
-    Error identify(std::istream &is_);
+    Error identify(std::iostream &ios_);
 
   public:
     std::string disc_image_ext;
