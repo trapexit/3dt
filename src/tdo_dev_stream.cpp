@@ -96,21 +96,21 @@ TDO::DevStream::find_label()
   char v;
 
   _ios.seekg(0);
-  while(_is && !_is.eof())
+  while(_ios && !_ios.eof())
     {
-      _is.read(&v,1);
+      _ios.read(&v,1);
       if(v != RECORD_STD_VOLUME)
         continue;
 
       for(i = 0; i < VOLUME_SYNC_BYTE_LEN; i++)
         {
-          _is.read(&v,1);
+          _ios.read(&v,1);
           if(v == VOLUME_SYNC_BYTE)
             continue;
           break;
         }
 
-      _is.seekg(-(i + 1),_is.cur);
+      _ios.seekg(-(i + 1),_ios.cur);
       if(i == 5)
         break;
     }
@@ -121,7 +121,7 @@ TDO::DevStream::setup()
 {
   Error err;
 
-  if(::is_mode1_2352(_is))
+  if(::is_mode1_2352(_ios))
     {
       _device_block_header    = 16;
       _device_block_data_size = 2048;
@@ -160,9 +160,9 @@ TDO::DevStream::setup()
       _romtags.emplace_back(romtag);
     }
 
-  _is.seekg(0,_is.end);
-  _device_block_count = (_is.tellg() / device_block_size());
-  _is.seekg(0);
+  _ios.seekg(0,_ios.end);
+  _device_block_count = (_ios.tellg() / device_block_size());
+  _ios.seekg(0);
   
   return {};
 }
@@ -336,7 +336,7 @@ TDO::DevStream::file_offset_to_data_block(const s64 file_offset_) const
 s64
 TDO::DevStream::file_tell() const
 {
-  return _is.tellg();
+  return _ios.tellg();
 }
 
 s64
@@ -414,7 +414,7 @@ TDO::DevStream::device_block_tell() const
 void
 TDO::DevStream::file_seek(const s64 pos_)
 {
-  _is.seekg(pos_);
+  _ios.seekg(pos_);
 }
 
 void
@@ -492,7 +492,7 @@ void
 TDO::DevStream::read(char      *buf_,
                      const u64  size_)
 {
-  _is.read(buf_,size_);
+  _ios.read(buf_,size_);
 }
 
 void
