@@ -64,7 +64,7 @@ namespace TDO
   void
   FileStream::close()
   {
-    if(_ifs.is_open())
-      _ifs.close();
+    if(_iofs.is_open())
+      _iofs.close();
   }
 }
