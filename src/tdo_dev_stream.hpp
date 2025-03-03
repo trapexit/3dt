@@ -59,7 +59,7 @@ namespace TDO
     bool good() const { return _is.good(); }
     bool bad() const { return _is.bad(); }
     bool eof() const { return _is.eof(); }
-    std::istream &istream() { return _is; }
+    std::iostream &iostream() { return _ios; }
 
   public:
     u64 data_start_offset() const;
