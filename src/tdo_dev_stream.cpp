@@ -61,7 +61,7 @@ swap(s32 &s32_)
 
 static
 bool
-is_mode1_2352(std::istream &is_)
+is_mode1_2352(std::iostream &ios_)
 {
   CDROMSectorBuf buf;
 
