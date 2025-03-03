@@ -49,7 +49,7 @@ namespace TDO
     std::istream &_is;
 
   public:
-    DevStream(std::istream &is);
+    DevStream(std::iostream &ios);
 
   public:
     void find_label();
