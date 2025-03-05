@@ -578,7 +578,7 @@ TDO::DevStream::read(u8 &u8_)
 }
 
 void
-TDO::DevStream::read(const u8 u8_)
+TDO::DevStream::write(const u8 u8_)
 {
   write((const char*)&u8_,1);
 }
