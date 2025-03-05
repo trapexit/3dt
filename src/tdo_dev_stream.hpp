@@ -154,9 +154,9 @@ namespace TDO
     void write(const TDO::DirectoryRecord &);
     void write(const TDO::ROMTag &);
     void write(const TDO::LinkedMemFileEntry &);
-    void write_data_blocks(std::vector<char> &v,
-                           const s64          block_pos,
-                           const s64          blocks);
+    void write_data_blocks(const std::vector<char> &v,
+                           const s64                block_pos,
+                           const s64                blocks);
     void write_data_bytes_from_block(std::vector<char> &v,
                                      const s64          block_pos,
                                      const s64          bytes);
