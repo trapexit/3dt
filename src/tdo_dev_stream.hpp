@@ -142,6 +142,43 @@ namespace TDO
       for(u64 i = 0; i < arr_.size(); i++)
         read(arr_[i]);
     }
+
+  public:
+    void write(char *buf, const u64 size);
+    void write(char &);
+    void write(u8 &);
+    void write(u32 &);
+    void write(s32 &);
+    void write(TDO::DiscLabel &);
+    void write(TDO::DirectoryHeader &);
+    void write(TDO::DirectoryRecord &);
+    void write(TDO::ROMTag &);
+    void write(TDO::LinkedMemFileEntry &);
+    void write_data_blocks(std::vector<char> &v,
+                           const s64          block_pos,
+                           const s64          blocks);
+    void write_data_bytes_from_block(std::vector<char> &v,
+                                     const s64          block_pos,
+                                     const s64          bytes);
+    void write_data_bytes(std::vector<char> &v,
+                          const s64          byte_pos,
+                          const s64          bytes);
+
+
+    template<u64 N>
+    void
+    write(std::array<char,N> &arr_)
+    {
+      write(&arr_[0],arr_.size());
+    }
+
+    template<u64 N>
+    void
+    write(std::array<u32,N> &arr_)
+    {
+      for(u64 i = 0; i < arr_.size(); i++)
+        write(arr_[i]);
+    }
   };
 
   class PosGuard
