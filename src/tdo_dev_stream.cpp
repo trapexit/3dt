@@ -566,9 +566,21 @@ TDO::DevStream::read(char &c_)
 }
 
 void
+TDO::DevStream::write(const char &c_)
+{
+  write(&c_,1);
+}
+
+void
 TDO::DevStream::read(u8 &u8_)
 {
   read((char*)&u8_,1);
+}
+
+void
+TDO::DevStream::read(const u8 &u8_)
+{
+  write((const char*)&u8_,1);
 }
 
 void
