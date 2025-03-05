@@ -144,16 +144,16 @@ namespace TDO
     }
 
   public:
-    void write(char *buf, const u64 size);
-    void write(char &);
-    void write(u8 &);
-    void write(u32 &);
-    void write(s32 &);
-    void write(TDO::DiscLabel &);
-    void write(TDO::DirectoryHeader &);
-    void write(TDO::DirectoryRecord &);
-    void write(TDO::ROMTag &);
-    void write(TDO::LinkedMemFileEntry &);
+    void write(const char *buf, const u64 size);
+    void write(const char &);
+    void write(const u8 &);
+    void write(const u32 &);
+    void write(const s32 &);
+    void write(const TDO::DiscLabel &);
+    void write(const TDO::DirectoryHeader &);
+    void write(const TDO::DirectoryRecord &);
+    void write(const TDO::ROMTag &);
+    void write(const TDO::LinkedMemFileEntry &);
     void write_data_blocks(std::vector<char> &v,
                            const s64          block_pos,
                            const s64          blocks);
