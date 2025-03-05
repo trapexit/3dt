@@ -145,10 +145,10 @@ namespace TDO
 
   public:
     void write(const char *buf, const u64 size);
-    void write(const char &);
-    void write(const u8 &);
-    void write(const u32 &);
-    void write(const s32 &);
+    void write(const char);
+    void write(const u8);
+    void write(const u32);
+    void write(const s32);
     void write(const TDO::DiscLabel &);
     void write(const TDO::DirectoryHeader &);
     void write(const TDO::DirectoryRecord &);
