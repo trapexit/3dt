@@ -496,6 +496,13 @@ TDO::DevStream::read(char      *buf_,
 }
 
 void
+TDO::DevStream::write(const char *buf_,
+                      const u64   size_)
+{
+  _ios.write(buf_,size_);
+}
+
+void
 TDO::DevStream::read_data_blocks(std::vector<char> &v_,
                                  const s64          pos_,
                                  const s64          blocks_)
