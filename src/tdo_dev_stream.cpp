@@ -591,6 +591,13 @@ TDO::DevStream::read(u32 &u32_)
 }
 
 void
+TDO::DevStream::write(const u32 u32_)
+{
+  swap(u32_);  
+  write((const char*)&u32_,sizeof(u32));
+}
+
+void
 TDO::DevStream::read(s32 &s32_)
 {
   read((char*)&s32_,sizeof(s32));
