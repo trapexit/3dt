@@ -605,7 +605,7 @@ TDO::DevStream::read(s32 &s32_)
 }
 
 void
-TDO::DevStream::write(const s32 s32_)
+TDO::DevStream::write(s32 s32_)
 {
   swap(s32_);  
   write((const char*)&s32_,sizeof(s32));
