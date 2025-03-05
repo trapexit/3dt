@@ -605,6 +605,13 @@ TDO::DevStream::read(s32 &s32_)
 }
 
 void
+TDO::DevStream::write(const s32 s32_)
+{
+  swap(s32_);  
+  write((const char*)&s32_,sizeof(s32));
+}
+
+void
 TDO::DevStream::read(TDO::DiscLabel &dl_)
 {
   read(dl_.record_type);
