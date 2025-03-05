@@ -160,10 +160,9 @@ namespace TDO
     void write_data_bytes_from_block(const std::vector<char> &v,
                                      const s64                block_pos,
                                      const s64                bytes);
-    void write_data_bytes(std::vector<char> &v,
-                          const s64          byte_pos,
-                          const s64          bytes);
-
+    void write_data_bytes(const std::vector<char> &v,
+                          const s64                byte_pos,
+                          const s64                bytes);
 
     template<u64 N>
     void
