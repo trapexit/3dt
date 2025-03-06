@@ -109,7 +109,7 @@ _sign_signature_block(TDO::FileStream &s_)
   fmt::print("{}\n",sig);
 
   signatures.resize(signatures.size() + sizeof(sig));
-  signatures.resize(((signatures.size() + (PHYSICAL_BLOCK_SIZE-1)) / PHYSICAL_BLOCK_SIZE) * s_.device_block_data_size());
+  signatures.resize(((signatures.size() + (PHYSICAL_BLOCK_SIZE-1)) / PHYSICAL_BLOCK_SIZE) * PHYSICAL_BLOCK_SIZE);
   signatures.resize(signatures.size() - sizeof(sig));
   signatures.insert(signatures.end(),
                     sig,
