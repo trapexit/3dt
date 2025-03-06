@@ -68,6 +68,7 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 #define PHYSICAL_BLOCK_SIZE (2 * 1024)
 #define LOGICAL_BLOCK_SIZE (32 * 1024)
 
+// Maybe just assume ISO w/ contiguous 2048 byte block size?
 static
 void
 _sign_signature_block(TDO::FileStream &s_)
