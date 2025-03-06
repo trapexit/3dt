@@ -122,7 +122,6 @@ _sign_signature_block(TDO::FileStream &s_)
       s_.write(&signatures[i * PHYSICAL_BLOCK_SIZE],PHYSICAL_BLOCK_SIZE);
     }
 
-  //set romtag size
   s_.data_block_seek(s_.romtags_block());
   while(true)
     {
