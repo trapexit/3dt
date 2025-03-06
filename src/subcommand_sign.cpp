@@ -62,7 +62,7 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 
   s_.data_block_seek(s_.romtags_block());
   s_.data_byte_skip(s_.romtags_size_in_bytes());
-  s_.iostream().write((char*)signature,sizeof(signature));
+  s_.write((char*)signature,sizeof(signature));
 }
 
 #define PHYSICAL_BLOCK_SIZE (2 * 1024)
