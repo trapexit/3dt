@@ -136,6 +136,9 @@ _sign_signature_block(TDO::FileStream &s_)
       if(romtag.type != RSA_SIGNATURE_BLOCK)
         continue;
 
+      if(romtag.size < signatures.size())
+        throw fmt::exception("signatures file too small, increase size and rebuild image");
+      
       s_.file_seek(offset);
       s_.data_byte_skip(offsetof(TDO::ROMTag,size));
       s_.write((u32)signatures.size());
