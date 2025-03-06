@@ -19,7 +19,6 @@
 #include "tdo_rsa.h"
 
 #include "tdo_file_stream.hpp"
-#include "tdo_dev_stream.hpp"
 
 #include "options.hpp"
 
