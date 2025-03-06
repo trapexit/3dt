@@ -137,7 +137,7 @@ _sign_signature_block(TDO::FileStream &s_)
         continue;
 
       if(romtag.size < signatures.size())
-        throw fmt::exception("signatures file too small, increase size and rebuild image");
+        throw std::runtime_error("signatures file too small, increase size and rebuild image");
       
       s_.file_seek(offset);
       s_.data_byte_skip(offsetof(TDO::ROMTag,size));
