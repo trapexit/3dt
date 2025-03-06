@@ -1,0 +1,182 @@
+/*
+  ISC License
+
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
+
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted, provided that the above
+  copyright notice and this permission notice appear in all copies.
+
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
+
+#include "tdo_rsa.h"
+
+#include "tdo_file_stream.hpp"
+#include "tdo_dev_stream.hpp"
+
+#include "options.hpp"
+
+#include "fmt.hpp"
+#include "fmt_rsa512_sig.hpp"
+
+static
+void
+_sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
+{
+  md5_digest_t digest;
+  rsa512_sig_t signature;
+  std::vector<char> data;
+  std::optional<TDO::ROMTag> romtag;
+
+  romtag = s_.romtag(RSA_NEWKNEWNEWGNUBOOT);
+  if(!romtag)
+    {
+      fmt::print("- No NEWKNEWNEWGNUBOOT romtag found.");
+      return;
+    }
+
+  s_.read_data_bytes_from_block(data,
+                                 s_.disc_label_block(),
+                                 s_.disc_label_size_in_bytes());
+  s_.read_data_bytes_from_block(data,
+                                 s_.romtags_block(),
+                                 s_.romtags_size_in_bytes());
+  s_.read_data_bytes_from_block(data,
+                                romtag->offset + 1,
+                                romtag->size);
+
+  md5_calc(data.data(),
+           data.size(),
+           digest);
+  tdo_rsa_sign(TDO_KEY_APP,digest,signature);
+
+  fmt::print(" - Signing DiscLabel + ROMTags + BootCode with APP key\n"
+             "   - signature: {}\n",
+             signature);
+
+  s_.data_block_seek(s_.romtags_block());
+  s_.data_byte_skip(s_.romtags_size_in_bytes());
+  s_.iostream().write((char*)signature,sizeof(signature));
+}
+
+#define PHYSICAL_BLOCK_SIZE (2 * 1024)
+#define LOGICAL_BLOCK_SIZE (32 * 1024)
+
+static
+void
+_sign_signature_block(TDO::FileStream &s_)
+{
+  md5_digest_t digest;
+  rsa512_sig_t sig;
+  u64 num_digests;
+  u64 volume_block_count;
+  std::vector<char> buf;
+  std::vector<char> signatures;
+
+  volume_block_count = s_.disc_label().volume_block_count;
+  num_digests        = ((volume_block_count * 2048) / 32768);
+  for(u64 i = 0; i < num_digests; i++)
+    {
+      s64 block_pos;
+
+      block_pos = ((i * LOGICAL_BLOCK_SIZE) / PHYSICAL_BLOCK_SIZE);
+
+      buf.clear();
+      s_.read_data_blocks(buf, block_pos, (LOGICAL_BLOCK_SIZE / PHYSICAL_BLOCK_SIZE));
+
+      md5_calc(buf.data(),buf.size(),digest);
+
+      signatures.insert(signatures.end(),
+                        digest,
+                        &digest[sizeof(digest)]);
+    }
+
+  fmt::print("{} {} {} {}\n",
+             signatures.size(),
+             signatures.size() / sizeof(digest),
+             num_digests,
+             s_.romtag(RSA_SIGNATURE_BLOCK)->size - signatures.size());
+
+
+  md5_calc(signatures.data(),signatures.size(),digest);
+  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
+  fmt::print("{}\n",sig);
+
+  signatures.resize(signatures.size() + sizeof(sig));
+  signatures.resize(((signatures.size() + 2047) / 2048) * 2048);
+  signatures.resize(signatures.size() - sizeof(sig));
+  signatures.insert(signatures.end(),
+                    sig,
+                    sig + sizeof(sig));
+
+  s64 sig_offset = s_.romtag(RSA_SIGNATURE_BLOCK)->offset + 1;
+  for(u64 i = 0; i < (signatures.size() / 2048); i++)
+    {
+      s_.data_block_seek(sig_offset + i);
+      s_.write(&signatures[i * PHYSICAL_BLOCK_SIZE],PHYSICAL_BLOCK_SIZE);
+    }
+
+  //set romtag size
+  s_.data_block_seek(s_.romtags_block());
+  while(true)
+    {
+      u64 offset;
+      TDO::ROMTag romtag;
+
+      offset = s_.file_tell();
+      s_.read(romtag);
+      if((romtag.sub_systype == 0) || (romtag.type == 0))
+        break;
+      if(romtag.type != RSA_SIGNATURE_BLOCK)
+        continue;
+
+      s_.file_seek(offset);
+      s_.data_byte_skip(offsetof(TDO::ROMTag,size));
+      s_.write((u32)signatures.size());
+      break;
+    }
+}
+
+static
+void
+_sign_image(TDO::FileStream &s_)
+{
+  _sign_disclabel_romtags_bootcode(s_);
+  _sign_signature_block(s_);
+}
+
+namespace Subcommand
+{
+  void
+  sign(const Options::Sign &opts_)
+  {
+    for(const auto &filepath : opts_.filepaths)
+      {
+        Error err;
+        TDO::FileStream stream;
+
+        err = stream.open(filepath);
+        if(err)
+          {
+            fmt::print(stderr,"3dt: {} - {}\n",err.str,filepath);
+            continue;
+          }
+
+        if(!stream.has_romtags())
+          {
+            fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
+            continue;
+          }
+
+        fmt::print("{}:\n",filepath);
+        ::_sign_image(stream);
+      }
+  }
+}
