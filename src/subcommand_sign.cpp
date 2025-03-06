@@ -119,6 +119,7 @@ _sign_signature_block(TDO::FileStream &s_)
   s64 sig_offset = s_.romtag(RSA_SIGNATURE_BLOCK)->offset + 1;
   for(u64 i = 0; i < (signatures.size() / PHYSICAL_BLOCK_SIZE); i++)
     {
+      fmt::print("offset: {}\n",sig_offset+i);
       s_.data_block_seek(sig_offset + i);
       s_.write(&signatures[i * PHYSICAL_BLOCK_SIZE],PHYSICAL_BLOCK_SIZE);
     }
