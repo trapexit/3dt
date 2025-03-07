@@ -62,9 +62,9 @@ public:
       continue;
 
     romtags.emplace_back();
-    romtags.back().type = type;
-    romtags.back().size = record_.byte_count;
-    romtags.back().offset = record_.disc_avatar_offset();
+    romtags.back().type   = type;
+    romtags.back().size   = record_.byte_count;
+    romtags.back().offset = record_.avatar_list[0];
   }
 };
 
