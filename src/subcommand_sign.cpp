@@ -25,11 +25,22 @@
 
 #include "fmt.hpp"
 #include "fmt_rsa512_sig.hpp"
+#include "nostd/string.hpp"
 
 class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
 {
 public:
   TDO::ROMTagVec romtags;
+
+public:
+  void
+  operator()(const std::filesystem::path &filepath_,
+             const TDO::DirectoryRecord  &record_,
+             const u32                    record_pos_,
+             TDO::DevStream              &stream_)
+  {
+    if(nostd::stringfilepath_.string()
+  }
 };
 
 
