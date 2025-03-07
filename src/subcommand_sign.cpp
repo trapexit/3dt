@@ -68,7 +68,6 @@ public:
     romtags.back().offset      = record_.avatar_list[0];
     romtags.back().version     = 0;
     romtags.back().revision    = 0;
-    
   }
 };
 
