@@ -43,7 +43,6 @@ public:
     std::string lowercase;
 
     lowercase = nostd::string::as_lowercase(filepath_.string());
-    
   }
 };
 
