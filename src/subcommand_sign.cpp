@@ -40,10 +40,31 @@ public:
              const u32                    record_pos_,
              TDO::DevStream              &stream_)
   {
-    std::string lowercase;
-
-    lowercase = nonstd::string::as_lowercase(filepath_.string());
+    u32 type;
+    std::string lc_filepath;
     
+    type = 0;
+    lc_filepath = nonstd::string::as_lowercase(filepath_.string());
+    if(lc_filepath == "signatures")
+      type = RSA_SIGNATURE_BLOCK;
+    else if(lc_filepath == "system/kernel/boot_code")
+      type = RSA_NEWKNEWNEWGNUBOOT;
+    else if(lc_filepath == "system/kernel/misc_code")
+      type = RSA_MISCCODE;
+    else if(lc_filepath == "system/kernel/os_code")
+      type = RSA_OS;
+    else if(lc_filepath == "launchme")
+      type = RSA_BLOCKS_ALWAYS;
+    else if(lc_filepath == "bannerscreen")
+      type = RSA_APPSPLASH;
+
+    if(type == 0)
+      continue;
+
+    romtags.emplace_back();
+    romtags.back().type = type;
+    romtags.back().size = record_.byte_count;
+    romtags.back().offset = record_.disc_avatar_offset();
   }
 };
 
