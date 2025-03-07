@@ -55,11 +55,11 @@ public:
       type = RSA_OS;
     else if(lc_filepath == "launchme")
       type = RSA_BLOCKS_ALWAYS;
-    else if(lc_filepath == "bannerscreen")
+    else if(lc_filepath == "banner screen")
       type = RSA_APPSPLASH;
 
     if(type == 0)
-      continue;
+      return;
 
     romtags.emplace_back();
     romtags.back().type        = type;
@@ -67,6 +67,8 @@ public:
     romtags.back().size        = record_.byte_count;
     romtags.back().offset      = record_.avatar_list[0];
     romtags.back().version     = 0;
+    romtags.back().revision    = 0;
+    
   }
 };
 
