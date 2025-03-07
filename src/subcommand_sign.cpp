@@ -40,7 +40,7 @@ public:
              const u32                    record_pos_,
              TDO::DevStream              &stream_)
   {
-    if(nostd::stringfilepath_.string()
+    
   }
 };
 
