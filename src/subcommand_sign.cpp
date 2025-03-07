@@ -26,6 +26,13 @@
 #include "fmt.hpp"
 #include "fmt_rsa512_sig.hpp"
 
+class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
+{
+public:
+  TDO::ROMTagVec romtags;
+};
+
+
 static
 void
 _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
