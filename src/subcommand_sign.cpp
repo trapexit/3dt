@@ -40,6 +40,9 @@ public:
              const u32                    record_pos_,
              TDO::DevStream              &stream_)
   {
+    std::string lowercase;
+
+    lowercase = nostd::string::as_lowercase(filepath_.string());
     
   }
 };
