@@ -212,7 +212,7 @@ namespace Subcommand
     ListCallbacks callbacks(opts_);
     TDO::FSWalker walker(fs,callbacks);
 
-    fs.open(opts_.filepath,std::ios::binary|fs.in);
+    fs.open(opts_.filepath,fs.binary|fs.in);
     if(!fs.good())
       return  Log::error_stream_open(opts_.filepath);
 
