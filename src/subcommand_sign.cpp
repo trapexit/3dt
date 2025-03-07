@@ -19,6 +19,7 @@
 #include "tdo_rsa.h"
 
 #include "tdo_file_stream.hpp"
+#include "tdo_fs_walker.hpp"
 
 #include "options.hpp"
 
