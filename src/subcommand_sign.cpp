@@ -63,6 +63,7 @@ public:
 
     romtags.emplace_back();
     romtags.back().type   = type;
+    romtags.back().sub_systype = 0xf;
     romtags.back().size   = record_.byte_count;
     romtags.back().offset = record_.avatar_list[0];
   }
