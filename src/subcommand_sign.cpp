@@ -268,12 +268,6 @@ namespace Subcommand
             continue;
           }
 
-        if(!stream.has_romtags())
-          {
-            fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
-            continue;
-          }
-
         fmt::print("{}:\n",filepath);
         stream.resize_multiple(LOG_BLOCK_SIZE);
         ::_generate_and_write_romtags(stream);
