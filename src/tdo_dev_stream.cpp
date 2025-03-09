@@ -775,6 +775,7 @@ TDO::DevStream::resize_multiple(s64 multiple_)
   
   _ios.seekg(0,std::ios::end);
   size = _ios.tellg();
+
   size = (((size + multiple_ - 1) / multiple_) * multiple_);
 
   _ios.seekp(size - 1);
