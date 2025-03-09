@@ -248,7 +248,7 @@ static
 void
 _sign_image(TDO::FileStream &s_)
 {
-  _sign_disclabel_romtags_bootcode(s_);
+
   //  _sign_signature_block(s_);
 }
 
@@ -277,7 +277,8 @@ namespace Subcommand
 
         fmt::print("{}:\n",filepath);
         ::_generate_and_write_romtags(stream);
-        //        ::_sign_image(stream);
+        ::_sign_disclabel_romtags_bootcode(stream);
+        ::_sign_signature_block(stream);
       }
   }
 }
