@@ -195,6 +195,9 @@ _sign_signature_block(TDO::FileStream &s_)
                         &digest[sizeof(digest)]);
     }
 
+  fmt::print("file_tell: {}\n",
+             s_.file_tell());
+
   fmt::print("{} {} {} {}\n",
              signatures.size(),
              signatures.size() / sizeof(digest),
