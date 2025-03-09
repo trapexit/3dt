@@ -194,7 +194,7 @@ namespace TDO
     }
 
   private:
-    DevStream      &_stream;
+    const DevStream      &_stream;
     std::streampos  _pos;
   };
 }
