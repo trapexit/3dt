@@ -224,7 +224,15 @@ TDO::DevStream::romtags()
 {
   TDO::ROMTagVec romtags;
   TDO::PosGuard _(*this);
-  
+
+  data_block_seek(romtags_block());
+  while(true)
+    {
+      romtags.emplace_back();
+      read(romtags.back());
+      if((romtags.back().type == 0) || (romtags.back().sub_systype == 0))
+        break;
+    }
   
   return romtags;
 }
