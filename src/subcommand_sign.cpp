@@ -249,7 +249,7 @@ void
 _sign_image(TDO::FileStream &s_)
 {
   _sign_disclabel_romtags_bootcode(s_);
-  _sign_signature_block(s_);
+  //  _sign_signature_block(s_);
 }
 
 namespace Subcommand
