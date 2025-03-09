@@ -305,13 +305,13 @@ void
 _sign_appsplash(TDO::FileStream &s_)
 {
   std::optional<TDO::ROMTag> romtag;
-
+  std::vector<char> data;
 
   romtag = s_.romtag(RSA_APPSPLASH);
   if(!romtag)
     throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
 
-  
+  s_.read_data_bytes(data,romtag.size);
 }
 
 namespace Subcommand
