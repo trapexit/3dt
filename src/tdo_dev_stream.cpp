@@ -210,7 +210,13 @@ TDO::DevStream::has_romtags()
 TDO::DiscLabel
 TDO::DevStream::disc_label() const
 {
-  return _disc_label;
+  TDO::DiscLabel dl;
+  TDO::PosGuard pos_guard(*this);
+
+  data_block_seek(disc_label_block());
+  
+  
+  return dl;
 }
 
 u64
