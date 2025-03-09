@@ -113,6 +113,9 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   TDO::FSWalker fsw(stream,tags);
   
   err = fsw.walk();
+  if(err)
+    throw std::runtime_error("fuck, shit broken");
+  
   stream.data_block_seek(stream.romtags_block());
   for(auto &tag : tags.romtags)
     stream.write(tag);
