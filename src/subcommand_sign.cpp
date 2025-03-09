@@ -267,13 +267,7 @@ namespace Subcommand
         fsw.walk();
         stream.data_block_seek(stream.romtags_block());
         for(auto &tag : tags.romtags)
-          {
-            stream.write(tag);
-            fmt::print("{}; {}; {}\n",
-                       tag.type,
-                       tag.offset,
-                       tag.size);
-          }
+          stream.write(tag);
         stream.write(TDO::ROMTag{});
 
         //::_sign_image(stream);        
