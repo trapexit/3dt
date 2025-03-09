@@ -50,7 +50,7 @@ public:
   {
 
   }
-  
+
   void
   operator()(const std::filesystem::path &filepath_,
              const TDO::DirectoryRecord  &record_,
