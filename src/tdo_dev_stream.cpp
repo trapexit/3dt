@@ -249,7 +249,7 @@ TDO::DevStream::romtag(const int type_)
       TDO::ROMTag romtag;
 
       read(romtag);
-      fmt::print("{}\n",romtag.type);
+      fmt::print("{:x}\n",romtag.type);
       if(romtag.type == type_)
         return romtag;
       if((romtag.type == 0) || (romtag.sub_systype == 0))
