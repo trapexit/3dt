@@ -27,6 +27,22 @@
 #include "fmt_rsa512_sig.hpp"
 #include "nonstd/string.hpp"
 
+class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
+{
+public:
+  void
+  begin()
+  {
+  }
+
+  void
+  end()
+  {
+  }
+
+  
+};  
+
 
 class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
 {
@@ -246,6 +262,7 @@ _sign_signature_block(TDO::FileStream &s_)
       break;
     }
 
+  // Correct OperaFS
   
 }
 
