@@ -150,18 +150,6 @@ TDO::DevStream::setup()
   // if(_disc_label.num_rom_tags == 0)
   //   _disc_label.num_rom_tags = ::count_m1_romtags(*this,_romtags_block);
 
-  data_block_seek(_romtags_block);
-  while(true)
-    {
-      TDO::ROMTag romtag;
-
-      read(romtag);
-      if((romtag.sub_systype == 0) || (romtag.type == 0))
-        break;
-            
-      _romtags.emplace_back(romtag);
-    }
-
   _ios.seekg(0,_ios.end);
   _device_block_count = (_ios.tellg() / device_block_size());
   _ios.seekg(0);
