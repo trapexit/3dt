@@ -279,7 +279,6 @@ namespace Subcommand
 
         fmt::print("{}:\n",filepath);
         ::_generate_and_write_romtags(stream);
-
         ::_sign_image(stream);
       }
   }
