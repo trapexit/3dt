@@ -230,8 +230,8 @@ TDO::DevStream::romtags()
     {
       TDO::ROMTag romtag;
       
-      read(romtags.back());
-      if((romtags.back().type == 0) || (romtags.back().sub_systype == 0))
+      read(romtag);
+      if((romtag.type == 0) || (romtag.sub_systype == 0))
         break;
       romtags.emplace_back(romtag);            
     }
