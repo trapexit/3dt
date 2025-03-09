@@ -220,7 +220,7 @@ TDO::DevStream::disc_label_block() const
 }
 
 TDO::ROMTagVec
-TDO::DevStream::romtags() const
+TDO::DevStream::romtags()
 {
   
   return _romtags;
