@@ -278,9 +278,9 @@ TDO::DevStream::romtags_count()
       TDO::ROMTag romtag;
 
       read(romtag);
+      count++;
       if((romtag.type == 0) || (romtag.sub_systype == 0))
         break;
-      count++;
     }
 
   return count;
