@@ -98,7 +98,7 @@ namespace TDO
 
   public:
     bool has_romtags();
-    const TDO::ROMTagVec& romtags() const;
+    TDO::ROMTagVec romtags();
     const std::optional<TDO::ROMTag> romtag(const int type) const;
     u64 romtags_block() const;
     u64 romtags_count() const;
