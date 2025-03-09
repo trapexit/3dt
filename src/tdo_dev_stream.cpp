@@ -766,3 +766,14 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
   read(lmfe_.type);
   read(lmfe_.filename,sizeof(lmfe_.filename));
 }
+
+void
+TDO::DevStream::resize_multiple(s64 multiple_)
+{
+  TDO::PosGuard _(*this);
+  s64 size;
+
+  _ios.seekg(0,std::ios::end);
+  size = _ios.tellg();
+  size = (((size + multiple_ - 1) / multiple_) * multiple_);
+}
