@@ -698,20 +698,20 @@ TDO::DevStream::read(TDO::ROMTag &tag_)
 void
 TDO::DevStream::write(TDO::ROMTag &tag_)
 {
-  read(tag_.sub_systype);
-  read(tag_.type);
-  read(tag_.version);
-  read(tag_.revision);
-  read(tag_.flags);
-  read(tag_.type_specific);
-  read(tag_.reserved1);
-  read(tag_.reserved2);
-  read(tag_.offset);
-  read(tag_.size);
-  read(tag_.reserved3[0]);
-  read(tag_.reserved3[1]);
-  read(tag_.reserved3[2]);
-  read(tag_.reserved3[3]);
+  write(tag_.sub_systype);
+  write(tag_.type);
+  write(tag_.version);
+  write(tag_.revision);
+  write(tag_.flags);
+  write(tag_.type_specific);
+  write(tag_.reserved1);
+  write(tag_.reserved2);
+  write(tag_.offset);
+  write(tag_.size);
+  write(tag_.reserved3[0]);
+  write(tag_.reserved3[1]);
+  write(tag_.reserved3[2]);
+  write(tag_.reserved3[3]);
 }
 
 void
