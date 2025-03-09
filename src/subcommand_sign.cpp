@@ -204,7 +204,7 @@ _sign_signature_block(TDO::FileStream &s_)
 
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
-  fmt::print("{}\n",sig);
+  fmt::print("sig: {}\n",sig);
 
   signatures.resize(signatures.size() + sizeof(sig));
   signatures.resize(((signatures.size() + (PHY_BLOCK_SIZE-1)) / PHY_BLOCK_SIZE) * PHY_BLOCK_SIZE);
