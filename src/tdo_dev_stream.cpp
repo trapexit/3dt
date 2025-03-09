@@ -226,7 +226,7 @@ TDO::DevStream::romtags()
   TDO::PosGuard _(*this);
   
   
-  return _romtags;
+  return romtags;
 }
 
 const
