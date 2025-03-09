@@ -261,8 +261,6 @@ namespace Subcommand
           }
 
         fmt::print("{}:\n",filepath);
-        //        ::_sign_image(stream);
-
         ROMTagsGenerator tags;
         TDO::FSWalker fsw(stream,tags);
         fsw.walk();
@@ -276,6 +274,8 @@ namespace Subcommand
                        tag.size);
           }
         stream.write(TDO::ROMTag{});
+
+        ::_sign_image(stream);        
       }
   }
 }
