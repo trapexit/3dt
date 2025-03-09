@@ -243,7 +243,8 @@ std::optional<TDO::ROMTag>
 TDO::DevStream::romtag(const int type_)
 {
   TDO::PosGuard _(*this);
-  
+
+  data_block_seek(romtags_block());  
   while(true)
     {
       TDO::ROMTag romtag;
