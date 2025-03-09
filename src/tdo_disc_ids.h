@@ -23,6 +23,8 @@
 
 #include <stdint.h>
 
+// TODO: Add hash of signatures file?
+
 EXTERN_C_BEGIN
 
 typedef struct tdoid_t tdoid_t;
