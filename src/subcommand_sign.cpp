@@ -293,7 +293,7 @@ _sign_signature_block(TDO::FileStream &s_)
   SignaturesFileUpdater sfu;
   TDO::FSWalker fsw(s_,sfu);
 
-  
+  sfu.signatures_file_size = signatures.size();
 }
 
 namespace Subcommand
