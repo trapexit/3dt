@@ -267,7 +267,10 @@ namespace Subcommand
         TDO::FSWalker fsw(stream,tags);
         for(auto &tag : tags.romtags)
           {
-
+            fmt::print("{}; {}; {}\n",
+                       tag.type,
+                       tag.offset,
+                       tag.length);
           }
       }
   }
