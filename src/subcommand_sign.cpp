@@ -163,7 +163,7 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 }
 
 #define PHY_BLOCK_SIZE (2 * 1024)
-#define LOGICAL_BLOCK_SIZE (32 * 1024)
+#define LOG_BLOCK_SIZE (32 * 1024)
 
 // Maybe just assume ISO w/ contiguous 2048 byte block size?
 static
@@ -178,15 +178,15 @@ _sign_signature_block(TDO::FileStream &s_)
   std::vector<char> signatures;
 
   volume_block_count = s_.disc_label().volume_block_count;
-  num_digests        = ((volume_block_count * LOGICAL_BLOCK_SIZE) / PHY_BLOCK_SIZE);
+  num_digests        = ((volume_block_count * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
   for(u64 i = 0; i < num_digests; i++)
     {
       s64 block_pos;
 
-      block_pos = ((i * LOGICAL_BLOCK_SIZE) / PHY_BLOCK_SIZE);
+      block_pos = ((i * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
 
       buf.clear();
-      s_.read_data_blocks(buf, block_pos, (LOGICAL_BLOCK_SIZE / PHY_BLOCK_SIZE));
+      s_.read_data_blocks(buf, block_pos, (LOG_BLOCK_SIZE / PHY_BLOCK_SIZE));
 
       md5_calc(buf.data(),buf.size(),digest);
 
