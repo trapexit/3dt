@@ -288,7 +288,7 @@ TDO::DevStream::romtags_count() const
 u64
 TDO::DevStream::romtags_size_in_bytes() const
 {
-  return ((_romtags.size() + 1) * sizeof(TDO::ROMTag));
+  return (romtags_count() * sizeof(TDO::ROMTag));
 }
 
 u64
