@@ -63,7 +63,7 @@ public:
     if(lc_filepath != "signatures")
       return;
 
-    stream_.data_byte_seek(record_pos_);
+    s_.data_byte_seek(record_pos_);
     s_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
     s_.write(signatures_file_size);
     s_.write((u32)((signatures_file_size + (2048 - 1)) / 2048));
