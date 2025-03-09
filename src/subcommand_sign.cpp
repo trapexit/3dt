@@ -69,6 +69,8 @@ public:
     romtags.back().offset      = record_.avatar_list[0];
     romtags.back().version     = 0;
     romtags.back().revision    = 0;
+    if(type == RSA_SIGNATURE_BLOCK)
+      romtags.back().type_specific = 15;
   }
 };
 
