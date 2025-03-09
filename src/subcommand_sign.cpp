@@ -290,6 +290,9 @@ _sign_signature_block(TDO::FileStream &s_)
     }
 
   // Correct OperaFS
+  SignaturesFileUpdater sfu;
+  TDO::FSWalker fsw(s_,sfu);
+
   
 }
 
