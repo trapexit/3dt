@@ -307,7 +307,8 @@ _sign_appsplash(TDO::FileStream &s_)
   std::optional<TDO::ROMTag> romtag;
 
 
-  romtag = s_.romtag(RSA_APPSPLASH)
+  romtag = s_.romtag(RSA_APPSPLASH);
+  
 }
 
 namespace Subcommand
