@@ -178,7 +178,7 @@ _sign_signature_block(TDO::FileStream &s_)
   std::vector<char> signatures;
 
   volume_block_count = s_.disc_label().volume_block_count;
-  num_digests        = ((volume_block_count * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
+  num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
   
   fmt::print("block count: {}; num digests: {}\n",
              volume_block_count,num_digests);
