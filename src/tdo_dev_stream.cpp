@@ -696,6 +696,25 @@ TDO::DevStream::read(TDO::ROMTag &tag_)
 }
 
 void
+TDO::DevStream::write(TDO::ROMTag &tag_)
+{
+  read(tag_.sub_systype);
+  read(tag_.type);
+  read(tag_.version);
+  read(tag_.revision);
+  read(tag_.flags);
+  read(tag_.type_specific);
+  read(tag_.reserved1);
+  read(tag_.reserved2);
+  read(tag_.offset);
+  read(tag_.size);
+  read(tag_.reserved3[0]);
+  read(tag_.reserved3[1]);
+  read(tag_.reserved3[2]);
+  read(tag_.reserved3[3]);
+}
+
+void
 TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 {
   read(lmfe_.fingerprint);
