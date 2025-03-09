@@ -268,7 +268,21 @@ TDO::DevStream::romtags_block() const
 u64
 TDO::DevStream::romtags_count() const
 {
-  return _romtags.size();
+  u64 count; 
+  TDO::PosGuard _(*this);
+
+  count = 0;
+  while(true)
+    {
+      TDO::ROMTag romtag;
+
+      read(romtag);
+      if((romtag.type == 0) || (romtag.sub_systype == 0))
+        break;
+      count++;
+    }
+
+  return count;
 }
 
 u64
