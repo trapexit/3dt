@@ -116,7 +116,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   if(err)
     throw std::runtime_error("fuck, shit broken");
   
-  stream.data_block_seek(stream.romtags_block());
+  s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
     stream.write(tag);
   stream.write(TDO::ROMTag{});
