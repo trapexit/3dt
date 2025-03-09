@@ -446,7 +446,7 @@ TDO::DevStream::device_block_tell() const
 void
 TDO::DevStream::file_seek(const s64 pos_)
 {
-  _ios.seekpos(pos_);
+  _ios.seekg(pos_);
 }
 
 void
