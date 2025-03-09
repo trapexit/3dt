@@ -120,7 +120,6 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   for(auto &tag : tags.romtags)
     stream.write(tag);
   stream.write(TDO::ROMTag{});
-
 }
 
 
