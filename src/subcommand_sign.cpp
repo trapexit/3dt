@@ -142,6 +142,7 @@ public:
       case RSA_NEWKNEWNEWGNUBOOT:
         romtags.back().version  = 2;
         romtags.back().revision = 5;
+        romtags.back().size = 5996;
         break;
       }
   }
