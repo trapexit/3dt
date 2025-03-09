@@ -219,10 +219,10 @@ TDO::DevStream::disc_label_block() const
   return _disc_label_block;
 }
 
-const
-TDO::ROMTagVec&
+TDO::ROMTagVec
 TDO::DevStream::romtags() const
 {
+  
   return _romtags;
 }
 
