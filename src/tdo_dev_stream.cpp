@@ -228,10 +228,12 @@ TDO::DevStream::romtags()
   data_block_seek(romtags_block());
   while(true)
     {
-      romtags.emplace_back();
+      TDO::ROMTag romtag;
+      
       read(romtags.back());
       if((romtags.back().type == 0) || (romtags.back().sub_systype == 0))
         break;
+      romtags.emplace_back(romtag);            
     }
   
   return romtags;
