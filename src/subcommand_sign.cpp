@@ -275,6 +275,7 @@ namespace Subcommand
                        tag.offset,
                        tag.size);
           }
+        stream.write(TDO::ROMTag());
       }
   }
 }
