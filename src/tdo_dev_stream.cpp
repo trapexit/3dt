@@ -243,12 +243,17 @@ const
 std::optional<TDO::ROMTag>
 TDO::DevStream::romtag(const int type_) const
 {
-  for(const auto& romtag : _romtags)
+  TDO::PosGuard _(*this);
+  
+  while(true)
     {
-      if(romtag.type != type_)
-        continue;
+      TDO::ROMTag romtag;
 
-      return romtag;
+      read(romtag);
+      if(romtag.type == type_)
+        return romtag;
+      if((romtag.type == 0) || (romtag.sub_systype == 0))
+        break;
     }
 
   return {};
