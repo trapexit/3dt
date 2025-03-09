@@ -244,14 +244,6 @@ _sign_signature_block(TDO::FileStream &s_)
     }
 }
 
-static
-void
-_sign_image(TDO::FileStream &s_)
-{
-
-  //  _sign_signature_block(s_);
-}
-
 namespace Subcommand
 {
   void
