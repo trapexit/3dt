@@ -265,6 +265,13 @@ namespace Subcommand
         ROMTagsGenerator tags;
         TDO::FSWalker fsw(stream,tags);
         fsw.walk();
+        std::sort(tags.romtags.begin(),
+                  tags.romtags.end(),
+                  [](TDO::ROMTag &a, TDO::ROMTag &b)
+                  {
+                    return a.type > b.type;
+                  });
+        
         stream.data_block_seek(stream.romtags_block());
         for(auto &tag : tags.romtags)
           {
@@ -274,13 +281,6 @@ namespace Subcommand
                        tag.offset,
                        tag.size);
           }
-        std::sort(tags.romtags.begin(),
-                  tags.romtags.end(),
-                  [](TDO::ROMTag &a, TDO::ROMTag &b)
-                  {
-                    return a.type > b.type;
-                  });
-        
         stream.write(TDO::ROMTag{});
 
         //::_sign_image(stream);        
