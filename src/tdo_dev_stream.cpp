@@ -214,7 +214,8 @@ TDO::DevStream::disc_label() const
   TDO::PosGuard pos_guard(*this);
 
   data_block_seek(disc_label_block());
-  
+
+  read(dl);
   
   return dl;
 }
