@@ -239,7 +239,6 @@ TDO::DevStream::romtags()
   return romtags;
 }
 
-const
 std::optional<TDO::ROMTag>
 TDO::DevStream::romtag(const int type_)
 {
