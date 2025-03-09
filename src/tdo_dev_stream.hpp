@@ -93,7 +93,7 @@ namespace TDO
     s64 data_block_to_file_offset(const s64) const;
 
   public:
-    TDO::DiscLabel disc_label() const;
+    TDO::DiscLabel disc_label();
     u64 disc_label_size_in_bytes() const;
     u64 disc_label_block() const;
 
