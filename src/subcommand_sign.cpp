@@ -308,6 +308,9 @@ _sign_appsplash(TDO::FileStream &s_)
 
 
   romtag = s_.romtag(RSA_APPSPLASH);
+  if(!romtag)
+    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
+
   
 }
 
