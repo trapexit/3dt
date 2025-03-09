@@ -270,7 +270,7 @@ namespace Subcommand
             fmt::print("{}; {}; {}\n",
                        tag.type,
                        tag.offset,
-                       tag.length);
+                       tag.size);
           }
       }
   }
