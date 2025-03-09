@@ -312,6 +312,7 @@ _sign_appsplash(TDO::FileStream &s_)
     throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
 
   s_.read_data_bytes(data,romtag.size - sizeof(rsa512_sig_t));
+  
 }
 
 namespace Subcommand
