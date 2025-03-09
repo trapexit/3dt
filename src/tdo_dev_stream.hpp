@@ -42,7 +42,6 @@ namespace TDO
     u64 _data_start_offset;
 
   private:
-    TDO::DiscLabel _disc_label;
     u64 _disc_label_block;
     TDO::ROMTagVec _romtags;
     u64 _romtags_block;
