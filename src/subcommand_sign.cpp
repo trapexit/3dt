@@ -179,6 +179,7 @@ _sign_signature_block(TDO::FileStream &s_)
 
   volume_block_count = s_.disc_label().volume_block_count;
   num_digests        = ((volume_block_count * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
+
   for(u64 i = 0; i < num_digests; i++)
     {
       s64 block_pos;
