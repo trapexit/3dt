@@ -162,7 +162,7 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
   s_.write((char*)signature,sizeof(signature));
 }
 
-#define PHYSICAL_BLOCK_SIZE (2 * 1024)
+#define PHY_BLOCK_SIZE (2 * 1024)
 #define LOGICAL_BLOCK_SIZE (32 * 1024)
 
 // Maybe just assume ISO w/ contiguous 2048 byte block size?
@@ -178,15 +178,15 @@ _sign_signature_block(TDO::FileStream &s_)
   std::vector<char> signatures;
 
   volume_block_count = s_.disc_label().volume_block_count;
-  num_digests        = ((volume_block_count * LOGICAL_BLOCK_SIZE) / PHYSICAL_BLOCK_SIZE);
+  num_digests        = ((volume_block_count * LOGICAL_BLOCK_SIZE) / PHY_BLOCK_SIZE);
   for(u64 i = 0; i < num_digests; i++)
     {
       s64 block_pos;
 
-      block_pos = ((i * LOGICAL_BLOCK_SIZE) / PHYSICAL_BLOCK_SIZE);
+      block_pos = ((i * LOGICAL_BLOCK_SIZE) / PHY_BLOCK_SIZE);
 
       buf.clear();
-      s_.read_data_blocks(buf, block_pos, (LOGICAL_BLOCK_SIZE / PHYSICAL_BLOCK_SIZE));
+      s_.read_data_blocks(buf, block_pos, (LOGICAL_BLOCK_SIZE / PHY_BLOCK_SIZE));
 
       md5_calc(buf.data(),buf.size(),digest);
 
@@ -207,18 +207,18 @@ _sign_signature_block(TDO::FileStream &s_)
   fmt::print("{}\n",sig);
 
   signatures.resize(signatures.size() + sizeof(sig));
-  signatures.resize(((signatures.size() + (PHYSICAL_BLOCK_SIZE-1)) / PHYSICAL_BLOCK_SIZE) * PHYSICAL_BLOCK_SIZE);
+  signatures.resize(((signatures.size() + (PHY_BLOCK_SIZE-1)) / PHY_BLOCK_SIZE) * PHY_BLOCK_SIZE);
   signatures.resize(signatures.size() - sizeof(sig));
   signatures.insert(signatures.end(),
                     sig,
                     sig + sizeof(sig));
 
   s64 sig_offset = s_.romtag(RSA_SIGNATURE_BLOCK)->offset + 1;
-  for(u64 i = 0; i < (signatures.size() / PHYSICAL_BLOCK_SIZE); i++)
+  for(u64 i = 0; i < (signatures.size() / PHY_BLOCK_SIZE); i++)
     {
       fmt::print("offset: {}\n",sig_offset+i);
       s_.data_block_seek(sig_offset + i);
-      s_.write(&signatures[i * PHYSICAL_BLOCK_SIZE],PHYSICAL_BLOCK_SIZE);
+      s_.write(&signatures[i * PHY_BLOCK_SIZE],PHY_BLOCK_SIZE);
     }
 
   s_.data_block_seek(s_.romtags_block());
