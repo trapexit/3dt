@@ -58,7 +58,7 @@ public:
     
     lc_filepath = nonstd::string::as_lowercase(filepath_.string());
     if(lc_filepath != "signatures")
-      break;
+      return;
   }
 };  
 
