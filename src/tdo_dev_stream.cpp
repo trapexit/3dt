@@ -696,7 +696,7 @@ TDO::DevStream::read(TDO::ROMTag &tag_)
 }
 
 void
-TDO::DevStream::write(TDO::ROMTag &tag_)
+TDO::DevStream::write(const TDO::ROMTag &tag_)
 {
   write(tag_.sub_systype);
   write(tag_.type);
