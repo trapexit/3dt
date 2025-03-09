@@ -246,7 +246,7 @@ namespace Subcommand
         ::_sign_image(stream);
 
         ROMTagsGenerator tags;
-        TDO::FSWalker fs(stream,tags);
+        TDO::FSWalker fsw(stream,tags);
       }
   }
 }
