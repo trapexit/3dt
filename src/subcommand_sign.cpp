@@ -43,6 +43,14 @@ public:
   end()
   {
   }
+
+  void
+  operator()(const std::filesystem::path &filepath_,
+             const TDO::DirectoryHeader  &dh_,
+             TDO::DevStream              &stream_)
+  {
+
+  }
   
   void
   operator()(const std::filesystem::path &filepath_,
