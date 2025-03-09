@@ -306,6 +306,8 @@ _sign_appsplash(TDO::FileStream &s_)
 {
   std::optional<TDO::ROMTag> romtag;
   std::vector<char> data;
+  rsa512_sig_t sig;
+  md5_digest_t digest;
 
   romtag = s_.romtag(RSA_APPSPLASH);
   if(!romtag)
