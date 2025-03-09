@@ -223,6 +223,7 @@ _sign_signature_block(TDO::FileStream &s_)
       s_.write(&signatures[i * PHY_BLOCK_SIZE],PHY_BLOCK_SIZE);
     }
 
+  // Correct SIGNATURE_BLOCK romtag
   s_.data_block_seek(s_.romtags_block());
   while(true)
     {
@@ -244,6 +245,8 @@ _sign_signature_block(TDO::FileStream &s_)
       s_.write((u32)signatures.size());
       break;
     }
+
+  
 }
 
 namespace Subcommand
