@@ -84,7 +84,7 @@ public:
     romtags.back().type        = type;
     romtags.back().sub_systype = 0x0F;
     romtags.back().size        = record_.byte_count;
-    romtags.back().offset      = record_.avatar_list[0];
+    romtags.back().offset      = record_.avatar_list[0] - 1;
     romtags.back().version     = 0;
     romtags.back().revision    = 0;
     switch(type)
