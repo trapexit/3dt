@@ -134,6 +134,8 @@ TDO::DevStream::setup()
       find_label();
       if(eof())
         return {"unable to find OperaFS in image"};
+
+      read(dl);
       
       _device_block_header    = 0;
       _device_block_data_size = _disc_label.volume_block_size;
