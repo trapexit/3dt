@@ -60,6 +60,9 @@ namespace TDO
     std::iostream &iostream() { return _ios; }
 
   public:
+    void resize_multiple(s64);
+    
+  public:
     u64 data_start_offset() const;
 
   public:
