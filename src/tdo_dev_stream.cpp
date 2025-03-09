@@ -241,7 +241,7 @@ TDO::DevStream::romtags()
 
 const
 std::optional<TDO::ROMTag>
-TDO::DevStream::romtag(const int type_) const
+TDO::DevStream::romtag(const int type_)
 {
   TDO::PosGuard _(*this);
   
