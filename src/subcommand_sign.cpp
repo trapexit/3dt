@@ -300,6 +300,13 @@ _sign_signature_block(TDO::FileStream &s_)
     throw std::runtime_error("broken sig write");
 }
 
+static
+void
+_sign_appsplash(TDO::FileStream &s_)
+{
+  
+}
+
 namespace Subcommand
 {
   void
