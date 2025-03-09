@@ -182,7 +182,7 @@ namespace TDO
   class PosGuard
   {
   public:
-    PosGuard(const DevStream &stream_)
+    PosGuard(DevStream &stream_)
       : _stream(stream_)
     {
       _pos = _stream.file_tell();
