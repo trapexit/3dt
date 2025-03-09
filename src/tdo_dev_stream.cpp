@@ -546,7 +546,9 @@ TDO::DevStream::read_data_blocks(std::vector<char> &v_,
   v_.resize(end + (device_block_data_size() * blocks_));
   for(s64 i = 0; i < blocks_; i++)
     {
-      fmt::print("{} {}",_ios.tellg(),_ios.good());
+      fmt::print("{} {}\n",_ios.tellg(),_ios.good());
+      if(_ios.good() == false)
+        throw std::runtime_error("");
       read(&v_[end],device_block_data_size());
       end += device_block_data_size();
     }
