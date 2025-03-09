@@ -274,6 +274,13 @@ namespace Subcommand
                        tag.offset,
                        tag.size);
           }
+        std::sort(tags.romtags.begin(),
+                  tags.romtags.end(),
+                  [](TDO::ROMTag &a, TDO::ROMTag &b)
+                  {
+                    
+                  });
+        
         stream.write(TDO::ROMTag{});
 
         //::_sign_image(stream);        
