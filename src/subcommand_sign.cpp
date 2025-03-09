@@ -79,6 +79,8 @@ public:
         romtags.back().revision = 255;
         break;
       case RSA_NEWKNEWNEWGNUBOOT:
+        romtags.back().version  = 2;
+        romtags.back().revision = 5;
         break;
       }
   }
