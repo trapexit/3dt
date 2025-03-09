@@ -54,7 +54,10 @@ public:
              const u32                    record_pos_,
              TDO::DevStream              &stream_)
   {
-
+    std::string lc_filepath;
+    
+    lc_filepath = nonstd::string::as_lowercase(filepath_.string());
+    
   }
 };  
 
