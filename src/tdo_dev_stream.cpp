@@ -129,6 +129,8 @@ TDO::DevStream::setup()
     }
   else
     {
+      TDO::DiscLabel dl;
+      
       find_label();
       if(eof())
         return {"unable to find OperaFS in image"};
