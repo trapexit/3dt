@@ -265,12 +265,6 @@ namespace Subcommand
         ROMTagsGenerator tags;
         TDO::FSWalker fsw(stream,tags);
         fsw.walk();
-        std::sort(tags.romtags.begin(),
-                  tags.romtags.end(),
-                  [](TDO::ROMTag &a, TDO::ROMTag &b)
-                  {
-                    return a.type < b.type;
-                  });
         stream.data_block_seek(stream.romtags_block());
         for(auto &tag : tags.romtags)
           {
