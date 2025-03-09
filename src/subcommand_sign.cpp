@@ -104,6 +104,22 @@ public:
   }
 };
 
+static
+void
+_generate_and_write_romtags(TDO::FileStream &s_)
+{
+  TDO::Error err;
+  ROMTagsGenerator tags;
+  TDO::FSWalker fsw(stream,tags);
+  
+  err = fsw.walk();
+  stream.data_block_seek(stream.romtags_block());
+  for(auto &tag : tags.romtags)
+    stream.write(tag);
+  stream.write(TDO::ROMTag{});
+
+}
+
 
 static
 void
@@ -262,13 +278,6 @@ namespace Subcommand
 
         fmt::print("{}:\n",filepath);
 
-        ROMTagsGenerator tags;
-        TDO::FSWalker fsw(stream,tags);
-        fsw.walk();
-        stream.data_block_seek(stream.romtags_block());
-        for(auto &tag : tags.romtags)
-          stream.write(tag);
-        stream.write(TDO::ROMTag{});
 
         ::_sign_image(stream);
       }
