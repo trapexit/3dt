@@ -42,10 +42,6 @@ public:
   {
     u32 type;
     std::string lc_filepath;
-
-    romtags.emplace_back();
-    romtags.back().type        = type;
-    romtags.back().sub_systype = 0x0F;
     
     type = 0;
     lc_filepath = nonstd::string::as_lowercase(filepath_.string());
@@ -65,6 +61,9 @@ public:
     if(type == 0)
       return;
 
+    romtags.emplace_back();
+    romtags.back().type        = type;
+    romtags.back().sub_systype = 0x0F;
     romtags.back().size        = record_.byte_count;
     romtags.back().offset      = record_.avatar_list[0];
     romtags.back().version     = 0;
