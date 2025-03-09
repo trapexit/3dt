@@ -276,7 +276,7 @@ namespace Subcommand
           }
         stream.write(TDO::ROMTag{});
 
-        ::_sign_image(stream);        
+        //::_sign_image(stream);        
       }
   }
 }
