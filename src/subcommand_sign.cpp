@@ -294,6 +294,9 @@ _sign_signature_block(TDO::FileStream &s_)
   TDO::FSWalker fsw(s_,sfu);
 
   sfu.signatures_file_size = signatures.size();
+  auto err = fsw.walk();
+  if(err)
+    throw std::runtime_error("broken sig write");
 }
 
 namespace Subcommand
