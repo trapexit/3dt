@@ -265,7 +265,7 @@ TDO::DevStream::romtags_block() const
 }
 
 u64
-TDO::DevStream::romtags_count() const
+TDO::DevStream::romtags_count()
 {
   u64 count; 
   TDO::PosGuard _(*this);
