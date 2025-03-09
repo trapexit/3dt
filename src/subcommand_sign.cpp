@@ -318,6 +318,7 @@ _sign_appsplash(TDO::FileStream &s_)
            data.size(),
            digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
+  
 }
 
 namespace Subcommand
