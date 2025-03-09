@@ -48,7 +48,7 @@ public:
     if(lc_filepath == "signatures")
       type = RSA_SIGNATURE_BLOCK;
     else if(lc_filepath == "system/kernel/boot_code")
-      type = RSA_NEWKNEWNEWGNUBOOT;
+      type = RSA_NEWKNEWNEWGNUBOOT; // version isn't used?
     else if(lc_filepath == "system/kernel/misc_code")
       type = RSA_MISCCODE;
     else if(lc_filepath == "system/kernel/os_code")
