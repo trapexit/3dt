@@ -278,7 +278,7 @@ namespace Subcommand
                   tags.romtags.end(),
                   [](TDO::ROMTag &a, TDO::ROMTag &b)
                   {
-                    
+                    return a.type > b.type;
                   });
         
         stream.write(TDO::ROMTag{});
