@@ -101,8 +101,8 @@ namespace TDO
     TDO::ROMTagVec romtags();
     std::optional<TDO::ROMTag> romtag(const int type);
     u64 romtags_block() const;
-    u64 romtags_count() const;
-    u64 romtags_size_in_bytes() const;
+    u64 romtags_count();
+    u64 romtags_size_in_bytes();
 
   public:
     void read(char *buf, const u64 size);
