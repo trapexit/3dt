@@ -110,7 +110,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 {
   TDO::Error err;
   ROMTagsGenerator tags;
-  TDO::FSWalker fsw(stream,tags);
+  TDO::FSWalker fsw(s_,tags);
   
   err = fsw.walk();
   if(err)
