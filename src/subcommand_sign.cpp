@@ -271,7 +271,6 @@ namespace Subcommand
                   {
                     return a.type > b.type;
                   });
-        
         stream.data_block_seek(stream.romtags_block());
         for(auto &tag : tags.romtags)
           {
