@@ -213,7 +213,7 @@ TDO::DiscLabel
 TDO::DevStream::disc_label() const
 {
   TDO::DiscLabel dl;
-  const TDO::PosGuard pos_guard(*this);
+  TDO::PosGuard pos_guard(*this);
 
   data_block_seek(disc_label_block());
 
