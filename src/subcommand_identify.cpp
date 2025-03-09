@@ -187,7 +187,7 @@ namespace
     Error err;
     std::fstream fs;
 
-    fs.open(filepath_,std::ios::binary);
+    fs.open(filepath_,std::ios::binary|std::ios::in);
     if(!fs.good())
       return Log::error_stream_open(filepath_);
 
