@@ -63,7 +63,7 @@ public:
     if(lc_filepath != "signatures")
       return;
 
-    
+    stream_.data_byte_seek(record_pos_);
   }
 };  
 
