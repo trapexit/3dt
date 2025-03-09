@@ -69,8 +69,16 @@ public:
     romtags.back().offset      = record_.avatar_list[0];
     romtags.back().version     = 0;
     romtags.back().revision    = 0;
-    if(type == RSA_SIGNATURE_BLOCK)
-      romtags.back().type_specific = 15;
+    switch(type)
+      {
+      case RSA_SIGNATURE_BLOCK:
+        romtags.back().type_specific = 15;
+        break;
+      case RSA_OS:
+        break;
+      case RSA_NEWKNEWNEWGNUBOOT:
+        break;
+      }
   }
 };
 
