@@ -30,6 +30,9 @@
 class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
 {
 public:
+  u32 signatures_file_size;
+  
+public:
   void
   begin()
   {
