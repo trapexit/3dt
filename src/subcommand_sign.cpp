@@ -269,7 +269,7 @@ namespace Subcommand
                   tags.romtags.end(),
                   [](TDO::ROMTag &a, TDO::ROMTag &b)
                   {
-                    return a.type > b.type;
+                    return a.type < b.type;
                   });
         stream.data_block_seek(stream.romtags_block());
         for(auto &tag : tags.romtags)
