@@ -362,7 +362,13 @@ TDO::DevStream::file_offset_to_data_block(const s64 file_offset_) const
 s64
 TDO::DevStream::file_tell() const
 {
-  return _ios.tellg();
+  s64 rv;
+
+  rv = _ios.tellg();
+  if(rv == -1)
+    throw std::runtime_error("fuck");
+  
+  return rv;
 }
 
 s64
