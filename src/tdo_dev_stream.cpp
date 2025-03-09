@@ -770,9 +770,9 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 void
 TDO::DevStream::resize_multiple(s64 multiple_)
 {
+  s64 size;  
   TDO::PosGuard _(*this);
-  s64 size;
-
+  
   _ios.seekg(0,std::ios::end);
   size = _ios.tellg();
   size = (((size + multiple_ - 1) / multiple_) * multiple_);
