@@ -147,9 +147,6 @@ TDO::DevStream::setup()
   _disc_label_block  = data_block_tell();  
   _romtags_block     = _disc_label_block + 1;      
 
-  // if(_disc_label.num_rom_tags == 0)
-  //   _disc_label.num_rom_tags = ::count_m1_romtags(*this,_romtags_block);
-
   _ios.seekg(0,_ios.end);
   _device_block_count = (_ios.tellg() / device_block_size());
   _ios.seekg(0);
