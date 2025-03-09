@@ -25,7 +25,7 @@
 #include <functional>
 #include <istream>
 
-
+// TODO: Add way to exit walk
 namespace TDO
 {
   class FSWalker
