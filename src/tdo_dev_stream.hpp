@@ -43,7 +43,6 @@ namespace TDO
 
   private:
     u64 _disc_label_block;
-    TDO::ROMTagVec _romtags;
     u64 _romtags_block;
     std::iostream &_ios;
 
