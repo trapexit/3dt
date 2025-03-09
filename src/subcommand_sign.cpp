@@ -49,7 +49,7 @@ public:
       type = RSA_SIGNATURE_BLOCK;
     else if(lc_filepath == "system/kernel/boot_code")
       type = RSA_NEWKNEWNEWGNUBOOT; // version, revision isn't used?
-                                    // picked up by 3DO AIF header
+                                    // picked up by 3DO AIF header, cdipir.c
     else if(lc_filepath == "system/kernel/misc_code")
       type = RSA_MISCCODE;
     else if(lc_filepath == "system/kernel/os_code")
