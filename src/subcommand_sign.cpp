@@ -265,6 +265,7 @@ namespace Subcommand
 
         ROMTagsGenerator tags;
         TDO::FSWalker fsw(stream,tags);
+        fsw.walk();
         for(auto &tag : tags.romtags)
           {
             fmt::print("{}; {}; {}\n",
