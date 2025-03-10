@@ -248,6 +248,24 @@ generate_sign_argparser(CLI::App      &app_,
 
 static
 void
+generate_signfile_argparser(CLI::App          &app_,
+                            Options::SignFile &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("sign","sign 3DO ISO for retail system use");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  
+  subcmd->callback(std::bind(Subcommand::sign,
+                             std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
