@@ -95,7 +95,7 @@ public:
   struct SignFile
   {
     PathVec filepaths;
-    bool append;
+    bool    append;
   };
 
   List     list     = {};
