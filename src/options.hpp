@@ -94,8 +94,9 @@ public:
 
   struct SignFile
   {
-    PathVec filepaths;
-    bool    append;
+    PathVec     filepaths;
+    std::string key_name;
+    bool        append;
   };
 
   List     list     = {};
