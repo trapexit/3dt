@@ -343,6 +343,7 @@ namespace Subcommand
 
         fmt::print("{}:\n",filepath);
         stream.resize_multiple(LOG_BLOCK_SIZE);
+        ::_update_disc_label(stream);
         ::_generate_and_write_romtags(stream);
         ::_sign_disclabel_romtags_bootcode(stream);
         ::_sign_signature_block(stream);
