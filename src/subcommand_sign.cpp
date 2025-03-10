@@ -165,12 +165,12 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
   TDO::ROMTagVec sorted;
 
-  sorted.emplace_back(s_.romtag(0x0D));
-  sorted.emplace_back(s_.romtag(0x07));
-  sorted.emplace_back(s_.romtag(0x0C));
-  sorted.emplace_back(s_.romtag(0x02));
-  sorted.emplace_back(s_.romtag(0x10));
-  sorted.emplace_back(s_.romtag(0x14));
+  sorted.emplace_back(*s_.romtag(0x0D));
+  sorted.emplace_back(*s_.romtag(0x07));
+  sorted.emplace_back(*s_.romtag(0x0C));
+  sorted.emplace_back(*s_.romtag(0x02));
+  sorted.emplace_back(*s_.romtag(0x10));
+  sorted.emplace_back(*s_.romtag(0x14));
 
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
