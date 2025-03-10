@@ -149,6 +149,19 @@ public:
 
 static
 void
+_sign_file(std::filesystem::path &filepath_)
+{
+  std::fstream fs;
+
+  fs.open(filepath_,std::ios::in|std::ios::out|std::ios::binary);
+
+  
+
+  fs.close();
+}
+
+static
+void
 _generate_and_write_romtags(TDO::FileStream &s_)
 {
   ROMTagsGenerator tags;
