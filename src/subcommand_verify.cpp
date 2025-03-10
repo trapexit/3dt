@@ -105,7 +105,7 @@ _verify_disclabel_romtags_bootcode(TDO::DevStream &s_)
            data.size(),
            digest);
 
-  tdo_rsa_sign(TDO_KEY_APP,digest,computed_sig);
+  tdo_rsa_sign(TDO_KEY_3DO,digest,computed_sig);
   fmt::print("   - computed sig: {}\n",computed_sig);
 
   fmt::print("   - match: {}\n",
