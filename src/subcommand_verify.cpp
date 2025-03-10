@@ -70,7 +70,6 @@ _verify_disclabel_romtags_bootcode(TDO::DevStream &s_)
   s_.read_data_bytes_from_block(data,
                                  s_.disc_label_block(),
                                  s_.disc_label_size_in_bytes());
-  fmt::print("{}\n",s_.romtags_size_in_bytes());
   s_.read_data_bytes_from_block(data,
                                  s_.romtags_block(),
                                  s_.romtags_size_in_bytes());
