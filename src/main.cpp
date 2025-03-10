@@ -259,6 +259,9 @@ generate_signfile_argparser(CLI::App          &app_,
     ->type_name("PATH")
     ->check(CLI::ExistingFile)
     ->required();
+  subcmd->add_option("--append",opts_.append)
+    ->default_val(false);
+  
   
   subcmd->callback(std::bind(Subcommand::sign_file,
                              std::cref(opts_)));
