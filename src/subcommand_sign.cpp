@@ -160,8 +160,6 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
   TDO::ROMTagVec sorted;
 
-  
-  
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
     s_.write(tag);
