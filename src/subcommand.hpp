@@ -35,4 +35,5 @@ namespace Subcommand
   void verify(const Options::Verify &options);
   void sign(const Options::Sign &options);
   void sign_file(const Options::SignFile &);
+  void decrypt_file(const Options::DecryptFile&);
 }
