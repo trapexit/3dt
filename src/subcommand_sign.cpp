@@ -319,7 +319,7 @@ _sign_appsplash(TDO::FileStream &s_)
   md5_calc(data.data(),
            data.size(),
            digest);
-  tdo_rsa_sign(TDO_KEY_3DO,digest,sig);
+  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
   s_.write((const char*)sig,sizeof(sig));
 }
