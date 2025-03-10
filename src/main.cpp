@@ -291,6 +291,7 @@ generate_argparser(CLI::App &app_,
   generate_verify_argparser(app_,options_.verify);
   generate_sign_argparser(app_,options_.sign);
   generate_signfile_argparser(app_,options_.signfile);
+  generate_decryptfile_argparser(app_,options_.decryptfile);  
 }
 
 static
