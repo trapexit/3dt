@@ -209,7 +209,7 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
   md5_calc(data.data(),
            data.size(),
            digest);
-  tdo_rsa_sign(TDO_KEY_3DO,digest,signature);
+  tdo_rsa_sign(TDO_KEY_APP,digest,signature);
 
   fmt::print(" - Signing DiscLabel + ROMTags + BootCode with APP key\n"
              "   - signature: {}\n",
