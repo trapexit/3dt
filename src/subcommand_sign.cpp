@@ -92,7 +92,6 @@ public:
              const TDO::DirectoryHeader  &dh_,
              TDO::DevStream              &stream_)
   {
-
   }
   
   void
