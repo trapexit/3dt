@@ -676,20 +676,20 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
 void
 TDO::DevStream::write(const TDO::DiscLabel &dl_)
 {
-  read(dl_.record_type);
-  read(dl_.volume_sync_bytes);
-  read(dl_.volume_structure_version);
-  read(dl_.volume_flags);
-  read(dl_.volume_commentary);
-  read(dl_.volume_identifier);
-  read(dl_.volume_unique_identifier);
-  read(dl_.volume_block_size);
-  read(dl_.volume_block_count);
-  read(dl_.root_unique_identifier);
-  read(dl_.root_directory_block_count);
-  read(dl_.root_directory_block_size);
-  read(dl_.root_directory_last_avatar_index);
-  read(dl_.root_directory_avatar_list);
+  write(dl_.record_type);
+  write(dl_.volume_sync_bytes);
+  write(dl_.volume_structure_version);
+  write(dl_.volume_flags);
+  write(dl_.volume_commentary);
+  write(dl_.volume_identifier);
+  write(dl_.volume_unique_identifier);
+  write(dl_.volume_block_size);
+  write(dl_.volume_block_count);
+  write(dl_.root_unique_identifier);
+  write(dl_.root_directory_block_count);
+  write(dl_.root_directory_block_size);
+  write(dl_.root_directory_last_avatar_index);
+  write(dl_.root_directory_avatar_list);
 }
 
 void
