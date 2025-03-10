@@ -263,7 +263,7 @@ generate_signfile_argparser(CLI::App          &app_,
     ->default_val(false);
   subcmd->add_option("--key-name",opts_.key_name)
     ->default_val(TDO_KEY_APP)
-    ->check(CLI::IsMember({"human","csv"}));    
+    ->check(CLI::IsMember({TDO_KEY_APP,TDO_KEY_3DO}));    
   
   subcmd->callback(std::bind(Subcommand::sign_file,
                              std::cref(opts_)));
