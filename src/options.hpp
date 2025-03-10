@@ -92,6 +92,12 @@ public:
     PathVec filepaths;
   };
 
+  struct SignFile
+  {
+    PathVec filepaths;
+    bool append;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
