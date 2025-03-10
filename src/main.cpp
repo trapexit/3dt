@@ -265,6 +265,7 @@ generate_argparser(CLI::App &app_,
   generate_romtags_argparser(app_,options_.romtags);
   generate_verify_argparser(app_,options_.verify);
   generate_sign_argparser(app_,options_.sign);
+  generate_signfile_argparser(app_,options_.sign_file);
 }
 
 static
