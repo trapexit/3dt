@@ -173,7 +173,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   sorted.emplace_back(*s_.romtag(0x14));
 
   s_.data_block_seek(s_.romtags_block());
-  for(auto &tag : tags.romtags)
+  for(auto &tag : sorted)
     s_.write(tag);
   s_.write(TDO::ROMTag{});
 }
