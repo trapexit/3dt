@@ -273,6 +273,24 @@ generate_signfile_argparser(CLI::App          &app_,
 
 static
 void
+generate_signfile_argparser(CLI::App          &app_,
+                            Options::SignFile &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("sign-file","sign file with 3DO or APP key");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to file to sign")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  
+  subcmd->callback(std::bind(Subcommand::sign_file,
+                             std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
