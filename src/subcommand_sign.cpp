@@ -167,7 +167,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
   sorted.emplace_back(*s_.romtag(RSA_NEWKNEWNEWGNUBOOT));
   sorted.emplace_back(*s_.romtag(RSA_OS));
-  sorted.emplace_back({0xf,0xc,0,0,0,0,2898261906,0});
+  sorted.emplace_back((TDO::ROMTag{0xf,0xc,0,0,0,0,2898261906,0});
   sorted.emplace_back(*s_.romtag(RSA_BLOCKS_ALWAYS));
   sorted.emplace_back(*s_.romtag(RSA_MISCCODE));
   sorted.emplace_back(*s_.romtag(RSA_APPSPLASH));
