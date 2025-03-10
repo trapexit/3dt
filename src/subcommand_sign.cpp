@@ -158,12 +158,14 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   if(err)
     throw std::runtime_error("fuck, shit broken");
 
-  TDO::ROMTagVec sorted;
-
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
     s_.write(tag);
   s_.write(TDO::ROMTag{});
+
+  TDO::ROMTagVec sorted;
+
+  sorted.emplace_back(s_.romtag(0x0D));
 }
 
 
