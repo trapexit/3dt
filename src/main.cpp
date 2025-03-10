@@ -255,7 +255,7 @@ generate_signfile_argparser(CLI::App          &app_,
 
   subcmd = app_.add_subcommand("sign-file","sign file with 3DO or APP key");
   subcmd->add_option("filepaths",opts_.filepaths)
-    ->description("path to disc images")
+    ->description("path to file to sign")
     ->type_name("PATH")
     ->check(CLI::ExistingFile)
     ->required();
