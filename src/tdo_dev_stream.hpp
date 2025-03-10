@@ -167,14 +167,14 @@ namespace TDO
 
     template<u64 N>
     void
-    write(std::array<char,N> &arr_)
+    write(const std::array<char,N> &arr_)
     {
       write(&arr_[0],arr_.size());
     }
 
     template<u64 N>
     void
-    write(std::array<u32,N> &arr_)
+    write(const std::array<u32,N> &arr_)
     {
       for(u64 i = 0; i < arr_.size(); i++)
         write(arr_[i]);
