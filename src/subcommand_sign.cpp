@@ -324,6 +324,13 @@ _sign_appsplash(TDO::FileStream &s_)
   s_.write((const char*)sig,sizeof(sig));
 }
 
+static
+void
+_update_disc_label(TDO::FileStream &s_)
+{
+
+}
+
 namespace Subcommand
 {
   void
