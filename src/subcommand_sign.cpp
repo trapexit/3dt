@@ -163,6 +163,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     s_.write(tag);
   s_.write(TDO::ROMTag{});
 
+  return;
+  
   TDO::ROMTagVec sorted;
 
   sorted.emplace_back(*s_.romtag(RSA_NEWKNEWNEWGNUBOOT));
