@@ -102,8 +102,6 @@ public:
   struct DecryptFile
   {
     PathVec     filepaths;
-    std::string key_name;
-    bool        append;
   };
 
   List     list     = {};
