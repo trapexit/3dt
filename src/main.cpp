@@ -273,7 +273,7 @@ generate_signfile_argparser(CLI::App          &app_,
 
 static
 void
-generate_signfile_argparser(CLI::App          &app_,
+generate_decrypt_argparser(CLI::App          &app_,
                             Options::SignFile &opts_)
 {
   CLI::App *subcmd;
