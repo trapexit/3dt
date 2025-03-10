@@ -328,7 +328,10 @@ static
 void
 _update_disc_label(TDO::FileStream &s_)
 {
+  TDO::DiscLabel dl;
 
+  dl = s_.disc_label();
+  
 }
 
 namespace Subcommand
