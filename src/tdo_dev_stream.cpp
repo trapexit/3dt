@@ -271,6 +271,8 @@ TDO::DevStream::romtags_count()
   u64 count; 
   TDO::PosGuard _(*this);
 
+  data_block_seek(romtags_block());
+  
   count = 0;
   while(true)
     {
