@@ -99,6 +99,13 @@ public:
     bool        append;
   };
 
+  struct DecryptFile
+  {
+    PathVec     filepaths;
+    std::string key_name;
+    bool        append;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
