@@ -16,6 +16,8 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "tdo_rsa.h"
+
 #include "subcommand.hpp"
 
 #include "CLI11.hpp"
