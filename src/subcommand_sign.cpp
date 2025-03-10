@@ -136,7 +136,7 @@ public:
         break;
       case RSA_OS:
         romtags.back().version  = 24;
-        romtags.back().revision = 255;
+        romtags.back().revision = 225;
         break;
       case RSA_NEWKNEWNEWGNUBOOT:
         romtags.back().version  = 2;
