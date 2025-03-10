@@ -116,4 +116,5 @@ public:
   Verify   verify   = {};
   Sign     sign     = {};
   SignFile signfile = {};
+  DecryptFile decryptfile = {};
 };
