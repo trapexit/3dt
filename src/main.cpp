@@ -278,7 +278,7 @@ generate_signfile_argparser(CLI::App          &app_,
 {
   CLI::App *subcmd;
 
-  subcmd = app_.add_subcommand("decrypt-file","sign file with 3DO or APP key");
+  subcmd = app_.add_subcommand("decrypt-file","");
   subcmd->add_option("filepaths",opts_.filepaths)
     ->description("path to file to decrypt")
     ->type_name("PATH")
