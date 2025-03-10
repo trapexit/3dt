@@ -109,4 +109,5 @@ public:
   ROMTags  romtags  = {};
   Verify   verify   = {};
   Sign     sign     = {};
+  SignFile signfile = {};
 };
