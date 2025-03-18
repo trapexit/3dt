@@ -259,6 +259,8 @@ _sign_signature_block(TDO::FileStream &s_)
     {
       s64 block_pos;
 
+      s_.stream();
+      
       block_pos = ((i * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
 
       buf.clear();
