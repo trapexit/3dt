@@ -129,7 +129,7 @@ public:
     romtags.back().offset      = record_.avatar_list[0] - 1;
     romtags.back().version     = 0;
     romtags.back().revision    = 0;
-    switch(type)
+    switch(type) // TODO: Look at these values
       {
       case RSA_SIGNATURE_BLOCK:
         romtags.back().type_specific = 15;
