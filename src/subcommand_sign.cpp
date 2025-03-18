@@ -154,9 +154,7 @@ _sign_file(std::filesystem::path &filepath_)
   std::fstream fs;
 
   fs.open(filepath_,std::ios::in|std::ios::out|std::ios::binary);
-
   
-
   fs.close();
 }
 
