@@ -800,8 +800,8 @@ TDO::DevStream::size_in_device_blocks()
 {
   s64 bytes;
 
-  bytes = size_in_bytes();
-  bytes /= 
+  bytes  = size_in_bytes();
+  bytes /= device_block_count();
 
   return bytes;
 }
