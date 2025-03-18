@@ -781,6 +781,9 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
   read(lmfe_.filename,sizeof(lmfe_.filename));
 }
 
+s64
+
+
 void
 TDO::DevStream::resize_multiple(s64 multiple_)
 {
