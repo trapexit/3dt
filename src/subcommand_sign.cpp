@@ -153,9 +153,9 @@ void
 _generate_and_write_romtags(TDO::FileStream &s_)
 {
   ROMTagsGenerator tags;
-  TDO::FSWalker fsw(s_,tags);
+  TDO::FSWalker fswalker(s_,tags);
   
-  auto err = fsw.walk();
+  auto err = fswalker.walk();
   if(err)
     throw std::runtime_error("fuck, shit broken");
 
