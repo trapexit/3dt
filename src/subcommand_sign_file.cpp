@@ -33,6 +33,7 @@ static
 void
 _sign_file(std::fstream     &fs_,
            const std::string key_name_,
+           const bool        write_,
            const bool        append_)
 {
   md5_digest_t digest;
