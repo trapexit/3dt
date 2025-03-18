@@ -26,6 +26,8 @@
 #include "fmt.hpp"
 #include "fmt_rsa512_sig.hpp"
 
+#include "types_ints.h"
+
 #include <vector>
 #include <fstream>
 
