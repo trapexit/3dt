@@ -35,6 +35,7 @@ static
 void
 _sign_file(std::fstream     &fs_,
            const std::string key_name_,
+           const u64         length_,
            const bool        write_,
            const bool        append_)
 {
