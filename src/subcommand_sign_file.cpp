@@ -63,6 +63,7 @@ _sign_file(std::fstream     &fs_,
 
   fmt::print(" - md5 digest: {}\n"
              " - rsa sig: {}\n",
+             digest,
              sig);
 
   if(write_)
