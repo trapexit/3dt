@@ -793,6 +793,17 @@ TDO::DevStream::size_in_bytes()
   return size;
 }
 
+s64
+TDO::DevStream::size_in_device_blocks()
+{
+  s64 bytes;
+
+  bytes = size_in_bytes();
+  
+
+  return bytes;
+}
+
 void
 TDO::DevStream::resize_multiple(s64 multiple_)
 {
