@@ -60,6 +60,8 @@ namespace TDO
     std::iostream &iostream() { return _ios; }
 
   public:
+    s64  size_in_bytes();
+    s64  size_in_device_blocks();
     void resize_multiple(s64);
     
   public:
@@ -186,6 +188,12 @@ namespace TDO
   public:
     PosGuard(DevStream &stream_)
       : _stream(stream_),
+        _pos(_stream.file_tell())
+    {
+    }
+
+    PosGuard(DevStream *stream_)
+      : _stream(*stream_),
         _pos(_stream.file_tell())
     {
     }
