@@ -782,9 +782,10 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 }
 
 s64
-TDO::DevStream
-
-
+TDO::DevStream::size_in_bytes()
+{
+  TDO::PosGuard _(*this);
+}
 
 void
 TDO::DevStream::resize_multiple(s64 multiple_)
