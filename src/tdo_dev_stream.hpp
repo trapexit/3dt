@@ -38,7 +38,6 @@ namespace TDO
     u64 _device_block_header;
     u64 _device_block_data_size;
     u64 _device_block_footer;
-    u64 _device_block_count;
     u64 _data_start_offset;
 
   private:
