@@ -24,6 +24,7 @@
 #include "options.hpp"
 
 #include "fmt.hpp"
+#include "fmt_rsa512_sig.hpp"
 
 #include <vector>
 #include <fstream>
