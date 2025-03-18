@@ -362,7 +362,7 @@ _update_disc_label(TDO::FileStream &s_)
 
   dl = s_.disc_label();
 
-  dl.volume_block_count = 0x00000570;
+  dl.volume_block_count = s_.size_in_device_blocks();
 
   s_.data_block_seek(s_.disc_label_block());
   s_.write(dl);
