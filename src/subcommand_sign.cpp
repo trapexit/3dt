@@ -370,7 +370,6 @@ namespace Subcommand
         ::_sign_appsplash(stream);        
         ::_sign_disclabel_romtags_bootcode(stream);
 
-        stream.flush();
         stream.close();
       }
   }
