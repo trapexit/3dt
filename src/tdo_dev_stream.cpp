@@ -328,7 +328,11 @@ TDO::DevStream::device_block_size() const
 u64
 TDO::DevStream::device_block_count() const
 {
-  return _device_block_count;
+  TDO::PosGuard _(this);
+
+  _ios.seekg(0,std::ios::end);
+
+  return (_ios.tellg() / device_block_size());
 }
 
 s64
@@ -799,7 +803,7 @@ TDO::DevStream::size_in_device_blocks()
   s64 bytes;
 
   bytes = size_in_bytes();
-  
+  bytes /= 
 
   return bytes;
 }
