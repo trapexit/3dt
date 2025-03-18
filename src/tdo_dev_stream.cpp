@@ -784,7 +784,13 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 s64
 TDO::DevStream::size_in_bytes()
 {
+  s64 size;
   TDO::PosGuard _(*this);
+
+  _ios.seekg(0,std::ios::end);
+  size = _ios.tellg();
+  
+  return 
 }
 
 void
