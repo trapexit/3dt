@@ -782,6 +782,8 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 }
 
 s64
+TDO::DevStream
+
 
 
 void
