@@ -790,7 +790,7 @@ TDO::DevStream::size_in_bytes()
   _ios.seekg(0,std::ios::end);
   size = _ios.tellg();
   
-  return 
+  return size;
 }
 
 void
