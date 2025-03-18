@@ -44,7 +44,6 @@ namespace TDO
     u64 _disc_label_block;
     u64 _romtags_block;
     std::iostream &_ios;
-    mutable std::shared_ptr<std::iostream> _iosp;
 
   public:
     DevStream(std::iostream &ios);
