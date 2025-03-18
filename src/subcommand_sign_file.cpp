@@ -59,7 +59,7 @@ _sign_file(std::fstream     &fs_,
                digest,
                sig);
 
-  fmt::print("{}\n",sig);
+  fmt::print(" - sig: {}\n",sig);
 
   if(write_)
     {
