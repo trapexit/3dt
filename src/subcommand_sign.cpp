@@ -362,7 +362,10 @@ namespace Subcommand
             continue;
           }
 
-        fmt::print("{}:\n",filepath);
+        fmt::print("{}:\n"
+                   " - current size: {}\n",
+                   filepath,
+                   stream.size_in_bytes());
         stream.resize_multiple(LOG_BLOCK_SIZE);
         ::_update_disc_label(stream);
         ::_generate_and_write_romtags(stream);
