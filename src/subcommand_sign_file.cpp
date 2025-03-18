@@ -59,8 +59,11 @@ _sign_file(std::fstream     &fs_,
                digest,
                sig);
 
-  fs_.seekp(filesize,std::ios::beg);
-  fs_.write((const char*)sig,sizeof(sig));
+  if(write_)
+    {
+      fs_.seekp(filesize,std::ios::beg);
+      fs_.write((const char*)sig,sizeof(sig));
+    }
 }
 
 void
