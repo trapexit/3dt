@@ -3,6 +3,7 @@
 #include "fmt.hpp"
 
 #include "tdo_rsa.h"
+#include "types_ints.h"
 
 template<>
 struct fmt::formatter<rsa512_sig_t> : formatter<std::string>
