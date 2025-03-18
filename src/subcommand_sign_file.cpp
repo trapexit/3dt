@@ -25,6 +25,7 @@
 
 #include "fmt.hpp"
 #include "fmt_rsa512_sig.hpp"
+#include "fmt_md5_digest.hpp"
 
 #include <vector>
 #include <fstream>
