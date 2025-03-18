@@ -132,7 +132,7 @@ public:
     switch(type) // TODO: Look at these values
       {
       case RSA_SIGNATURE_BLOCK:
-        romtags.back().type_specific = 128;
+        romtags.back().type_specific = 15;
         break;
       case RSA_OS:
         romtags.back().version  = 24;
