@@ -802,9 +802,7 @@ TDO::DevStream::resize_multiple(s64 multiple_)
   _ios.seekg(0,std::ios::end);
   size = _ios.tellg();
 
-  fmt::print("orig size: {}\n",size);
   size = (((size + multiple_ - 1) / multiple_) * multiple_);
-  fmt::print("new size: {}\n",size);  
 
   _ios.seekp(size - 1);
   _ios.put(0);
