@@ -72,7 +72,7 @@ namespace TDO
     u64 device_block_header() const;
     u64 device_block_data_size() const;
     u64 device_block_footer() const;
-    u64 device_block_count() const;
+    u64 device_block_count();
 
   public:
     void file_seek(const s64 pos);
