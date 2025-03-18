@@ -82,7 +82,7 @@ Subcommand::sign_file(const Options::SignFile &opts_)
           break;
         }
 
-      ::_sign_file(fs,opts_.key_name,opts_.append);
+      ::_sign_file(fs,opts_.key_name,false,opts_.append);
 
       fs.close();
     }
