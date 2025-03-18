@@ -811,7 +811,7 @@ TDO::DevStream::resize_multiple(s64 multiple_)
   s64 size;  
   TDO::PosGuard _(this);
   
-  _ios.seekg(0,std::ios::end);
+  _ios.seekg(0,_ios.end);
   size = _ios.tellg();
 
   size = (((size + multiple_ - 1) / multiple_) * multiple_);
