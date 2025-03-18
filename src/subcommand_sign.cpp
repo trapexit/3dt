@@ -363,10 +363,13 @@ namespace Subcommand
           }
 
         fmt::print("{}:\n"
-                   " - current size: {}\n",
+                   " - current size: {}b\n",
                    filepath,
                    stream.size_in_bytes());
         stream.resize_multiple(LOG_BLOCK_SIZE);
+        fmt::print(" - padded size: {}b\n",
+                   stream.size_in_bytes());
+        
         ::_update_disc_label(stream);
         ::_generate_and_write_romtags(stream);
         ::_sign_signature_block(stream);
