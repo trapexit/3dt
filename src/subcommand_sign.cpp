@@ -147,6 +147,7 @@ public:
   }
 };
 
+
 static
 void
 _generate_and_write_romtags(TDO::FileStream &s_)
