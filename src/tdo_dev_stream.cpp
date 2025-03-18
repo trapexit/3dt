@@ -86,7 +86,6 @@ TDO::DevStream::DevStream(std::iostream &ios_)
     _data_start_offset(0),
     _ios(ios_)
 {
-  _iosp = std::make_shared<std::fstream>();
 }
 
 void
