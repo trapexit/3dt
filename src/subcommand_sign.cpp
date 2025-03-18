@@ -162,23 +162,6 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   for(auto &tag : tags.romtags)
     s_.write(tag);
   s_.write(TDO::ROMTag{});
-
-  return;
-  
-  TDO::ROMTagVec sorted;
-
-  sorted.emplace_back(*s_.romtag(RSA_NEWKNEWNEWGNUBOOT));
-  sorted.emplace_back(*s_.romtag(RSA_OS));
-  sorted.emplace_back(TDO::ROMTag{0xf,0xc,0,0,0,0,0,0,2898261906,0});
-  sorted.emplace_back(*s_.romtag(RSA_BLOCKS_ALWAYS));
-  sorted.emplace_back(*s_.romtag(RSA_MISCCODE));
-  sorted.emplace_back(*s_.romtag(RSA_APPSPLASH));
-  sorted.emplace_back(*s_.romtag(RSA_SIGNATURE_BLOCK));
-
-  s_.data_block_seek(s_.romtags_block());
-  for(auto &tag : sorted)
-    s_.write(tag);
-  s_.write(TDO::ROMTag{});
 }
 
 
