@@ -324,7 +324,7 @@ TDO::DevStream::device_block_size() const
 }
 
 u64
-TDO::DevStream::device_block_count() const
+TDO::DevStream::device_block_count()
 {
   TDO::PosGuard _(this);
 
