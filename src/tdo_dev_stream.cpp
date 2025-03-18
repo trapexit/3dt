@@ -327,7 +327,7 @@ TDO::DevStream::device_block_count()
 {
   TDO::PosGuard _(this);
 
-  _ios.seekg(0,std::ios::end);
+  _ios.seekg(0,_ios.end);
 
   return (_ios.tellg() / device_block_size());
 }
