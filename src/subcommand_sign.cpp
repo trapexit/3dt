@@ -122,7 +122,8 @@ public:
     if(type == 0)
       return;
 
-    romtags.emplace_back();
+    TDO::ROMTag romtag;
+
     romtags.back().type        = type;
     romtags.back().sub_systype = 0x0F;
     romtags.back().size        = record_.byte_count;
@@ -144,6 +145,8 @@ public:
         romtags.back().size = 5996;
         break;
       }
+
+    romtags.emplace_back(romtag); 
   }
 };
 
