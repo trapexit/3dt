@@ -144,9 +144,11 @@ public:
         romtag.revision = 5;
         // This hardcoded value is
         std::vector<char> buf;
+        md5_digest_t digest;
         stream_.read_data_bytes_from_block(buf,
                                            record_.avatar_list[0],
                                            5996);
+        md5_calc(buf.data(),buf.size(),digest);
         romtag.size = 5996;
         break;
       }
