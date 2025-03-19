@@ -17,6 +17,7 @@
 */
 
 #include "tdo_rsa.h"
+#include "file_digests.hpp"
 
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
