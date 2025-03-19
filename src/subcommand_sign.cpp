@@ -144,16 +144,18 @@ public:
       case RSA_NEWKNEWNEWGNUBOOT:
         romtag.version  = 2;
         romtag.revision = 5;
+
         // This should be removable once '3doiso' is replaced.
-        std::vector<char> buf;
-        md5_digest_t digest;
-        stream_.read_data_bytes_from_block(buf,
-                                           record_.avatar_list[0],
-                                           5996);
-        md5_calc(buf.data(),buf.size(),digest);
-        fmt::print("md5: {}\n",digest);
-        if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
-          romtag.size = 5996;
+        {
+          std::vector<char> buf;
+          md5_digest_t digest;
+          stream_.read_data_bytes_from_block(buf,
+                                             record_.avatar_list[0],
+                                             5996);
+          md5_calc(buf.data(),buf.size(),digest);
+          if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
+            romtag.size = 5996;
+        }
         break;
       }
 
