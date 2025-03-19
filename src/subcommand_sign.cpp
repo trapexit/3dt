@@ -393,7 +393,7 @@ namespace Subcommand
                    stream.size_in_bytes());
         
         ::_update_disc_label(stream);
-        ::_generate_and_write_romtags(stream);
+        ::_generate_and_write_romtags(stream); // and file records
         ::_sign_signature_block(stream);
         ::_sign_appsplash(stream);        
         ::_sign_disclabel_romtags_bootcode(stream);
