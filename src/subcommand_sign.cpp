@@ -142,6 +142,11 @@ public:
       case RSA_NEWKNEWNEWGNUBOOT:
         romtag.version  = 2;
         romtag.revision = 5;
+        // This hardcoded value is
+        std::vector<char> buf;
+        stream_.read_data_bytes_from_block(buf,
+                                           record_.avatar_list[0],
+                                           5996);
         romtag.size = 5996;
         break;
       }
