@@ -161,7 +161,8 @@ public:
               romtag.size = 5996;
               dr.byte_count = romtag.size;
               stream_.data_byte_seek(record_pos_);
-              stream_.write(dr);
+              stream_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
+              stream_.write(romtag.size);
             }
         }
         break;
