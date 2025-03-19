@@ -160,6 +160,8 @@ public:
               fmt::print("correcting boot_code size to 5996\n");
               romtag.size = 5996;
               dr.byte_count = romtag.size;
+              stream_.data_byte_seek(record_pos_);
+              stream_.write(dr);
             }
         }
         break;
