@@ -154,7 +154,10 @@ public:
                                              5996);
           md5_calc(buf.data(),buf.size(),digest);
           if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
-            romtag.size = 5996;
+            {
+              fmt::print("correcting boot_code size to 5996\n");
+              romtag.size = 5996;
+            }
         }
         break;
       }
