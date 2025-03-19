@@ -149,6 +149,7 @@ public:
                                            record_.avatar_list[0],
                                            5996);
         md5_calc(buf.data(),buf.size(),digest);
+        fmt::print("md5: {}\n",digest);
         romtag.size = 5996;
         break;
       }
