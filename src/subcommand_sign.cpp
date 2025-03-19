@@ -151,7 +151,8 @@ public:
                                            5996);
         md5_calc(buf.data(),buf.size(),digest);
         fmt::print("md5: {}\n",digest);
-        romtag.size = 5996;
+        if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
+          romtag.size = 5996;
         break;
       }
 
