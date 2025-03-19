@@ -141,8 +141,7 @@ public:
       case RSA_NEWKNEWNEWGNUBOOT:
         romtags.back().version  = 2;
         romtags.back().revision = 5;
-        fmt::print("RSA_NEWKNEWNEWGNUBOOT size: {}\n",romtags.back().size);
-        //        romtags.back().size = 5996; // FIXME?!?!
+        romtags.back().size = 5996;
         break;
       }
   }
