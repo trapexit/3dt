@@ -144,7 +144,7 @@ public:
       case RSA_NEWKNEWNEWGNUBOOT:
         romtag.version  = 2;
         romtag.revision = 5;
-        // This hardcoded value is
+        // This should be removable once '3doiso' is replaced.
         std::vector<char> buf;
         md5_digest_t digest;
         stream_.read_data_bytes_from_block(buf,
