@@ -124,25 +124,25 @@ public:
 
     TDO::ROMTag romtag;
 
-    romtags.back().type        = type;
-    romtags.back().sub_systype = 0x0F;
-    romtags.back().size        = record_.byte_count;
-    romtags.back().offset      = record_.avatar_list[0] - 1;
-    romtags.back().version     = 0;
-    romtags.back().revision    = 0;
+    romtag.type        = type;
+    romtag.sub_systype = 0x0F;
+    romtag.size        = record_.byte_count;
+    romtag.offset      = record_.avatar_list[0] - 1;
+    romtag.version     = 0;
+    romtag.revision    = 0;
     switch(type) // TODO: Look at these values
       {
       case RSA_SIGNATURE_BLOCK:
-        romtags.back().type_specific = 15;
+        romtag.type_specific = 15;
         break;
       case RSA_OS:
-        romtags.back().version  = 24;
-        romtags.back().revision = 225;
+        romtag.version  = 24;
+        romtag.revision = 225;
         break;
       case RSA_NEWKNEWNEWGNUBOOT:
-        romtags.back().version  = 2;
-        romtags.back().revision = 5;
-        romtags.back().size = 5996;
+        romtag.version  = 2;
+        romtag.revision = 5;
+        romtag.size = 5996;
         break;
       }
 
