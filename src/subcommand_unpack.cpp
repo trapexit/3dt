@@ -127,7 +127,7 @@ namespace Subcommand
 
     for(auto &srcpath : options_.filepaths)
       {
-        fs.open(srcpath,std::ios::binary);
+        fs.open(srcpath,fs.binary|fs.in);
         if(fs.bad())
           {
             Log::error_stream_open(srcpath);
