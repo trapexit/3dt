@@ -172,24 +172,6 @@ public:
 
 static
 void
-_generate_and_write_romtags(TDO::FileStream &s_)
-{
-  ROMTagsGenerator tags;
-  TDO::FSWalker fswalker(s_,tags);
-  
-  auto err = fswalker.walk();
-  if(err)
-    throw std::runtime_error("fuck, shit broken");
-
-  s_.data_block_seek(s_.romtags_block());
-  for(auto &tag : tags.romtags)
-    s_.write(tag);
-  s_.write(TDO::ROMTag{});
-}
-
-
-static
-void
 _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 {
   md5_digest_t digest;
@@ -372,6 +354,24 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
   s_.data_block_seek(s_.disc_label_block());
   s_.write(dl);
 }
+
+static
+void
+_generate_and_write_romtags(TDO::FileStream &s_)
+{
+  ROMTagsGenerator tags;
+  TDO::FSWalker fswalker(s_,tags);
+  
+  auto err = fswalker.walk();
+  if(err)
+    throw std::runtime_error("fuck, shit broken");
+
+  s_.data_block_seek(s_.romtags_block());
+  for(auto &tag : tags.romtags)
+    s_.write(tag);
+  s_.write(TDO::ROMTag{});
+}
+
 
 namespace Subcommand
 {
