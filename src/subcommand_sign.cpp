@@ -373,6 +373,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 }
 
 
+
 namespace Subcommand
 {
   void
