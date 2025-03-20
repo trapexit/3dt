@@ -124,8 +124,6 @@ public:
     if(type == 0)
       return;
 
-    fmt::print("{}\n",lc_filepath);
-
     TDO::ROMTag romtag;
 
     romtag.type        = type;
@@ -169,7 +167,7 @@ public:
         break;
       }
 
-
+    fmt::print("{}: {}\n",lc_filepath,romtag.type);
     romtags.emplace_back(romtag); 
   }
 };
