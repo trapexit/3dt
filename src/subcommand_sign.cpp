@@ -371,11 +371,11 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "signatures");
   if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
     throw std::runtime_error(err.str + "system/kernel/boot_code");
-  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
+  if(!s_.romtag(RSA_OS))
     throw std::runtime_error(err.str + "system/kernel/os_code");
-  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
+  if(!s_.romtag(RSA_MISCCODE))
     throw std::runtime_error(err.str + "system/kernel/misc_code");
-  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
+  if(!s_.romtag(RSA_BLOCKS_ALWAYS))
     throw std::runtime_error(err.str + "launchme");
      
   s_.data_block_seek(s_.romtags_block());
