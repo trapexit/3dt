@@ -392,7 +392,7 @@ namespace Subcommand
         fmt::print(" - padded size: {}b\n",
                    stream.size_in_bytes());
         
-        ::_update_disc_label(stream);
+        ::_update_disclabel(stream);
         ::_generate_and_write_romtags(stream); // and file records
         ::_sign_signature_block(stream);
         ::_sign_appsplash(stream);        
