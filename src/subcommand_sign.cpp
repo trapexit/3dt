@@ -359,6 +359,14 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
 {
   TDO::DiscLabel dl;
 
+  fmt::print("{}:\n"
+             " - current size: {}b\n",
+             filepath,
+             s_.size_in_bytes());
+  s_.resize_multiple(LOG_BLOCK_SIZE);
+  fmt::print(" - padded size: {}b\n",
+             s_.size_in_bytes());
+  
   dl = s_.disc_label();
 
   dl.volume_block_count = s_.size_in_device_blocks();
@@ -384,13 +392,6 @@ namespace Subcommand
             continue;
           }
 
-        fmt::print("{}:\n"
-                   " - current size: {}b\n",
-                   filepath,
-                   stream.size_in_bytes());
-        stream.resize_multiple(LOG_BLOCK_SIZE);
-        fmt::print(" - padded size: {}b\n",
-                   stream.size_in_bytes());
         
         ::_update_disclabel(stream);
         ::_generate_and_write_romtags(stream); // and file records
