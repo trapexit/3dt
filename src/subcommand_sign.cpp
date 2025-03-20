@@ -365,6 +365,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
   if(!s_.romtag(RSA_APPSPLASH))
     throw std::runtime_error("image is missing BannerScreen");
+  if(!s_.romtag(RSA_SIGNATURE_BLOCK))
+    throw std::runtime_error("image is missing Signature file");
   
 
   s_.data_block_seek(s_.romtags_block());
