@@ -365,6 +365,11 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   if(err)
     throw std::runtime_error(err.str);
 
+  s_.data_block_seek(s_.romtags_block());
+  for(auto &tag : tags.romtags)
+    s_.write(tag);
+  s_.write(TDO::ROMTag{});
+
   err.str = "image is missing file: ";
   if(!s_.romtag(RSA_APPSPLASH))
     throw std::runtime_error(err.str + "BannerScreen");
@@ -378,11 +383,6 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/misc_code");
   if(!s_.romtag(RSA_BLOCKS_ALWAYS))
     throw std::runtime_error(err.str + "launchme");
-     
-  s_.data_block_seek(s_.romtags_block());
-  for(auto &tag : tags.romtags)
-    s_.write(tag);
-  s_.write(TDO::ROMTag{});
 }
 
 
