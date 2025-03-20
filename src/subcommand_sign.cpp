@@ -346,8 +346,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/os_code");
   if(!s_.romtag(RSA_MISCCODE))
     throw std::runtime_error(err.str + "system/kernel/misc_code");
-  if(!s_.romtag(RSA_BLOCKS_ALWAYS))
-    throw std::runtime_error(err.str + "launchme");
+  // if(!s_.romtag(RSA_BLOCKS_ALWAYS))
+  //   throw std::runtime_error(err.str + "launchme");
 }
 
 
