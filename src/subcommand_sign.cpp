@@ -182,11 +182,6 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
   std::optional<TDO::ROMTag> romtag;
 
   romtag = s_.romtag(RSA_NEWKNEWNEWGNUBOOT);
-  if(!romtag)
-    {
-      fmt::print("  - No NEWKNEWNEWGNUBOOT romtag found.\n");
-      return;
-    }
 
   s_.read_data_bytes_from_block(data,
                                  s_.disc_label_block(),
