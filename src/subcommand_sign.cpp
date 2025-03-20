@@ -364,7 +364,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   
   auto err = fswalker.walk();
   if(err)
-    throw err;
+    throw std::runtime_error(err);
 
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
