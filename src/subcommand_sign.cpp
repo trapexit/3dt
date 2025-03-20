@@ -83,8 +83,8 @@ public:
       type = RSA_OS;
     //    else if(lc_filepath == "launchme")
     //      type = RSA_BLOCKS_ALWAYS;
-    else if(lc_filepath == "bannerscreen")
-      type = RSA_APPSPLASH;
+    // else if(lc_filepath == "bannerscreen")
+    //   type = RSA_APPSPLASH;
 
     if(type == 0)
       return;
