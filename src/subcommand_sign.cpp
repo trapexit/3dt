@@ -81,9 +81,6 @@ public:
       type = RSA_MISCCODE;
     else if(lc_filepath == "system/kernel/os_code")
       type = RSA_OS;
-    // not needed, not checked
-    //    else if(lc_filepath == "launchme")
-    //      type = RSA_BLOCKS_ALWAYS;
     else if(lc_filepath == "bannerscreen")
       type = RSA_APPSPLASH;
 
