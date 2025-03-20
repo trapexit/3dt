@@ -167,10 +167,10 @@ public:
             }
         }
         break;
-
-
-        romtags.emplace_back(romtag); 
       }
+
+
+    romtags.emplace_back(romtag); 
   }
 };
 
