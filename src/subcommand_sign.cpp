@@ -62,23 +62,6 @@ public:
 
 public:
   void
-  begin()
-  {
-  }
-
-  void
-  end()
-  {
-  }
-
-  void
-  operator()(const std::filesystem::path &filepath_,
-             const TDO::DirectoryHeader  &dh_,
-             TDO::DevStream              &stream_)
-  {
-  }
-  
-  void
   operator()(const std::filesystem::path &filepath_,
              const TDO::DirectoryRecord  &record_,
              const u32                    record_pos_,
