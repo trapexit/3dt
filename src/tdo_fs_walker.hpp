@@ -33,15 +33,15 @@ namespace TDO
   public:
     struct Callbacks
     {
-      virtual void begin() = 0;
-      virtual void end() = 0;
+      virtual void begin() {};
+      virtual void end() {};
       virtual void operator()(const std::filesystem::path&,
                               const TDO::DirectoryHeader&,
-                              TDO::DevStream&) = 0;
+                              TDO::DevStream&) {};
       virtual void operator()(const std::filesystem::path&,
                               const TDO::DirectoryRecord&,
                               const uint32_t,
-                              TDO::DevStream&) = 0;
+                              TDO::DevStream&) {};
     };
 
   public:
