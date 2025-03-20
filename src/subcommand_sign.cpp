@@ -392,8 +392,7 @@ namespace Subcommand
             continue;
           }
 
-        
-        ::_update_disclabel(stream);
+        ::_pad_image_and_update_disclabel(stream);
         ::_generate_and_write_romtags(stream); // and file records
         ::_sign_signature_block(stream);
         ::_sign_appsplash(stream);        
