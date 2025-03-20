@@ -83,8 +83,8 @@ public:
       type = RSA_OS;
     //    else if(lc_filepath == "launchme")
     //      type = RSA_BLOCKS_ALWAYS;
-    // else if(lc_filepath == "bannerscreen")
-    //   type = RSA_APPSPLASH;
+    else if(lc_filepath == "bannerscreen")
+      type = RSA_APPSPLASH;
 
     if(type == 0)
       return;
@@ -336,8 +336,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   s_.write(TDO::ROMTag{});
 
   err.str = "image is missing file: ";
-  // if(!s_.romtag(RSA_APPSPLASH))
-  //   throw std::runtime_error(err.str + "BannerScreen");
+  if(!s_.romtag(RSA_APPSPLASH))
+    throw std::runtime_error(err.str + "BannerScreen");
   if(!s_.romtag(RSA_SIGNATURE_BLOCK))
     throw std::runtime_error(err.str + "signatures");
   if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
@@ -346,8 +346,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/os_code");
   if(!s_.romtag(RSA_MISCCODE))
     throw std::runtime_error(err.str + "system/kernel/misc_code");
-  // if(!s_.romtag(RSA_BLOCKS_ALWAYS))
-  //   throw std::runtime_error(err.str + "launchme");
+  //  if(!s_.romtag(RSA_BLOCKS_ALWAYS))
+  //    throw std::runtime_error(err.str + "launchme");
 }
 
 
@@ -374,7 +374,7 @@ namespace Subcommand
         ::_pad_image_and_update_disclabel(stream);
         ::_generate_and_write_romtags(stream);
         ::_sign_signature_block(stream);
-        //        ::_sign_appsplash(stream);        
+        ::_sign_appsplash(stream);        
         ::_sign_disclabel_romtags_bootcode(stream);
 
         stream.close();
