@@ -390,6 +390,8 @@ namespace Subcommand
             continue;
           }
 
+        fmt::print("{}:\n",filepath);
+
         ::_pad_image_and_update_disclabel(stream);
         ::_generate_and_write_romtags(stream); // and file records
         ::_sign_signature_block(stream);
