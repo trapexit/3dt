@@ -124,6 +124,8 @@ public:
     if(type == 0)
       return;
 
+    fmt::print("{}\n",lc_filepath);
+
     TDO::ROMTag romtag;
 
     romtag.type        = type;
