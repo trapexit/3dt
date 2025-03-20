@@ -356,18 +356,22 @@ static
 void
 _generate_and_write_romtags(TDO::FileStream &s_)
 {
+  Error err;
   ROMTagsGenerator tags;
   TDO::FSWalker fswalker(s_,tags);
   
-  auto err = fswalker.walk();
+  err = fswalker.walk();
   if(err)
     throw std::runtime_error(err.str);
 
+  err.str = "image is missing file: ";
   if(!s_.romtag(RSA_APPSPLASH))
-    throw std::runtime_error("image is missing BannerScreen");
+    throw std::runtime_error(err.str + "BannerScreen");
   if(!s_.romtag(RSA_SIGNATURE_BLOCK))
-    throw std::runtime_error("image is missing Signature file");
-  
+    throw std::runtime_error(err.str + "signatures");
+  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
+    throw std::runtime_error("image is missing system/kernel/boot_code");
+     
 
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
