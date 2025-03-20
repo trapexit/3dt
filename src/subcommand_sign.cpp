@@ -148,8 +148,9 @@ public:
         // This should be removable once '3doiso' is replaced. It
         // appears to pad boot_code to 8192 bytes which confuses things.
         {
+          md5_digest_t digest;          
           std::vector<char> buf;
-          md5_digest_t digest;
+
           stream_.read_data_bytes_from_block(buf,
                                              record_.avatar_list[0],
                                              5996);
