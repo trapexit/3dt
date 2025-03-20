@@ -35,10 +35,10 @@ public:
   u32 signatures_file_size;
   
 public:
-  void
-  begin()
-  {
-  }
+  // void
+  // begin()
+  // {
+  // }
 
   void
   end()
