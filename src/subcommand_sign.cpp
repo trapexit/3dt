@@ -370,7 +370,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   if(!s_.romtag(RSA_SIGNATURE_BLOCK))
     throw std::runtime_error(err.str + "signatures");
   if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
-    throw std::runtime_error("image is missing system/kernel/boot_code");
+    throw std::runtime_error(err.str + "system/kernel/boot_code");
      
 
   s_.data_block_seek(s_.romtags_block());
