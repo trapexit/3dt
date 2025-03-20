@@ -336,8 +336,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   s_.write(TDO::ROMTag{});
 
   err.str = "image is missing file: ";
-  if(!s_.romtag(RSA_APPSPLASH))
-    throw std::runtime_error(err.str + "BannerScreen");
+  // if(!s_.romtag(RSA_APPSPLASH))
+  //   throw std::runtime_error(err.str + "BannerScreen");
   if(!s_.romtag(RSA_SIGNATURE_BLOCK))
     throw std::runtime_error(err.str + "signatures");
   if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
