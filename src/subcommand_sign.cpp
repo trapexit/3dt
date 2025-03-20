@@ -145,7 +145,8 @@ public:
         romtag.version  = 2;
         romtag.revision = 5;
 
-        // This should be removable once '3doiso' is replaced.
+        // This should be removable once '3doiso' is replaced. It
+        // appears to pad boot_code to 8192 bytes which confuses things.
         {
           std::vector<char> buf;
           md5_digest_t digest;
