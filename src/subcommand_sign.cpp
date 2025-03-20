@@ -174,6 +174,81 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 #define PHY_BLOCK_SIZE (2 * 1024)
 #define LOG_BLOCK_SIZE (32 * 1024)
 
+
+static
+void
+_sign_appsplash(TDO::FileStream &s_)
+{
+  std::optional<TDO::ROMTag> romtag;
+  std::vector<char> data;
+  rsa512_sig_t sig;
+  md5_digest_t digest;
+
+  romtag = s_.romtag(RSA_APPSPLASH);
+  if(!romtag)
+    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
+
+  s_.read_data_bytes_from_block(data,
+                                romtag->offset + 1,
+                                romtag->size - sizeof(rsa512_sig_t));
+  md5_calc(data.data(),
+           data.size(),
+           digest);
+  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
+
+  s_.write((const char*)sig,sizeof(sig));
+}
+
+static
+void
+_pad_image_and_update_disclabel(TDO::FileStream &s_)
+{
+  TDO::DiscLabel dl;
+
+  fmt::print(" - current size: {}b\n",
+             s_.size_in_bytes());
+  s_.resize_multiple(LOG_BLOCK_SIZE);
+  fmt::print(" - padded size:  {}b\n",
+             s_.size_in_bytes());
+  
+  dl = s_.disc_label();
+
+  dl.volume_block_count = s_.size_in_device_blocks();
+
+  s_.data_block_seek(s_.disc_label_block());
+  s_.write(dl);
+}
+
+static
+void
+_generate_and_write_romtags(TDO::FileStream &s_)
+{
+  Error err;
+  ROMTagsGenerator tags;
+  TDO::FSWalker fswalker(s_,tags);
+  
+  err = fswalker.walk();
+  if(err)
+    throw std::runtime_error(err.str);
+
+  s_.data_block_seek(s_.romtags_block());
+  for(auto &tag : tags.romtags)
+    s_.write(tag);
+  s_.write(TDO::ROMTag{});
+
+  err.str = "image is missing file: ";
+  if(!s_.romtag(RSA_APPSPLASH))
+    throw std::runtime_error(err.str + "BannerScreen");
+  if(!s_.romtag(RSA_SIGNATURE_BLOCK))
+    throw std::runtime_error(err.str + "signatures");
+  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
+    throw std::runtime_error(err.str + "system/kernel/boot_code");
+  if(!s_.romtag(RSA_OS))
+    throw std::runtime_error(err.str + "system/kernel/os_code");
+  if(!s_.romtag(RSA_MISCCODE))
+    throw std::runtime_error(err.str + "system/kernel/misc_code");
+}
+
 // Maybe just assume ISO w/ contiguous 2048 byte block size?
 static
 void
@@ -271,81 +346,6 @@ _sign_signature_block(TDO::FileStream &s_)
   if(err)
     throw std::runtime_error("broken sig write");
 }
-
-static
-void
-_sign_appsplash(TDO::FileStream &s_)
-{
-  std::optional<TDO::ROMTag> romtag;
-  std::vector<char> data;
-  rsa512_sig_t sig;
-  md5_digest_t digest;
-
-  romtag = s_.romtag(RSA_APPSPLASH);
-  if(!romtag)
-    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
-
-  s_.read_data_bytes_from_block(data,
-                                romtag->offset + 1,
-                                romtag->size - sizeof(rsa512_sig_t));
-  md5_calc(data.data(),
-           data.size(),
-           digest);
-  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
-
-  s_.write((const char*)sig,sizeof(sig));
-}
-
-static
-void
-_pad_image_and_update_disclabel(TDO::FileStream &s_)
-{
-  TDO::DiscLabel dl;
-
-  fmt::print(" - current size: {}b\n",
-             s_.size_in_bytes());
-  s_.resize_multiple(LOG_BLOCK_SIZE);
-  fmt::print(" - padded size:  {}b\n",
-             s_.size_in_bytes());
-  
-  dl = s_.disc_label();
-
-  dl.volume_block_count = s_.size_in_device_blocks();
-
-  s_.data_block_seek(s_.disc_label_block());
-  s_.write(dl);
-}
-
-static
-void
-_generate_and_write_romtags(TDO::FileStream &s_)
-{
-  Error err;
-  ROMTagsGenerator tags;
-  TDO::FSWalker fswalker(s_,tags);
-  
-  err = fswalker.walk();
-  if(err)
-    throw std::runtime_error(err.str);
-
-  s_.data_block_seek(s_.romtags_block());
-  for(auto &tag : tags.romtags)
-    s_.write(tag);
-  s_.write(TDO::ROMTag{});
-
-  err.str = "image is missing file: ";
-  if(!s_.romtag(RSA_APPSPLASH))
-    throw std::runtime_error(err.str + "BannerScreen");
-  if(!s_.romtag(RSA_SIGNATURE_BLOCK))
-    throw std::runtime_error(err.str + "signatures");
-  if(!s_.romtag(RSA_NEWKNEWNEWGNUBOOT))
-    throw std::runtime_error(err.str + "system/kernel/boot_code");
-  if(!s_.romtag(RSA_OS))
-    throw std::runtime_error(err.str + "system/kernel/os_code");
-  if(!s_.romtag(RSA_MISCCODE))
-    throw std::runtime_error(err.str + "system/kernel/misc_code");
-}
-
 
 
 namespace Subcommand
