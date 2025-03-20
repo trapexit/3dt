@@ -372,6 +372,7 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
   dl.volume_block_count = s_.size_in_device_blocks();
 
   s_.data_block_seek(s_.disc_label_block());
+  s_.data_byte_skip(offsetof(TDO::DiscLabel,volume_block_count));
   s_.write(dl);
 }
 
