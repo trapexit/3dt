@@ -257,7 +257,7 @@ _sign_appsplash(TDO::FileStream &s_)
 
 static
 void
-_sign_signature_block(TDO::FileStream &s_)
+_generate_and_sign_signatures_file(TDO::FileStream &s_)
 {
   md5_digest_t digest;
   rsa512_sig_t sig;
@@ -269,7 +269,8 @@ _sign_signature_block(TDO::FileStream &s_)
   volume_block_count = s_.disc_label().volume_block_count;
   num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
 
-  fmt::print("  - block count: {}\n"
+  fmt::print("  - Sign signatures"
+             "  - block count: {}\n"
              "  - num digests: {}\n",
              volume_block_count,
              num_digests);
