@@ -238,7 +238,10 @@ _correct_boot_code_size(TDO::FileStream &s_)
 {
   md5_digest_t digest;
   std::vector<char> buf;
+  std::optional<TDO::ROMTag> romtag;
 
+  romtag = s_.romtag(RSA_NEWKNEWNEWGNUBOOT);
+  
   s_.read_data_bytes_from_block(buf,
                                 record_.avatar_list[0],
                                 5996);
