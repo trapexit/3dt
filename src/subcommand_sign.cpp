@@ -236,7 +236,7 @@ _sign_appsplash(TDO::FileStream &s_)
 
   romtag = s_.romtag(RSA_APPSPLASH);
   if(!romtag)
-    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
+    throw std::runtime_error("  - APPSPLASH romtag is missing");
 
   s_.read_data_bytes_from_block(data,
                                 romtag->offset + 1,
