@@ -249,7 +249,6 @@ _sign_appsplash(TDO::FileStream &s_)
   s_.write((const char*)sig,sizeof(sig));
 }
 
-// Maybe just assume ISO w/ contiguous 2048 byte block size?
 static
 void
 _sign_signature_block(TDO::FileStream &s_)
