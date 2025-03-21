@@ -212,7 +212,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   for(auto &tag : tags.romtags)
     {
       fmt::print("    - type: {}; offset: {}; size: {}b\n",
-                 tag.type,
+                 TDO::ROMTag::type_str(tag.type),
                  tag.offset,
                  tag.size);
       s_.write(tag);
