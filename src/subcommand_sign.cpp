@@ -231,8 +231,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/misc_code");
 }
 
-// This should be removable once '3doiso' is replaced. It
-// appears to pad boot_code to 8192 bytes which confuses things.
+// This should be removable once '3doiso' is replaced. It appears to
+// pad boot_code to 8192 bytes which confuses things.
 static
 void
 _correct_boot_code_size(TDO::FileStream &s_)
