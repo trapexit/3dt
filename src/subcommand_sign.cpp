@@ -134,7 +134,6 @@ public:
   }
 };
 
-
 static
 void
 _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
