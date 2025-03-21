@@ -270,8 +270,8 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
   num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
 
   fmt::print("  - Generate and sign signatures file"
-             "  - block count: {}\n"
-             "  - num digests: {}\n",
+             "    - block count: {}\n"
+             "    - num digests: {}\n",
              volume_block_count,
              num_digests);
   for(u64 i = 0; i < num_digests; i++)
