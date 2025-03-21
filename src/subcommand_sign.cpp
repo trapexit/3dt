@@ -130,7 +130,6 @@ public:
         break;
       }
 
-    fmt::print("{}: {}\n",lc_filepath,romtag.type);
     romtags.emplace_back(romtag);
   }
 };
