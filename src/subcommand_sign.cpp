@@ -274,8 +274,6 @@ _sign_signature_block(TDO::FileStream &s_)
       block_pos = ((i * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
 
       buf.clear();
-      fmt::print("{} {}\n",block_pos,s_.good());
-
       s_.read_data_blocks(buf,block_pos,(LOG_BLOCK_SIZE / PHY_BLOCK_SIZE));
 
       md5_calc(buf.data(),buf.size(),digest);
