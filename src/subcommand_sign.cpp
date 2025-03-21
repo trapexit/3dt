@@ -256,6 +256,42 @@ _sign_appsplash(TDO::FileStream &s_)
 }
 
 static
+std::vector<char>
+_generate_signatures_file_data(TDO::FileStream &s_)
+{
+  u64 num_digests;
+  u64 volume_block_count;
+  std::vector<char> buf;
+  std::vector<char> signatures;
+
+  volume_block_count = s_.disc_label().volume_block_count;
+  num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
+
+  fmt::print("  - Generate and sign signatures file with APP key\n"
+             "    - block count: {}\n"
+             "    - num digests: {}\n",
+             volume_block_count,
+             num_digests);
+  for(u64 i = 0; i < num_digests; i++)
+    {
+      s64 block_pos;
+
+      block_pos = ((i * LOG_BLOCK_SIZE) / PHY_BLOCK_SIZE);
+
+      buf.clear();
+      s_.read_data_blocks(buf,block_pos,(LOG_BLOCK_SIZE / PHY_BLOCK_SIZE));
+
+      md5_calc(buf.data(),buf.size(),digest);
+
+      signatures.insert(signatures.end(),
+                        digest,
+                        &digest[sizeof(digest)]);
+    }
+
+  return signatures;
+}
+
+static
 void
 _generate_and_sign_signatures_file(TDO::FileStream &s_)
 {

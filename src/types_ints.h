@@ -40,7 +40,31 @@ typedef int64_t      s64;
 typedef volatile u64 vu64;
 typedef volatile s64 vs64;
 
+typedef uint8_t const  cu8;
+typedef int8_t const   cs8;
+typedef volatile u8 const cvu8;
+typedef volatile s8 const cvs8;
+
+typedef uint16_t const  cu16;
+typedef int16_t const   cs16;
+typedef volatile u16 const cvu16;
+typedef volatile s16 const cvs16;
+
+typedef uint32_t const  cu32;
+typedef int32_t const   cs32;
+typedef volatile u32 const cvu32;
+typedef volatile s32 const cvs32;
+
+typedef uint64_t const  cu64;
+typedef int64_t const   cs64;
+typedef volatile u64 const cvu64;
+typedef volatile s64 const cvs64;
+
 typedef float        f32;
 typedef double       f64;
 typedef volatile f32 vf32;
 typedef volatile f64 vf64;
+typedef float const  cf32;
+typedef double const cf64;
+typedef volatile f32 const cvf32;
+typedef volatile f64 const cvf64;

@@ -10,10 +10,10 @@ CC    = $(COMPILER_PREFIX)-gcc
 CXX   = $(COMPILER_PREFIX)-g++
 STRIP = $(COMPILER_PREFIX)-strip
 
-ifeq ($(DEBUG),1)
-OPT := -O0 -ggdb
-else
+ifeq ($(NDEBUG),1)
 OPT := -Os -static
+else
+OPT := -O0 -ggdb
 endif
 
 ifeq ($(SANITIZE),1)
