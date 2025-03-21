@@ -211,6 +211,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
     {
+      fmt::print("    - type: {}; offset: {}; size: {}b\n",
+                 
       s_.write(tag);
     }
   s_.write(TDO::ROMTag{});
