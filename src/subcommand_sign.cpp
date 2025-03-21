@@ -33,7 +33,7 @@ class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
 {
 public:
   u32 signatures_file_size;
-  
+
 public:
   void
   operator()(const std::filesystem::path &filepath_,
@@ -42,7 +42,7 @@ public:
              TDO::DevStream              &s_)
   {
     std::string lc_filepath;
-    
+
     lc_filepath = nonstd::string::as_lowercase(filepath_.string());
     if(lc_filepath != "signatures")
       return;
@@ -52,7 +52,7 @@ public:
     s_.write(signatures_file_size);
     s_.write((u32)((signatures_file_size + (2048 - 1)) / 2048));
   }
-};  
+};
 
 
 class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
@@ -69,7 +69,7 @@ public:
   {
     u32 type;
     std::string lc_filepath;
-    
+
     type = 0;
     lc_filepath = nonstd::string::as_lowercase(filepath_.string());
     if(lc_filepath == "signatures")
@@ -111,7 +111,7 @@ public:
         // This should be removable once '3doiso' is replaced. It
         // appears to pad boot_code to 8192 bytes which confuses things.
         {
-          md5_digest_t digest;          
+          md5_digest_t digest;
           std::vector<char> buf;
 
           stream_.read_data_bytes_from_block(buf,
@@ -131,7 +131,7 @@ public:
       }
 
     fmt::print("{}: {}\n",lc_filepath,romtag.type);
-    romtags.emplace_back(romtag); 
+    romtags.emplace_back(romtag);
   }
 };
 
@@ -210,7 +210,7 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
   s_.resize_multiple(LOG_BLOCK_SIZE);
   fmt::print(" - padded size:  {}b\n",
              s_.size_in_bytes());
-  
+
   dl = s_.disc_label();
 
   dl.volume_block_count = s_.size_in_device_blocks();
@@ -226,7 +226,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   Error err;
   ROMTagsGenerator tags;
   TDO::FSWalker fswalker(s_,tags);
-  
+
   err = fswalker.walk();
   if(err)
     throw std::runtime_error(err.str);
@@ -263,7 +263,7 @@ _sign_signature_block(TDO::FileStream &s_)
 
   volume_block_count = s_.disc_label().volume_block_count;
   num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
-  
+
   fmt::print("block count: {}; num digests: {}\n",
              volume_block_count,num_digests);
   for(u64 i = 0; i < num_digests; i++)
@@ -274,7 +274,7 @@ _sign_signature_block(TDO::FileStream &s_)
 
       buf.clear();
       fmt::print("{} {}\n",block_pos,s_.good());
-      
+
       s_.read_data_blocks(buf,block_pos,(LOG_BLOCK_SIZE / PHY_BLOCK_SIZE));
 
       md5_calc(buf.data(),buf.size(),digest);
@@ -330,7 +330,7 @@ _sign_signature_block(TDO::FileStream &s_)
                  signatures.size());
       if(romtag.size < signatures.size())
         throw std::runtime_error("signatures file too small, increase size and rebuild image");
-      
+
       s_.file_seek(offset);
       s_.data_byte_skip(offsetof(TDO::ROMTag,size));
       s_.write((u32)signatures.size());
@@ -371,7 +371,7 @@ namespace Subcommand
         ::_generate_and_write_romtags(stream);
         ::_sign_appsplash(stream);
         ::_sign_signature_block(stream);
-        ::_sign_disclabel_romtags_bootcode(stream);        
+        ::_sign_disclabel_romtags_bootcode(stream);
 
         stream.close();
       }
