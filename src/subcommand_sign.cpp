@@ -203,6 +203,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
   ROMTagsGenerator tags;
   TDO::FSWalker fswalker(s_,tags);
 
+  fmt::print("  - Generate and write ROM Tags"
   err = fswalker.walk();
   if(err)
     throw std::runtime_error(err.str);
