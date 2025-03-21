@@ -290,7 +290,6 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
                         &digest[sizeof(digest)]);
     }
 
-  //  signatures.resize(3424);
   fmt::print("{} {} {} {}\n",
              signatures.size(),
              signatures.size() / sizeof(digest),
