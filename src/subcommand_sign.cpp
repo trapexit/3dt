@@ -301,7 +301,8 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
 
   signatures = ::_generate_signatures_file_data(s_);
 
-  fmt::print("{} {} {} {}\n",
+  fmt::print("    - signatures size: {}b\n"
+             "    - {} {} {}\n",
              signatures.size(),
              signatures.size() / sizeof(digest),
              num_digests,
