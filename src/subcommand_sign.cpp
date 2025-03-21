@@ -234,6 +234,13 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
 static
 void
+_correct_boot_code_size(TDO::FileStream &s_)
+{
+  
+}
+
+static
+void
 _sign_appsplash(TDO::FileStream &s_)
 {
   std::optional<TDO::ROMTag> romtag;
