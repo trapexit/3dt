@@ -210,7 +210,9 @@ _generate_and_write_romtags(TDO::FileStream &s_)
 
   s_.data_block_seek(s_.romtags_block());
   for(auto &tag : tags.romtags)
-    s_.write(tag);
+    {
+      s_.write(tag);
+    }
   s_.write(TDO::ROMTag{});
 
   err.str = "image is missing file: ";
