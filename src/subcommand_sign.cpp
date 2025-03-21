@@ -251,9 +251,9 @@ _correct_boot_code_size(TDO::FileStream &s_)
     {
       fmt::print("  - Correcting boot_code size to 5996\n");
       romtag.size = 5996;
-      stream_.data_byte_seek(record_pos_);
-      stream_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
-      stream_.write((u32)romtag.size);
+      s_.data_byte_seek(record_pos_);
+      s_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
+      s_.write((u32)romtag.size);
     }
 }
 
