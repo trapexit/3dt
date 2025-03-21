@@ -108,8 +108,7 @@ public:
         romtag.version  = 2;
         romtag.revision = 5;
 
-        // This should be removable once '3doiso' is replaced. It
-        // appears to pad boot_code to 8192 bytes which confuses things.
+
         {
           md5_digest_t digest;
           std::vector<char> buf;
@@ -232,6 +231,8 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/misc_code");
 }
 
+// This should be removable once '3doiso' is replaced. It
+// appears to pad boot_code to 8192 bytes which confuses things.
 static
 void
 _correct_boot_code_size(TDO::FileStream &s_)
