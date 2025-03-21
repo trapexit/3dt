@@ -244,7 +244,7 @@ _correct_boot_code_size(TDO::FileStream &s_)
   romtag = s_.romtag(RSA_NEWKNEWNEWGNUBOOT);
   
   s_.read_data_bytes_from_block(buf,
-                                record_.avatar_list[0],
+                                romtag->offset + 1,
                                 5996);
   md5_calc(buf.data(),buf.size(),digest);
   if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
