@@ -265,7 +265,8 @@ _sign_signature_block(TDO::FileStream &s_)
 
   fmt::print("  - block count: {}\n"
              "  - num digests: {}\n",
-             volume_block_count,num_digests);
+             volume_block_count,
+             num_digests);
   for(u64 i = 0; i < num_digests; i++)
     {
       s64 block_pos;
