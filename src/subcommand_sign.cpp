@@ -120,7 +120,7 @@ public:
           md5_calc(buf.data(),buf.size(),digest);
           if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
             {
-              fmt::print("  - Correcting boot_code size to 5996\n");
+              fmt::print("    - Correcting boot_code size to 5996\n");
               romtag.size = 5996;
               stream_.data_byte_seek(record_pos_);
               stream_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
