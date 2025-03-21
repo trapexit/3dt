@@ -108,7 +108,8 @@ public:
         romtag.version  = 2;
         romtag.revision = 5;
 
-
+        // This should be removable once '3doiso' is replaced. It
+        // appears to pad boot_code to 8192 bytes which confuses things.
         {
           md5_digest_t digest;
           std::vector<char> buf;
@@ -231,8 +232,7 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/misc_code");
 }
 
-// This should be removable once '3doiso' is replaced. It appears to
-// pad boot_code to 8192 bytes which confuses things.
+
 static
 void
 _correct_boot_code_size(TDO::FileStream &s_)
@@ -244,17 +244,17 @@ _correct_boot_code_size(TDO::FileStream &s_)
   romtag = s_.romtag(RSA_NEWKNEWNEWGNUBOOT);
   
   s_.read_data_bytes_from_block(buf,
-                                romtag->offset + 1,
+                                record_.avatar_list[0],
                                 5996);
   md5_calc(buf.data(),buf.size(),digest);
-  if(memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
-    return;
-
-  fmt::print("  - Correcting boot_code size to 5996\n");
-  romtag.size = 5996;
-  s_.data_byte_seek(record_pos_);
-  s_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
-  s_.write((u32)romtag.size);
+  if(!memcmp(digest,MD5_DIGEST_BOOT_CODE,sizeof(md5_digest_t)))
+    {
+      fmt::print("  - Correcting boot_code size to 5996\n");
+      romtag.size = 5996;
+      stream_.data_byte_seek(record_pos_);
+      stream_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
+      stream_.write((u32)romtag.size);
+    }
 }
 
 static
