@@ -177,30 +177,6 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 
 static
 void
-_sign_appsplash(TDO::FileStream &s_)
-{
-  std::optional<TDO::ROMTag> romtag;
-  std::vector<char> data;
-  rsa512_sig_t sig;
-  md5_digest_t digest;
-
-  romtag = s_.romtag(RSA_APPSPLASH);
-  if(!romtag)
-    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
-
-  s_.read_data_bytes_from_block(data,
-                                romtag->offset + 1,
-                                romtag->size - sizeof(rsa512_sig_t));
-  md5_calc(data.data(),
-           data.size(),
-           digest);
-  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
-
-  s_.write((const char*)sig,sizeof(sig));
-}
-
-static
-void
 _pad_image_and_update_disclabel(TDO::FileStream &s_)
 {
   TDO::DiscLabel dl;
@@ -247,6 +223,30 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/os_code");
   if(!s_.romtag(RSA_MISCCODE))
     throw std::runtime_error(err.str + "system/kernel/misc_code");
+}
+
+static
+void
+_sign_appsplash(TDO::FileStream &s_)
+{
+  std::optional<TDO::ROMTag> romtag;
+  std::vector<char> data;
+  rsa512_sig_t sig;
+  md5_digest_t digest;
+
+  romtag = s_.romtag(RSA_APPSPLASH);
+  if(!romtag)
+    throw std::runtime_error("APPSPLASH romtag is missing!!! OMG!");
+
+  s_.read_data_bytes_from_block(data,
+                                romtag->offset + 1,
+                                romtag->size - sizeof(rsa512_sig_t));
+  md5_calc(data.data(),
+           data.size(),
+           digest);
+  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
+
+  s_.write((const char*)sig,sizeof(sig));
 }
 
 // Maybe just assume ISO w/ contiguous 2048 byte block size?
