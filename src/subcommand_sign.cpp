@@ -179,7 +179,7 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
 {
   TDO::DiscLabel dl;
 
-  fmt::print("  - Pad image and update disc label\n",
+  fmt::print("  - Pad image and update disc label\n"
              "    - current size: {}b\n",
              s_.size_in_bytes());
   s_.resize_multiple(LOG_BLOCK_SIZE);
