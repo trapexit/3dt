@@ -307,7 +307,7 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
-  fmt::print("    - MD5 digest: {}\n
+  fmt::print("    - MD5 digest: {}\n"
              "    - RSA signature: {}\n",
              digest,
              sig);
