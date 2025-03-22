@@ -388,7 +388,7 @@ namespace Subcommand
         ::_pad_image_and_update_disclabel(stream);
         ::_generate_and_write_romtags(stream);
         ::_sign_appsplash(stream);
-        ::_generate_and_sign_signatures_file(stream);
+        ::_generate_sign_resize_signatures_file(stream);
         ::_sign_disclabel_romtags_bootcode(stream);
 
         stream.close();
