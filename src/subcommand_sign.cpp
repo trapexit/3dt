@@ -302,7 +302,7 @@ _round_up(u64 number_,
 
 static
 void
-_generate_and_sign_signatures_file(TDO::FileStream &s_)
+_generate_sign_resize_signatures_file(TDO::FileStream &s_)
 {
   md5_digest_t digest;
   rsa512_sig_t sig;
