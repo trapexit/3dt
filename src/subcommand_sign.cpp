@@ -320,8 +320,7 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
              digest,
              sig);
 
-  signatures.resize(signatures.size() + sizeof(sig));
-  signatures.resize(::_round_up(signatures.size(),PHY_BLOCK_SIZE));
+  signatures.resize(::_round_up((signatures.size() + sizeof(sig)),PHY_BLOCK_SIZE));
   signatures.resize(signatures.size() - sizeof(sig));
   signatures.insert(signatures.end(),
                     sig,
