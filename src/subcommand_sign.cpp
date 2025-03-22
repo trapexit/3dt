@@ -301,12 +301,8 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
 
   signatures = ::_generate_signatures_file_data(s_);
 
-  fmt::print("    - signatures size: {}b\n"
-             "    - {} {} {}\n",
-             signatures.size(),
-             signatures.size() / sizeof(digest),
-             num_digests,
-             s_.romtag(RSA_SIGNATURE_BLOCK)->size - signatures.size());
+  fmt::print("    - signatures size: {}b\n",
+             signatures.size());
 
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
