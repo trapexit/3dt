@@ -348,9 +348,6 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
       if(romtag.type != RSA_SIGNATURE_BLOCK)
         continue;
 
-      fmt::print("romtag size: {}; signatures size: {}\n",
-                 romtag.size,
-                 signatures.size());
       if(romtag.size < signatures.size())
         throw std::runtime_error("signatures file too small, increase size and rebuild image");
 
