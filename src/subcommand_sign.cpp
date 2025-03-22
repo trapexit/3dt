@@ -306,7 +306,11 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
 
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
-  fmt::print("sig: {}\n",sig);
+
+  fmt::print("    - MD5 digest: {}\n
+             "    - RSA signature: {}\n",
+             digest,
+             sig);
 
   signatures.resize(signatures.size() + sizeof(sig));
   signatures.resize(((signatures.size() + (PHY_BLOCK_SIZE-1)) / PHY_BLOCK_SIZE) * PHY_BLOCK_SIZE);
