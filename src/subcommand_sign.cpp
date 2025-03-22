@@ -254,6 +254,12 @@ _sign_appsplash(TDO::FileStream &s_)
            digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
+  fmt::print("  - Signing bannerscreen\n"
+             "    - MD5 digest: {}\n"
+             "    - RSA signature: {}\n",
+             digest,
+             signature);
+
   s_.write((const char*)sig,sizeof(sig));
 }
 
