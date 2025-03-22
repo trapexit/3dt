@@ -292,6 +292,14 @@ _generate_signatures_file_data(TDO::FileStream &s_)
 }
 
 static
+u64
+_round_up(u64 number_,
+          u64 multiple_)
+{
+  return (((number_ + multiple_ - 1) / multiple_) * multiple_);
+}
+
+static
 void
 _generate_and_sign_signatures_file(TDO::FileStream &s_)
 {
