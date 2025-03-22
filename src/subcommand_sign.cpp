@@ -356,7 +356,6 @@ _generate_and_sign_signatures_file(TDO::FileStream &s_)
       break;
     }
 
-  // Correct OperaFS
   SignaturesFileUpdater sfu;
   TDO::FSWalker fsw(s_,sfu);
 
