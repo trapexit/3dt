@@ -245,7 +245,9 @@ _sign_appsplash(TDO::FileStream &s_)
   romtag = s_.romtag(RSA_APPSPLASH);
   if(!romtag)
     throw std::runtime_error("APPSPLASH romtag is missing");
-
+  
+  // check for files with or without sig based on size
+  
   s_.read_data_bytes_from_block(data,
                                 romtag->offset + 1,
                                 romtag->size - sizeof(rsa512_sig_t));
