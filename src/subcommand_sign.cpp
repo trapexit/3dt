@@ -397,7 +397,7 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
       (appdigest.c:374).
   */
 
-  #if 0
+  #if 1
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
