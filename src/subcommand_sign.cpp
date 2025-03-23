@@ -412,6 +412,8 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
                     sig,
                     sig + sizeof(sig));
 
+  signatures = std::vector<char>{signatures.size(),0};
+
   s64 sig_offset = s_.romtag(RSA_SIGNATURE_BLOCK)->offset + 1;
   for(u64 i = 0; i < (signatures.size() / PHY_BLOCK_SIZE); i++)
     {
