@@ -392,7 +392,8 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
     * The default is 15 (DEFAULT_MAX_PAIN, appdigest.c:30).
     * Can be disabled by setting to 0 (appdigest.c:370).
     * Set to DEFAULT_MAX_PAIN if set to 1 (appdigest.c:372).
-    * Set to 
+    * If set to >= MAX_DIGEST_CHECKS results in MAX_DIGEST_CHECKS - 1
+      (appdigest.c:374).
   */
   
   //  md5_calc(signatures.data(),signatures.size(),digest);
