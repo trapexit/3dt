@@ -267,7 +267,7 @@ _sign_appsplash(TDO::FileStream &s_)
              "    - MD5 digest: {}\n"
              "    - RSA signature: {}\n",
              digest,
-             signature);
+             sig);
 
   s_.write((const char*)sig,sizeof(sig));
 }
