@@ -196,6 +196,7 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
 }
 
 static
+void
 _add_3dt_mark(TDO::FileStream &s_)
 {
   std::string mark;
