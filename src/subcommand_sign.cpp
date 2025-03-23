@@ -174,7 +174,6 @@ _sign_disclabel_romtags_bootcode(TDO::FileStream &s_)
 #define PHY_BLOCK_SIZE (2 * 1024)
 #define LOG_BLOCK_SIZE (32 * 1024)
 
-
 static
 void
 _pad_image_and_update_disclabel(TDO::FileStream &s_)
