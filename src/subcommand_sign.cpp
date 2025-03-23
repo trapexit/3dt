@@ -222,6 +222,7 @@ _add_3dt_mark(TDO::FileStream &s_)
   // The disc label is the only thing in the first block on the disc
   // and is smaller than 0x100 bytes so seems like as good as any
   // location to leave some indication what signed the image.
+  fmt::print("  - Setting location {} to '{}'\n");
   s_.data_byte_seek(0x100);
   s_.write(mark.c_str(),mark.size());
 }
