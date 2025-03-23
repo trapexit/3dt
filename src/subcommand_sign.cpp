@@ -377,6 +377,8 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
   fmt::print("    - signatures size: {}b\n",
              signatures.size());
 
+  // The signatures file signature is actually not checked by
+  // Portfolio OS.
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
