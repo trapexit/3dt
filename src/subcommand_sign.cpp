@@ -433,8 +433,8 @@ namespace Subcommand
         fmt::print("{}:\n",filepath);
 
         ::_pad_image_and_update_disclabel(stream);
+        ::_add_3dt_mark(stream);        
         ::_generate_and_write_romtags(stream);
-        ::_add_3dt_mark(stream);
         ::_sign_appsplash(stream);
         ::_generate_sign_resize_signatures_file(stream);
         ::_sign_disclabel_romtags_bootcode(stream);
