@@ -268,7 +268,7 @@ _sign_appsplash(TDO::FileStream &s_)
   
   s_.read_data_bytes_from_block(data,
                                 romtag->offset + 1,
-                                romtag->size - sizeof(rsa512_sig_t));
+                                romtag->size + offset);
   md5_calc(data.data(),
            data.size(),
            digest);
