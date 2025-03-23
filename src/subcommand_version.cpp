@@ -16,6 +16,8 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "version.hpp"
+
 #include "fmt.hpp"
 
 #define MAJOR 1
