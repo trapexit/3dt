@@ -211,7 +211,8 @@ void
 _add_3dt_mark(TDO::FileStream &s_)
 {
   std::string mark;
-
+  const u64 mark_offset = 0x100;
+  
   mark = fmt::format("signed with 3dt v{}.{}.{}",
                      VERSION_MAJOR,
                      VERSION_MINOR,
