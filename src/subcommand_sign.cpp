@@ -358,7 +358,6 @@ _generate_signatures_file_data(TDO::FileStream &s_)
 
       md5_calc(buf.data(),buf.size(),digest);
 
-      memset(digest,0,sizeof(digest));
       signatures.insert(signatures.end(),
                         digest,
                         &digest[sizeof(digest)]);
