@@ -42,8 +42,8 @@ namespace Subcommand
                "TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n"
                "PERFORMANCE OF THIS SOFTWARE.\n\n"
                ,
-               MAJOR,
-               MINOR,
-               PATCH);
+               VERSION_MAJOR,
+               VERSION_MINOR,
+               VERSION_PATCH);
   }
 }
