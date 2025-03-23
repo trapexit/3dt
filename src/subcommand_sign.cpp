@@ -233,6 +233,14 @@ _generate_and_write_romtags(TDO::FileStream &s_)
     throw std::runtime_error(err.str + "system/kernel/misc_code");
 }
 
+enum
+  {
+    APPSPLASH_HDR_SIZE = 24,
+    APPSPLASH_SIG_SIZE = sizeof(rsa512_sig_t),
+    APPSPLASH_NTSC_SIZE = ((320 * 240 * 2) + APPSPLASH_HDR_SIZE),
+    APPSPLASH_NTSC_SIZE_W_SIG = APPSPLASH_NTSC_SIZE + 
+  };
+
 static
 void
 _sign_appsplash(TDO::FileStream &s_)
