@@ -389,7 +389,7 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
 
     * Typically the value found in games is 15.
     * The default is 15 (DEFAULT_MAX_PAIN, appdigest.c:30).
-    * 
+    * Can be disabled by setting to 0 (appdigest.c:370).
   */
   
   //  md5_calc(signatures.data(),signatures.size(),digest);
