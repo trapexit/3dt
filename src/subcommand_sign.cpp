@@ -363,6 +363,9 @@ _generate_signatures_file_data(TDO::FileStream &s_)
                         &digest[sizeof(digest)]);
     }
 
+  if((num_digests & (512-1)) == 0)
+    signatures.resize(signatures.size() + 8192);
+
   return signatures;
 }
 
