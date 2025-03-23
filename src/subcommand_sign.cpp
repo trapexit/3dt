@@ -250,10 +250,16 @@ _sign_appsplash(TDO::FileStream &s_)
   switch(romtag->size)
     {
     case ((320 * 240 * 2) + 24):
-      off
-    case ((320 * 240 * 2) + 24 + 64):
+      offset = 0;
+      break;
+    case ((320 * 240 * 2) + 24 + sizeof(rsa512_sig_t)):
+      offset = -sizeof(rsa512_sig_t);
+      break;
     case ((352 * 288 * 2) + 24):
-    case ((353 * 288 * 2) + 24 + 64):
+      offset = 0;
+      break;
+    case ((353 * 288 * 2) + 24 + sizeof(rsa512_sig_t)):
+      offset = -sizeof(rsa512_sig_t);      
       break;
     default:
       offset = 0;
