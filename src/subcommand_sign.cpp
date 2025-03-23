@@ -31,6 +31,14 @@
 #include "fmt_md5_digest.hpp"
 #include "nonstd/string.hpp"
 
+static
+u64
+_round_up(u64 number_,
+          u64 multiple_)
+{
+  return (((number_ + multiple_ - 1) / multiple_) * multiple_);
+}
+
 class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
 {
 public:
@@ -52,7 +60,7 @@ public:
     s_.data_byte_seek(record_pos_);
     s_.data_byte_skip(offsetof(TDO::DirectoryRecord,byte_count));
     s_.write(signatures_file_size);
-    s_.write((u32)((signatures_file_size + (2048 - 1)) / 2048));
+    s_.write((u32)::_round_up(signatures_file_size,2048));
   }
 };
 
@@ -346,14 +354,6 @@ _generate_signatures_file_data(TDO::FileStream &s_)
     }
 
   return signatures;
-}
-
-static
-u64
-_round_up(u64 number_,
-          u64 multiple_)
-{
-  return (((number_ + multiple_ - 1) / multiple_) * multiple_);
 }
 
 static
