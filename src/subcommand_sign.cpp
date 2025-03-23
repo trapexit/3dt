@@ -87,7 +87,7 @@ public:
     if(type == 0)
       return;
 
-    TDO::ROMTag romtag;
+    TDO::ROMTag romtag{};
 
     romtag.type        = type;
     romtag.sub_systype = 0x0F;
