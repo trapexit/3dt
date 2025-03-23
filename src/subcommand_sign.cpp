@@ -197,6 +197,15 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
 }
 
 static
+_add_3dt_mark(TDO::FileStrema &s_)
+{
+  constexpr std::string mark{""};
+  
+  s_.data_byte_seek(0x100);
+  s_.write(mark.c_str(),mark.size());
+}
+
+static
 void
 _generate_and_write_romtags(TDO::FileStream &s_)
 {
