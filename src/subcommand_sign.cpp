@@ -333,6 +333,7 @@ _generate_signatures_file_data(TDO::FileStream &s_)
 {
   u64 num_digests;
   u64 volume_block_count;
+  u64 volume_block_size;
   md5_digest_t digest;
   std::vector<char> buf;
   std::vector<char> signatures;
