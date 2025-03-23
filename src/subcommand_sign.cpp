@@ -387,9 +387,12 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
     checks a number of blocks MD5 checksums. The value set by the
     SIGNATURE_BLOCK's 'TypeSpecific' field.
 
+    * MAX_DIGEST_CHECKS = 128 (appdigest.c:49).
     * Typically the value found in games is 15.
     * The default is 15 (DEFAULT_MAX_PAIN, appdigest.c:30).
     * Can be disabled by setting to 0 (appdigest.c:370).
+    * Set to DEFAULT_MAX_PAIN if set to 1 (appdigest.c:372).
+    * Set to 
   */
   
   //  md5_calc(signatures.data(),signatures.size(),digest);
