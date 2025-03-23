@@ -212,7 +212,7 @@ _add_3dt_mark(TDO::FileStream &s_)
 {
   std::string mark;
 
-  mark = fmt::format("signed by 3dt v{}.{}.{}",
+  mark = fmt::format("signed with 3dt v{}.{}.{}",
                      VERSION_MAJOR,
                      VERSION_MINOR,
                      VERSION_PATCH);
