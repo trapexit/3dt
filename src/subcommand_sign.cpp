@@ -385,8 +385,11 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
     to check the whole disc block MD5 checksums and the signature but
     that isn't in the retail system. What actually happens is it
     checks a number of blocks MD5 checksums. The value set by the
-    SIGNATURE_BLOCK's 'TypeSpecific' field. Typically is 15 but can
-    range from 1 to 128.
+    SIGNATURE_BLOCK's 'TypeSpecific' field.
+
+    * Typically the value found in games is 15.
+    * The default is 15 (DEFAULT_MAX_PAIN, appdigest.c:30).
+    * 
   */
   
   //  md5_calc(signatures.data(),signatures.size(),digest);
