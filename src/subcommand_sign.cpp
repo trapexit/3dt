@@ -380,7 +380,9 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
              signatures.size());
 
   // The signatures file signature is actually not checked by
-  // Portfolio OS.
+  // Portfolio OS. See appdigest.c:399. They had a compile time option
+  // to check the whole disc block MD5 checksums and the signature but
+  // that isn't in the retail system.
   md5_calc(signatures.data(),signatures.size(),digest);
   tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
