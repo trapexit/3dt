@@ -340,7 +340,7 @@ _generate_signatures_file_data(TDO::FileStream &s_)
 
   volume_block_count = s_.disc_label().volume_block_count;
   volume_block_size  = s_.disc_label().volume_block_size;
-  num_digests        = ((volume_block_count * PHY_BLOCK_SIZE) / LOG_BLOCK_SIZE);
+  num_digests        = ((volume_block_count * volume_block_size) / LOG_BLOCK_SIZE);
 
   fmt::print("  - Generate and sign signatures file with APP key\n"
              "    - block count: {}\n"
