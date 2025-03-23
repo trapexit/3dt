@@ -198,7 +198,9 @@ _pad_image_and_update_disclabel(TDO::FileStream &s_)
 static
 _add_3dt_mark(TDO::FileStrema &s_)
 {
-  constexpr std::string mark{""};
+  std::string mark;
+
+  mark = fmt::format("signed by 3dt v{}.{}.{}");
   
   s_.data_byte_seek(0x100);
   s_.write(mark.c_str(),mark.size());
