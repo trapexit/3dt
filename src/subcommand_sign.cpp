@@ -247,6 +247,12 @@ _sign_appsplash(TDO::FileStream &s_)
     throw std::runtime_error("APPSPLASH romtag is missing");
   
   // check for files with or without sig based on size
+  switch(romtag->size)
+    {
+    case 153624:
+    case 153624+64:
+      break;
+    }
   
   s_.read_data_bytes_from_block(data,
                                 romtag->offset + 1,
