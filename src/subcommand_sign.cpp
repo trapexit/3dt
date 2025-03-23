@@ -475,7 +475,7 @@ namespace Subcommand
         ::_add_3dt_mark(stream);        
         ::_generate_and_write_romtags(stream);
         ::_sign_appsplash(stream);
-        //        ::_generate_sign_resize_signatures_file(stream);
+        ::_generate_sign_resize_signatures_file(stream);
         ::_sign_disclabel_romtags_bootcode(stream);
 
         stream.close();
