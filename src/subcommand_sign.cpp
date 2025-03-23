@@ -39,6 +39,7 @@ _round_up(u64 number_,
   return (((number_ + multiple_ - 1) / multiple_) * multiple_);
 }
 
+
 class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
 {
 public:
