@@ -397,15 +397,16 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
       (appdigest.c:374).
   */
 
-  #if 1
-  md5_calc(signatures.data(),signatures.size(),digest);
-  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
+  if(1)
+    {
+      md5_calc(signatures.data(),signatures.size(),digest);
+      tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
-  fmt::print("    - MD5 digest: {}\n"
-             "    - RSA signature: {}\n",
-             digest,
-             sig);
-  #endif
+      fmt::print("    - MD5 digest: {}\n"
+                 "    - RSA signature: {}\n",
+                 digest,
+                 sig);
+    }
 
   signatures.resize(::_round_up((signatures.size() + sizeof(sig)),PHY_BLOCK_SIZE));
   signatures.resize(signatures.size() - sizeof(sig));
