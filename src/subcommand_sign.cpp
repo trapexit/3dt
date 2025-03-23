@@ -265,12 +265,12 @@ _sign_appsplash(TDO::FileStream &s_)
     case APPSPLASH_NTSC_SIZE_W_SIG:      
       offset = -sizeof(rsa512_sig_t);
       break;
-    case ((352 * 288 * 2) + 24):
+    case APPSPLASH_PAL_SIZE:
       offset = 0;
       break;
-    case ((353 * 288 * 2) + 24 + sizeof(rsa512_sig_t)):
-      offset = -sizeof(rsa512_sig_t);      
-      break;
+    case APPSPLASH_PAL_SIZE_W_SIG:      
+      offset = -sizeof(rsa512_sig_t);
+      break;      
     default:
       offset = 0;
       break;
