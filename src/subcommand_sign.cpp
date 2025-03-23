@@ -241,17 +241,22 @@ _sign_appsplash(TDO::FileStream &s_)
   std::vector<char> data;
   rsa512_sig_t sig;
   md5_digest_t digest;
+  s64 offset;
 
   romtag = s_.romtag(RSA_APPSPLASH);
   if(!romtag)
     throw std::runtime_error("APPSPLASH romtag is missing");
-  
+
   switch(romtag->size)
     {
     case ((320 * 240 * 2) + 24):
+      off
     case ((320 * 240 * 2) + 24 + 64):
     case ((352 * 288 * 2) + 24):
     case ((353 * 288 * 2) + 24 + 64):
+      break;
+    default:
+      offset = 0;
       break;
     }
   
