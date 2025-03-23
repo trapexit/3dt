@@ -208,6 +208,7 @@ _add_3dt_mark(TDO::FileStream &s_)
                      VERSION_MINOR,
                      VERSION_PATCH);
   mark.resize(32,'\0');
+  mark[31] = '\0';
   
   s_.data_byte_seek(0x100);
   s_.write(mark.c_str(),mark.size());
