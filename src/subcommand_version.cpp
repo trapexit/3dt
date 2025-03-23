@@ -26,7 +26,8 @@ namespace Subcommand
   version()
   {
     fmt::print("3dt v{}.{}.{}\n\n"
-               "https://github.com/trapexit/3dt\n\n"
+               "https://github.com/trapexit/3dt\n"
+               "\n"
                "ISC License (ISC)\n\n"
                "Copyright 2022, Antonio SJ Musumeci <trapexit@spawn.link>\n\n"
                "Permission to use, copy, modify, and/or distribute this software for\n"
