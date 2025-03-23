@@ -249,8 +249,10 @@ _sign_appsplash(TDO::FileStream &s_)
   // check for files with or without sig based on size
   switch(romtag->size)
     {
-    case 153624:
-    case 153624+64:
+    case ((320 * 240 * 2) + 24);
+    case ((320 * 240 * 2) + 24 + 64);
+    case ((352 * 288 * 2) + 24);
+    case ((353 * 288 * 2) + 24 + 64);
       break;
     }
   
