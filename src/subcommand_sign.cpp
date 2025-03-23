@@ -379,10 +379,16 @@ _generate_sign_resize_signatures_file(TDO::FileStream &s_)
   fmt::print("    - signatures size: {}b\n",
              signatures.size());
 
-  // The signatures file signature is actually not checked by
-  // Portfolio OS. See appdigest.c:399. They had a compile time option
-  // to check the whole disc block MD5 checksums and the signature but
-  // that isn't in the retail system.
+  /*
+    The signatures file signature is actually not checked by
+    Portfolio OS. See appdigest.c:399. They had a compile time option
+    to check the whole disc block MD5 checksums and the signature but
+    that isn't in the retail system. What actually happens is it
+    checks a number of blocks MD5 checksums. The value set by the
+    SIGNATURE_BLOCK's 'TypeSpecific' field. Typically is 15 but can
+    range from 1 to 128.
+  */
+  
   //  md5_calc(signatures.data(),signatures.size(),digest);
   //  tdo_rsa_sign(TDO_KEY_APP,digest,sig);
 
