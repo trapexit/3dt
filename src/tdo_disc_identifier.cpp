@@ -64,22 +64,27 @@ TDO::DiscIdentifier::DiscIdentifier()
 Error
 TDO::DiscIdentifier::identify(std::istream &is_)
 {
-  Error err;
-  TDO::DevStream stream(is_);
+  try
+    {
+      Error err;
+      TDO::DevStream stream(is_);
 
-  err = stream.setup();
-  if(err)
-    return err;
+      stream.setup();
 
-  stream.data_byte_seek(0);
-  stream.read(label);
+      stream.data_byte_seek(0);
+      stream.read(label);
 
-  err = fsstats.collect(stream);
-  if(err)
-    return err;
+      err = fsstats.collect(stream);
+      if(err)
+        return err;
 
-  ::find_matches(label,fsstats,full_matches,partial_matches);
-  disc_image_ext = ::get_ext_based_on_type(stream);
+      ::find_matches(label,fsstats,full_matches,partial_matches);
+      disc_image_ext = ::get_ext_based_on_type(stream);
 
-  return {};
+      return {};
+    }
+  catch(const Error &err)
+    {
+      return err;
+    }
 }

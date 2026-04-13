@@ -51,7 +51,6 @@ namespace Subcommand
   to_iso(const Options::ToISO &options_)
   {
     Error err;
-    std::int64_t i;
     std::uint64_t blocks;
     std::ofstream ofs;
     fs::path output_path;
@@ -76,23 +75,34 @@ namespace Subcommand
         return Log::error_stream_open(output_path);
       }
 
-    i = 0;
-    blocks = stream.device_block_count() - 1;
-    while(stream.good() && !stream.eof())
+    const std::uint64_t leading_blocks =
+      (stream.data_offset() / stream.device_block_data_size());
+    const std::uint64_t device_blocks = stream.device_block_count();
+
+    if(device_blocks > leading_blocks)
+      blocks = (device_blocks - leading_blocks);
+    else
+      blocks = 0;
+    try
       {
-        stream.data_block_seek(i);
+        for(std::uint64_t block = 0; block < blocks; block++)
+          {
+            stream.data_byte_seek(block * stream.device_block_data_size());
+            stream.read(buf);
 
-        stream.read(buf);
-        if(!stream.good())
-          break;
+            ofs.write(buf.data(),buf.size());
+            if(ofs.bad())
+              return Log::error({"write failed"});
 
-        ofs.write(buf.data(),buf.size());
-        if(ofs.bad())
-          return Log::error({"write failed"});
-
-        fmt::print("\r{}: block {} of {} written",output_path,i,blocks);
-
-        i++;
+            fmt::print("\r{}: block {} of {} written",
+                       output_path,
+                       block,
+                       (blocks == 0 ? 0 : (blocks - 1)));
+          }
+      }
+    catch(const Error &err)
+      {
+        return Log::error(err);
       }
 
     fmt::print("\n");

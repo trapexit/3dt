@@ -36,8 +36,8 @@ namespace TDO
     DevStream(std::istream &is);
 
   public:
-    void  find_label();
-    Error setup();
+    void find_label();
+    void setup();
 
   public:
     bool good() const { return _is.good(); }
@@ -83,10 +83,10 @@ namespace TDO
 
   public:
     void read(char *buf, uint32_t size);
-    void read(char &c);
-    void read(uint8_t &u8);
-    void read(uint32_t &u32);
-    void read(int32_t &i32);
+    void read(char &);
+    void read(uint8_t &);
+    void read(uint32_t &);
+    void read(int32_t &);
     void read(TDO::DiscLabel &);
     void read(TDO::DirectoryHeader &);
     void read(TDO::DirectoryRecord &);
@@ -100,9 +100,9 @@ namespace TDO
       read(&arr_[0],arr_.size());
     }
 
-    template<std::size_t N>
+    template<typename T, std::size_t N>
     void
-    read(std::array<uint32_t,N> &arr_)
+    read(std::array<T,N> &arr_)
     {
       for(std::size_t i = 0; i < arr_.size(); i++)
         read(arr_[i]);
@@ -115,6 +115,25 @@ namespace TDO
     std::uint32_t  _data_offset;
     std::istream  &_is;
     bool           _initialized;
+
+  private:
+    bool is_mode1_2352();
+    std::uint32_t count_m1_romtags(const std::int64_t pos_);
+
+  private:
+    template<typename... Args>
+    void
+    _throw(const char *fmt_, Args&&... args_)
+    {
+      std::string msg;
+
+      msg = fmt::format(fmt_,std::forward<Args>(args_)...);
+
+      msg += fmt::format(" at offset {}",_is.tellg());
+
+      throw Error(msg);
+    }
+
   };
 
   class PosGuard

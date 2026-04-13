@@ -26,6 +26,11 @@ struct Error
   {
   }
 
+  Error(const Error &err_)
+    : str(err_.str)
+  {
+  }
+
   Error(Error &&err_)
     : str(std::move(err_.str))
   {

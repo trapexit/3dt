@@ -154,12 +154,17 @@ namespace
   get_label(TDO::FileStream &stream_,
             TDO::DiscLabel  &label_)
   {
-    Error err;
+    try
+      {
+        stream_.data_byte_seek(0);
+        stream_.read(label_);
 
-    stream_.data_byte_seek(0);
-    stream_.read(label_);
-
-    return {};
+        return {};
+      }
+    catch(const Error &err)
+      {
+        return err;
+      }
   }
 
   static
