@@ -22,6 +22,7 @@
 
 #include <cstring>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 
@@ -47,6 +48,60 @@ update_record(const TDO::ROMTagVec &tags_,
     }
 }
 
+static
+Error
+decode_v1_filename(const TDO::DirectoryRecord &dr_,
+                   std::string                &filename_)
+{
+  static constexpr std::size_t filename_size = 32;
+
+  const void *terminator;
+
+  terminator = memchr(dr_.filename,'\0',filename_size);
+  if(terminator != nullptr)
+    {
+      const std::size_t length = static_cast<const char*>(terminator) - dr_.filename;
+
+      if(length == 0)
+        return "invalid empty directory record filename";
+
+      filename_.assign(dr_.filename,length);
+    }
+  else
+    {
+      filename_.assign(dr_.filename,filename_size);
+    }
+
+  if(filename_.empty())
+    return "invalid empty directory record filename";
+  if(filename_ == "." || filename_ == "..")
+    return "invalid directory record filename";
+  if(filename_.find_first_of("/\\") != std::string::npos)
+    return "invalid directory record filename";
+
+  return Error();
+}
+
+static
+Error
+validate_v1_dir_block_bounds(const std::int64_t block_start_,
+                             const std::uint32_t block_size_,
+                             const std::int64_t pos_,
+                             const char         *what_)
+{
+  if(block_size_ == 0)
+    return {"invalid OperaFS directory block size"};
+  if(pos_ < block_start_)
+    return {std::string("invalid OperaFS ") + what_ + ": before directory block"};
+
+  const std::int64_t block_end = block_start_ + static_cast<std::int64_t>(block_size_);
+
+  if(pos_ > block_end)
+    return {std::string("invalid OperaFS ") + what_ + ": beyond directory block"};
+
+  return Error();
+}
+
 class Impl
 {
 public:
@@ -62,12 +117,19 @@ public:
 public:
   Error
   walk_v1_dir_block(const TDO::DiscLabel &label_,
-                    const TDO::ROMTagVec &romtags_,
-                    const std::int64_t    dh_data_byte_pos_,
-                    const fs::path       &path_)
+                      const TDO::ROMTagVec &romtags_,
+                      const std::int64_t    active_dir_byte_pos_,
+                      const std::int64_t    active_dir_end_,
+                      const std::int64_t    dh_data_byte_pos_,
+                      const std::uint32_t   dir_block_size_,
+                      const fs::path       &path_)
   {
     TDO::DirectoryHeader dh;
     std::int64_t data_byte_pos;
+    Error err;
+
+    if(dir_block_size_ < sizeof(TDO::DirectoryHeader))
+      return {"invalid OperaFS directory block: smaller than directory header"};
 
     data_byte_pos = dh_data_byte_pos_;
     _stream.data_byte_seek(data_byte_pos);
@@ -76,34 +138,82 @@ public:
     _callbacks(path_,dh,_stream);
 
     data_byte_pos += dh.first_entry_offset;
+    err = validate_v1_dir_block_bounds(dh_data_byte_pos_,dir_block_size_,data_byte_pos,"directory entry offset");
+    if(err)
+      return err;
+
+    const std::int64_t first_free_byte_pos =
+      dh_data_byte_pos_ + static_cast<std::int64_t>(dh.first_free_byte);
+
+    err = validate_v1_dir_block_bounds(dh_data_byte_pos_,dir_block_size_,first_free_byte_pos,"directory free offset");
+    if(err)
+      return err;
+    if(data_byte_pos == first_free_byte_pos)
+      return Error();
+
     _stream.data_byte_seek(data_byte_pos);
 
     while(true)
       {
-        std::uint32_t dr_pos;
+        const std::int64_t dr_pos = _stream.data_byte_tell();
+        const std::uint32_t dr_file_pos = _stream.file_tell();
         TDO::DirectoryRecord dr;
+        std::string decoded_filename;
+        std::int64_t next_pos;
 
-        dr_pos = _stream.file_tell();
+        if(dr_pos < data_byte_pos)
+          return {"invalid OperaFS directory read position: reversed record offset"};
+        if(dr_pos >= first_free_byte_pos)
+          break;
+        err = validate_v1_dir_block_bounds(dh_data_byte_pos_,dir_block_size_,dr_pos,"directory record offset");
+        if(err)
+          return err;
+
         _stream.read(dr);
+
+        next_pos = _stream.data_byte_tell();
+        if(next_pos <= dr_pos)
+          return {"invalid OperaFS directory read position: non-advancing record read"};
+        if(next_pos > first_free_byte_pos)
+          return {"invalid OperaFS directory record: extends beyond directory data"};
+        err = validate_v1_dir_block_bounds(dh_data_byte_pos_,dir_block_size_,next_pos,"directory record end");
+        if(err)
+          return err;
+
         update_record(romtags_,dr);
+        err = decode_v1_filename(dr,decoded_filename);
+        if(err)
+          return err;
 
         {
           TDO::PosGuard guard(_stream);
-          _callbacks(path_ / dr.filename,dr,dr_pos,_stream);
+          _callbacks(path_ / decoded_filename,dr,dr_file_pos,_stream);
         }
 
         if(dr.is_directory())
-          walk_v1_dir(label_,romtags_,dr,path_ / dr.filename);
+          {
+            const std::int64_t child_dir_byte_pos =
+              static_cast<std::int64_t>(dr.avatar_list[0]) * label_.volume_block_size;
+
+            if((child_dir_byte_pos >= active_dir_byte_pos_) && (child_dir_byte_pos < active_dir_end_))
+              return {"invalid OperaFS directory recursion target: non-advancing child directory block"};
+
+            err = walk_v1_dir(label_,romtags_,dr,path_ / decoded_filename);
+            if(err)
+              return err;
+          }
 
         if(dr.last_in_dir())
           break;
         if(dr.last_in_block())
           break;
-        if(_stream.data_byte_tell() >= (dh_data_byte_pos_ + dh.first_free_byte))
+        if(_stream.data_byte_tell() >= first_free_byte_pos)
           break;
+
+        data_byte_pos = next_pos;
       }
 
-    return {};
+    return Error();
   }
 
   Error
@@ -115,16 +225,32 @@ public:
               const fs::path       &path_)
   {
     std::int64_t  dh_data_byte_pos;
+    const std::int64_t active_dir_byte_pos = (dir_block_ * label_.volume_block_size);
+    const std::int64_t active_dir_end =
+      active_dir_byte_pos + (static_cast<std::int64_t>(dir_block_size_) * dir_block_count_);
     TDO::PosGuard pos_guard(_stream);
 
-    dh_data_byte_pos = (dir_block_ * label_.volume_block_size);
+    if((dir_block_count_ != 0) && (dir_block_size_ == 0))
+      return {"invalid OperaFS directory metadata: zero directory block size"};
+
+    dh_data_byte_pos = active_dir_byte_pos;
     for(std::uint32_t block = 0; block < dir_block_count_; block++)
       {
-        walk_v1_dir_block(label_,romtags_,dh_data_byte_pos,path_);
+        Error err;
+
+        err = walk_v1_dir_block(label_,
+                                romtags_,
+                                active_dir_byte_pos,
+                                active_dir_end,
+                                dh_data_byte_pos,
+                                dir_block_size_,
+                                path_);
+        if(err)
+          return err;
         dh_data_byte_pos += dir_block_size_;
       }
 
-    return {};
+    return Error();
   }
 
   Error
@@ -159,6 +285,7 @@ public:
           const fs::path       &path_)
   {
     std::uint32_t pos;
+    Error err;
 
     pos = label_.root_directory_avatar_list[0] * label_.root_directory_block_size;
     while(true)
@@ -191,7 +318,7 @@ public:
         pos = lmfe.flink_offset;
       }
 
-    return {};
+    return Error();
   }
 
   Error
@@ -202,11 +329,10 @@ public:
     TDO::DiscLabel dl;
     TDO::ROMTagVec romtags;
 
-    err = _stream.setup();
-    if(err)
-      return err;
+    _stream.setup();
 
     _stream.read(dl);
+
     romtags = _stream.romtags();
 
     _callbacks.begin();
@@ -250,8 +376,15 @@ namespace TDO
   Error
   FSWalker::walk()
   {
-    Impl impl(_is,_callbacks);
+    try
+      {
+        Impl impl(_is,_callbacks);
 
-    return impl.walk();
+        return impl.walk();
+      }
+    catch(const Error &err)
+      {
+        return err;
+      }
   }
 }

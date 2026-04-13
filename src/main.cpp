@@ -16,6 +16,8 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#include "error.hpp"
+#include "log.hpp"
 #include "subcommand.hpp"
 
 #include "CLI11.hpp"
@@ -261,6 +263,11 @@ main(int    argc_,
   catch(const CLI::ParseError &e)
     {
       return app.exit(e);
+    }
+  catch(const Error &err)
+    {
+      Log::error(err);
+      return 1;
     }
 
   return 0;
