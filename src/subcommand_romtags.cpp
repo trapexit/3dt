@@ -134,28 +134,35 @@ Subcommand::romtags(const Options::ROMTags &opts_)
 
   for(const auto &filepath : opts_.filepaths)
     {
-      Error err;
-      TDO::FileStream stream;
+      try
+        {
+          Error err;
+          TDO::FileStream stream;
 
-      err = stream.open(filepath);
-      if(err)
+          err = stream.open(filepath);
+          if(err)
+            {
+              fmt::print(stderr,"3dt: {} - {}\n",err.str,filepath);
+              continue;
+            }
+
+          if(!stream.has_romtags())
+            {
+              fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
+              continue;
+            }
+
+          if(printed_header == false)
+            {
+              print_romtags_csv_header();
+              printed_header = true;
+            }
+
+          ::romtags_human(filepath,stream);
+        }
+      catch(const Error &err)
         {
           fmt::print(stderr,"3dt: {} - {}\n",err.str,filepath);
-          break;
         }
-
-      if(!stream.has_romtags())
-        {
-          fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
-          break;
-        }
-
-      if(printed_header == false)
-        {
-          print_romtags_csv_header();
-          printed_header = true;
-        }
-
-      ::romtags_human(filepath,stream);
     }
 }

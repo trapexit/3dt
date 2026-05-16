@@ -34,14 +34,21 @@ namespace TDO
   Error
   FileStream::open(const std::filesystem::path &filepath_)
   {
-    Error err;
-
     close();
 
     _ifs.open(filepath_,std::ios::binary);
-    err = setup();
-    if(err)
-      return err;
+    if(!_ifs.good())
+      return {};
+
+    try
+      {
+        setup();
+      }
+    catch(const Error &err)
+      {
+        close();
+        return err;
+      }
 
     _filepath = filepath_;
 
