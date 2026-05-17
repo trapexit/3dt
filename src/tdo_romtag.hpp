@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,13 +18,19 @@
 
 #pragma once
 
+#include "types_ints.h"
+
 #include <cstdint>
 #include <vector>
+#include <string>
 
 namespace TDO
 {
+  class DevStream;
+
   struct ROMTag
   {
+  public:
     uint8_t sub_systype;
     uint8_t type;
     uint8_t version;
@@ -36,9 +42,41 @@ namespace TDO
     uint32_t offset;
     uint32_t size;
     uint32_t reserved3[4];
+
+  public:
+    static std::string type_str(const uint8_t);
+    std::string type_str() const;
   };
 
   typedef std::vector<TDO::ROMTag> ROMTagVec;
+
+  // Validate a ROMTag.offset and return offset+1 in u64 space, throwing
+  // on out-of-range values. Used wherever we treat a ROMTag's first
+  // payload block as the avatar of a signed region.
+  //
+  // tag_.offset is u32, so the only "out of u32 range" value is
+  // 0xFFFFFFFF itself; we reject it specifically because offset+1 in
+  // u32 space wraps to 0 and silently redirects reads/writes onto the
+  // disc label.
+  u64
+  safe_romtag_first_data_block(TDO::DevStream    &stream_,
+                               const TDO::ROMTag &tag_,
+                               const char        *label_);
+
+  // Validate the full payload range of a ROMTag against the image
+  // size: returns the first data block (offset+1) like
+  // safe_romtag_first_data_block, but additionally rejects payloads
+  // whose start or end falls past the end of the underlying image.
+  // The signer reads/writes the full [first_block .. first_block +
+  // payload_size_bytes_) range; without an explicit end-bound check
+  // the only enforcement is whatever the underlying stream rejects on
+  // I/O. Use this for any signing or verification path that consumes
+  // the whole ROMTag payload.
+  u64
+  safe_romtag_payload_range(TDO::DevStream    &stream_,
+                            const TDO::ROMTag &tag_,
+                            const u64          payload_size_bytes_,
+                            const char        *label_);
 }
 
 

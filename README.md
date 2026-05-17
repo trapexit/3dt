@@ -10,6 +10,11 @@
 * unpack disc and ROM OperaFS contents
 * convert raw disc images to .iso
 * supports reading CD-ROM Mode 1 images and 2048 byte/sector ISOs
+* pack directories into 3DO disc images
+* repack existing images and compact free space
+* sign and re-sign 3DO images
+* verify 3DO signatures
+* encrypt or decrypt 3DO obfuscation payloads (primarily the boot file)
 
 
 ## Usage
@@ -30,9 +35,16 @@ Subcommands:
   info                        prints lowlevel info on disc
   identify                    attempt to identify disc image
   unpack                      unpack disc image
+  pack                        pack a directory into a 3DO disc image
+  repack                      repack a 3DO disc image compacting avatars and empty space
+  verify                      verify RSA sigs
+  sign                        sign 3DO ISO for retail system use
+  sign-file                   sign file with 3DO or APP key
   rename                      rename disc image as identified
   to-iso                      convert a .bin or similar disc image to .iso
   romtags                     print out image romtags
+  decrypt-file                decrypt CD-DIPIR boot payload
+  encrypt-file                encrypt CD-DIPIR boot payload
 ```
 
 Use `--help` on individual subcommands to get specific subcmd options.
@@ -187,13 +199,136 @@ Print rom tags
 
 ```
 $ 3dt romtags Wolfenstein\ 3D\ \(USA\).iso
-File,SubSysType,Type,Version,Revision,Flags,TypeSpecific,Offset,Size
-Wolfenstein 3D (USA).iso,0x0f,NEWKNEWNEWGNUBOOT,2,5,0,0,1,6448
-Wolfenstein 3D (USA).iso,0x0f,OS,24,225,0,0,5,115520
-Wolfenstein 3D (USA).iso,0x0f,BILLSTUFF,0,0,0,0,2893249791,0
-Wolfenstein 3D (USA).iso,0x0f,BLOCKS_ALWAYS,0,0,0,0,42713,47
-Wolfenstein 3D (USA).iso,0x0f,MISCCODE,0,0,0,0,69,2908
-Wolfenstein 3D (USA).iso,0x0f,SIGNATURE_BLOCK,0,0,0,15,42766,57344
+Wolfenstein 3D (USA).iso:
+  - Offset:      1
+    SubSysType:  0x0f
+    Type:        0x0d (NEWKNEWNEWGNUBOOT)
+    Version:     2
+    Revision:    5
+    Flags:       0
+    TypeSpec:    0
+    Size:        6448
+  - Offset:      5
+    SubSysType:  0x0f
+    Type:        0x07 (OS)
+    Version:     24
+    Revision:    225
+    Flags:       0
+    TypeSpec:    0
+    Size:        115520
+  - Offset:      69
+    SubSysType:  0x0f
+    Type:        0x10 (MISCCODE)
+    Version:     0
+    Revision:    0
+    Flags:       0
+    TypeSpec:    0
+    Size:        2908
+  - Offset:      42713
+    SubSysType:  0x0f
+    Type:        0x02 (BLOCKS_ALWAYS)
+    Version:     0
+    Revision:    0
+    Flags:       0
+    TypeSpec:    0
+    Size:        47
+  - Offset:      42766
+    SubSysType:  0x0f
+    Type:        0x05 (SIGNATURE_BLOCK)
+    Version:     0
+    Revision:    0
+    Flags:       0
+    TypeSpec:    15
+    Size:        57344
+```
+
+
+### pack
+
+Build a 3DO disc image from a source tree.
+
+```
+3dt pack /path/to/source --output game.iso
+```
+
+If present, `layout.json` is used automatically; otherwise pass a custom path with `--layout`.
+
+Common options:
+- `--volume-label` / `--volume-commentary`: set label metadata
+- `--volume-unique-id` / `--root-unique-id`: set identifiers
+- `--dry-run`: validate layout and allocations without writing the image
+- `--mark`: write 3dt marker metadata
+- `--sign`: run signing as part of pack
+- `--digest-check-count`: tune signature digest check policy
+- `--no-banner-romtag`: disable RSA_APPSPLASH romtag generation
+- `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by default)
+
+
+### repack
+
+Rebuild an image while compacting avatars and reclaiming free space.
+
+```
+3dt repack game.iso --output game-repacked.iso
+```
+
+Repack also supports `--sign` and the same romtag/signature options as `pack`.
+
+
+### sign
+
+Sign an existing image for retail playback.
+
+```
+3dt sign game.iso --output game-signed.iso
+```
+
+Useful flags include `--force` for unusual source layouts, `--mark`, `--digest-check-count`, and `--billstuff-romtag`.
+
+
+### verify
+
+Validate signed images and report status.
+
+```
+3dt verify --format=csv game.iso
+```
+
+Output formats are `human`, `csv`, and `json`; add `--no-digest-table` to skip digest-table checks.
+
+
+### sign-file
+
+Sign, verify, or emit signatures for a file payload.
+
+```
+3dt sign-file --verify boot_code
+3dt sign-file --write --append --key-name app boot_code
+```
+
+### decrypt-file
+
+Decrypt signed 3DO file payloads.
+This is mainly used for the boot file (`system/kernel/boot_code`, sometimes
+referred to as `boot_file`) when working with CD-DIPIR-protected images.
+In practice that is the primary real-world use.
+This maps to the Portfolio OS `src/dipir/cdipir.c` boot flow (`DecryptBlock()`).
+Re-run `3dt encrypt-file` on the same file once edits are complete.
+
+```
+3dt decrypt-file boot_code
+```
+
+### encrypt-file
+
+Encrypt a file using the same boot-file obfuscation transform.
+This is effectively the inverse operation of `decrypt-file` and is used when
+you need to restore the encrypted form (typically for `system/kernel/boot_code`).
+The inverse transform corresponds to Portfolio OS CD-DIPIR boot-file logic in
+`src/dipir/cdipir.c`.
+
+```
+3dt encrypt-file boot_code
 ```
 
 

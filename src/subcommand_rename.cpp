@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -53,30 +53,28 @@ namespace l
   }
 
   static
-  Error
+  void
   rename(const fs::path &filepath_,
          const bool      take_first_,
-         std::istream   &is_)
+         std::iostream  &ios_)
   {
-    Error err;
     TDO::DiscIdentifier identifier;
 
-    err = identifier.identify(is_);
-    if(err)
-      return err;
+    identifier.identify(ios_);
 
     if(identifier.full_matches.empty())
-      return {"no match found"};
+      throw Error("no match found");
 
     if((identifier.full_matches.size() == 1) || (take_first_ == true))
-      return l::rename(filepath_,identifier.full_matches[0],identifier.disc_image_ext);
+      {
+        l::rename(filepath_,identifier.full_matches[0],identifier.disc_image_ext);
+        return;
+      }
 
     fmt::print("{}: skipping due to multiple matches - ",filepath_);
     for(auto match : identifier.full_matches)
       fmt::print("{}",match->name);
     fmt::print("\n");
-
-    return {};
   }
 
   static
@@ -84,21 +82,18 @@ namespace l
   rename(const fs::path &filepath_,
          const bool      take_first_)
   {
-    Error err;
-    std::ifstream ifs;
+    std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
+    fs.open(filepath_,std::ios::binary|std::ios::in);
+    if(!fs.good())
       {
         Log::error_stream_open(filepath_);
-        return;
+        throw Error("failed to open");
       }
 
-    err = l::rename(filepath_,take_first_,ifs);
-    if(err)
-      Log::error(err);
+    l::rename(filepath_,take_first_,fs);
 
-    ifs.close();
+    fs.close();
   }
 }
 
@@ -107,7 +102,23 @@ namespace Subcommand
   void
   rename(const Options::Rename &options_)
   {
+    bool failed;
+
+    failed = false;
     for(auto &filepath : options_.filepaths)
-      l::rename(filepath,options_.take_first);
+      {
+        try
+          {
+            l::rename(filepath,options_.take_first);
+          }
+        catch(const std::exception &e)
+          {
+            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+            failed = true;
+          }
+      }
+
+    if(failed)
+      throw Error("rename failed");
   }
 }

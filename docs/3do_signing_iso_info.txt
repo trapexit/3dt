@@ -1,0 +1,45 @@
+* Take the MD5 diget of binary.
+* Convert MD5 diget into string representation; "%02X" per byte.
+* Calculate 64 byte RSA sig from MD5
+
+## Things to get digest and sign
+
+* BannerScreen. get location from ROM tags. Just attach sig to end of
+file. Since the size of banner is 153600 bytes for data + 24 bytes for
+header it spills over into a 76th 2048 byte sector meaning there is
+always room for the sig.
+* Signature file
+* boot_code: already has a sig, just replace to be sure?
+* misc_code: 
+* os_code
+* romtags: put sig at end, 32 * romtags.size() + 1 (last entry is all
+zeros), the md5 digest consists of the disc label, romtags (including
+last entry), and NEWKNEWNEWGNUBOOT.
+
+## How to calculate signatures file
+
+* Create md5 binary digests of every 32K (16 2k blocks)
+* create a "signatures" file with all digests in order
+* ignore block 0
+* ignore block 14?
+* the checker in appdigest.c ignores
+  * 0x080F : third label digest
+  * 0x0306 : Fatty Bear
+  * everything covering signature 
+* TypeSpecific from sig romtag indicates "MaxPain", how many blocks to
+  check
+* Add an additional 2048 block to signature file
+* create md5 digest of signature file with zeroed out additional
+  sector minus 64 bytes for the rsa sig
+* Convert 16 byte digest to "%02X" per byte string and APP sign
+* store to signature size - 64, report the size in romtags minus the
+  extra sector
+
+## How it checks
+
+* Selects TypeSpecific blocks to check from signature romtag
+* Selects from a range of blocks between app_start_block and last_block
+* If RSA_APP romtag exists
+  * app_start_block = ((tag offset + romtag_block) / 16)
+  Else
+  * app_start_block = 256

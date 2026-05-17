@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -76,13 +76,33 @@ namespace
                label_.root_directory_block_count,
                label_.root_directory_block_size,
                label_.root_directory_last_avatar_index);
-    for(unsigned int i = 0; i <= label_.root_directory_last_avatar_index; i++)
+    // Cap the iteration by the avatar_list's fixed capacity rather
+    // than trusting root_directory_last_avatar_index, which on a
+    // malformed/odd label may exceed the on-disc array (-> OOB read)
+    // or even be UINT32_MAX (-> the original `i <= last_idx` form
+    // looped forever once unsigned i wrapped past UINT_MAX). Cast
+    // through u64 so the `+ 1` cannot itself wrap when last_idx is
+    // UINT32_MAX. Print what the array actually holds; warn if the
+    // disc label says there are more.
+    const auto avatar_capacity = label_.root_directory_avatar_list.size();
+    const uint32_t last_idx    = label_.root_directory_last_avatar_index;
+    const bool last_idx_oob =
+      (static_cast<uint64_t>(last_idx) + 1 > avatar_capacity);
+    const uint32_t print_count =
+      last_idx_oob
+      ? static_cast<uint32_t>(avatar_capacity)
+      : (last_idx + 1);
+    for(uint32_t i = 0; i < print_count; i++)
       fmt::print("   - {}\n",label_.root_directory_avatar_list[i]);
-    if(label_.volume_flags & VOLUME_FLAG_M2)
-      fmt::print(" - num_rom_tags: {}\n"
-                 " - application_id: {}\n",
-                 label_.num_rom_tags,
-                 label_.application_id);
+    if(last_idx_oob)
+      fmt::print("   (note: root_directory_last_avatar_index={} "
+                 "exceeds avatar_list capacity {})\n",
+                 last_idx,avatar_capacity);
+    // if(label_.volume_flags & VOLUME_FLAG_M2)
+    //   fmt::print(" - num_rom_tags: {}\n"
+    //              " - application_id: {}\n",
+    //              label_.num_rom_tags,
+    //              label_.application_id);
     fmt::print(" - file_count: {}\n"
 
                " - total_data_size: {}\n",
@@ -150,65 +170,44 @@ namespace
   }
 
   static
-  Error
+  void
   get_label(TDO::FileStream &stream_,
             TDO::DiscLabel  &label_)
   {
-    try
-      {
-        stream_.data_byte_seek(0);
-        stream_.read(label_);
-
-        return {};
-      }
-    catch(const Error &err)
-      {
-        return err;
-      }
+    stream_.data_byte_seek(0);
+    stream_.read(label_);
   }
 
   static
-  Error
+  void
   get_extra_info(TDO::FileStream &stream_,
                  uint32_t        &file_count_,
                  uint32_t        &total_data_size_)
   {
-    Error err;
     TDO::FilesystemStats fsstats;
 
-    err = fsstats.collect(stream_);
-    if(err)
-      return err;
+    fsstats.collect(stream_);
 
     file_count_      = fsstats.file_count;
     total_data_size_ = fsstats.total_data_size;
-
-    return {};
   }
 
   static
-  Error
+  void
   info(const PrintFunc &printfunc_,
        TDO::FileStream &stream_)
   {
-    Error err;
     uint32_t file_count;
     uint32_t total_data_size;
     TDO::DiscLabel label;
 
-    err = ::get_label(stream_,label);
-    if(err)
-      return err;
+    ::get_label(stream_,label);
 
     file_count = 0;
     total_data_size = 0;
-    err = ::get_extra_info(stream_,file_count,total_data_size);
-    if(err)
-      return err;
+    ::get_extra_info(stream_,file_count,total_data_size);
 
     printfunc_(stream_.filepath(),label,file_count,total_data_size);
-
-    return {};
   }
 
   static
@@ -216,19 +215,17 @@ namespace
   info(const PrintFunc &printfunc_,
        const fs::path  &filepath_)
   {
-    Error err;
     TDO::FileStream stream;
 
-    err = stream.open(filepath_);
-    if(err)
-      return Log::error(err);
+    stream.open(filepath_);
 
     if(!stream.good())
-      return Log::error_stream_open(filepath_);
+      {
+        Log::error_stream_open(filepath_);
+        throw Error("failed to open");
+      }
 
-    err = ::info(printfunc_,stream);
-    if(err)
-      return Log::error(err);
+    ::info(printfunc_,stream);
 
     stream.close();
   }
@@ -240,11 +237,26 @@ namespace Subcommand
   void
   info(const Options::Info &options_)
   {
+    bool failed;
     PrintFunc printfunc;
 
     printfunc = get_print_function(options_);
+    failed = false;
 
     for(auto &filepath : options_.filepaths)
-      ::info(printfunc,filepath);
+      {
+        try
+          {
+            ::info(printfunc,filepath);
+          }
+        catch(const std::exception &e)
+          {
+            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+            failed = true;
+          }
+      }
+
+    if(failed)
+      throw Error("info failed");
   }
 }

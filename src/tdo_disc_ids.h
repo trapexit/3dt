@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,8 @@
 #include "extern_c.h"
 
 #include <stdint.h>
+
+// TODO: Add hash of signatures file?
 
 EXTERN_C_BEGIN
 

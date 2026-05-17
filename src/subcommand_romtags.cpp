@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -49,61 +49,9 @@ print_romtags_csv_header(void)
 }
 
 static
-std::string
-rsanode_type(const uint8_t type_)
-{
-  switch(type_)
-    {
-    case RSA_MUST_RSA:
-      return "MUST_RSA";
-    case RSA_NEWKNEWNEWGNUBOOT:
-      return "NEWKNEWNEWGNUBOOT";
-    case RSA_OS:
-      return "OS";
-    case RSA_BILLSTUFF:
-      return "BILLSTUFF";
-    case RSA_BLOCKS_ALWAYS:
-      return "BLOCKS_ALWAYS";
-    case RSA_MISCCODE:
-      return "MISCCODE";
-    case RSA_SIGNATURE_BLOCK:
-      return "SIGNATURE_BLOCK";
-    case RSA_APPSPLASH:
-      return "APPSPLASH";
-    case RSA_DEPOTCONFIG:
-      return "DEPOTCONFIG";
-    case RSA_DEVICE_INFO:
-      return "DEVICE_INFO";
-    case RSA_DEV_PERMS:
-      return "DEV_PERMS";
-    case RSA_BOOT_OVERLAY:
-      return "BOOT_OVERLAY";
-
-    case RSA_M2_OS:
-      return "M2_OS";
-    case RSA_M2_MISCCODE:
-      return "M2_MISCCODE";
-    case RSA_M2_DRIVER:
-      return "M2_DRIVER";
-    case RSA_M2_DEVDIPIR:
-      return "M2_DEVDIPIR";
-    case RSA_M2_APPBANNER:
-      return "M2_APPBANNER";
-    case RSA_M2_APP_KEYS:
-      return "M2_APP_KEYS";
-    case RSA_OPERA_CD_IMAGE:
-      return "OPERA_CD_IMAGE";
-    case RSA_M2_ICON:
-      return "M2_ICON";
-    }
-
-  return fmt::format("{:#04x}",type_);
-}
-
-static
 void
-romtags_human(const std::filesystem::path &filepath_,
-              TDO::DevStream              &stream_)
+romtags_csv(const std::filesystem::path &filepath_,
+            TDO::DevStream              &stream_)
 {
   TDO::ROMTagVec tags;
   CSVWriter csv(",");
@@ -115,7 +63,7 @@ romtags_human(const std::filesystem::path &filepath_,
       csv << filepath_.string()
           << fmt::format("{:#04x}",tag.sub_systype)
           << fmt::format("{:#04x}",tag.type)
-          << fmt::format("{}",rsanode_type(tag.type))
+          << fmt::format("{}",tag.type_str())
           << fmt::format("{}",tag.version)
           << fmt::format("{}",tag.revision)
           << fmt::format("{:x}",tag.flags)
@@ -127,42 +75,80 @@ romtags_human(const std::filesystem::path &filepath_,
   fmt::print("{}\n",csv.toString());
 }
 
+static
+void
+romtags_human(const std::filesystem::path &filepath_,
+               TDO::DevStream              &stream_)
+{
+  TDO::ROMTagVec tags;
+
+  tags = stream_.romtags();
+  fmt::print("{}:\n", filepath_.filename());
+  for(const auto &tag : tags)
+    {
+       fmt::print("  - Offset:      {}\n"
+                  "    SubSysType:  {:#04x}\n"
+                  "    Type:        {:#04x} ({})\n"
+                  "    Version:     {}\n"
+                  "    Revision:    {}\n"
+                  "    Flags:       {:#x}\n"
+                  "    TypeSpec:    {}\n"
+                  "    Size:        {}\n",
+                  tag.offset,
+                  tag.sub_systype,
+                  tag.type,
+                  tag.type_str(),
+                  tag.version,
+                  tag.revision,
+                  tag.flags,
+                  tag.type_specific,
+                 tag.size);
+    }
+}
+
 void
 Subcommand::romtags(const Options::ROMTags &opts_)
 {
+  bool failed;
   bool printed_header = false;
 
+  failed = false;
   for(const auto &filepath : opts_.filepaths)
     {
       try
         {
-          Error err;
           TDO::FileStream stream;
 
-          err = stream.open(filepath);
-          if(err)
-            {
-              fmt::print(stderr,"3dt: {} - {}\n",err.str,filepath);
-              continue;
-            }
+          stream.open(filepath);
 
           if(!stream.has_romtags())
             {
               fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
+              failed = true;
               continue;
             }
 
-          if(printed_header == false)
+          if(opts_.format == "csv")
             {
-              print_romtags_csv_header();
-              printed_header = true;
+              if(printed_header == false)
+                {
+                  print_romtags_csv_header();
+                  printed_header = true;
+                }
+              romtags_csv(filepath,stream);
             }
-
-          ::romtags_human(filepath,stream);
+          else
+            {
+              romtags_human(filepath,stream);
+            }
         }
-      catch(const Error &err)
+      catch(const std::exception &e)
         {
-          fmt::print(stderr,"3dt: {} - {}\n",err.str,filepath);
+          fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+          failed = true;
         }
     }
+
+  if(failed)
+    throw Error("romtags failed");
 }

@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 #include "tdo_filesystem_stats.hpp"
 
 #include "tdo_fs_walker.hpp"
+#include "tdo_safe_narrow.hpp"
 
 
 class FSStatsCollector final : public TDO::FSWalker::Callbacks
@@ -59,18 +60,37 @@ public:
     total_data_size += record_.byte_count;
   }
 
-public:
   Error
+  invalid_filename(const std::filesystem::path&,
+                   const std::string&,
+                   const TDO::DirectoryRecord &record_,
+                   const uint32_t,
+                   const Error&,
+                   TDO::DevStream&)
+  {
+    file_count++;
+    total_data_size += record_.byte_count;
+
+    return {};
+  }
+
+public:
+  void
   collect(TDO::DevStream &stream_)
   {
     TDO::FSWalker walker(stream_,*this);
 
-    return walker.walk();
+    walker.walk();
   }
 
 public:
-  uint32_t file_count;
-  uint32_t total_data_size;
+  // Accumulate in u64 so that a malformed image whose records claim
+  // more bytes than 32-bit can express is detected at collect() time
+  // rather than silently wrapping into a plausible-looking value.
+  // The OperaFS image-size invariant is u32-bounded; overflowing u32
+  // here means the image is malformed.
+  uint64_t file_count;
+  uint64_t total_data_size;
 };
 
 namespace TDO
@@ -81,19 +101,16 @@ namespace TDO
   {
   }
 
-  Error
+  void
   FilesystemStats::collect(TDO::DevStream &stream_)
   {
-    Error err;
     FSStatsCollector collector;
 
-    err = collector.collect(stream_);
-    if(err)
-      return err;
+    collector.collect(stream_);
 
-    file_count      = collector.file_count;
-    total_data_size = collector.total_data_size;
-
-    return {};
+    file_count      = TDO::checked_narrow_u64_to_u32(collector.file_count,
+                                                     "filesystem file_count");
+    total_data_size = TDO::checked_narrow_u64_to_u32(collector.total_data_size,
+                                                     "filesystem total_data_size");
   }
 }

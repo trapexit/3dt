@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -33,17 +33,18 @@ namespace TDO
     ~FileStream();
 
   public:
-    Error open(const std::filesystem::path &filepath);
+    void open(const std::filesystem::path &filepath,
+              const std::ios::openmode     mode = std::ios::in);
     void  close();
 
   public:
     const std::filesystem::path& filepath() const;
 
   public:
-    std::istream& istream();
+    std::iostream& iostream();
 
   private:
     std::filesystem::path _filepath;
-    std::ifstream         _ifs;
+    std::fstream          _fs;
   };
 }

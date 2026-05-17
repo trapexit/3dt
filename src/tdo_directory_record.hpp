@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include "error.hpp"
 #include "fmt.hpp"
 
 #include <cctype>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -66,7 +68,21 @@ namespace TDO
     bool last_in_dir() const { return !!(flags & DR_FLAG_LAST_IN_DIR); }
 
   public:
-    uint32_t disc_avatar_offset(const uint32_t i) const { return (avatar_list[i] * block_size); }
+    // OperaFS targets a 32-bit platform; both the avatar block index
+    // and the byte offset must fit in u32. Compute the multiply in
+    // u64 so we can detect a malformed image whose record drives the
+    // product past UINT32_MAX, then narrow. Throwing here surfaces
+    // the bad record to the calling listing/unpack path's per-image
+    // try/catch rather than silently displaying a wrapped offset.
+    uint32_t disc_avatar_offset(const uint32_t i) const
+    {
+      const uint64_t offset =
+        static_cast<uint64_t>(avatar_list[i]) * block_size;
+      if(offset > std::numeric_limits<uint32_t>::max())
+        throw Error("avatar disc offset out of 32-bit range: " +
+                    std::to_string(offset));
+      return static_cast<uint32_t>(offset);
+    }
     uint32_t disc_avatar_offset() const { return disc_avatar_offset(0); }
 
   public:
