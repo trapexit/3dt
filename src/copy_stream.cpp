@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,8 @@
 */
 
 #include "copy_stream.hpp"
+
+#include "error.hpp"
 
 #include <array>
 #include <algorithm>
@@ -45,5 +47,11 @@ namespace util
         bytes_to_write -= is_.gcount();
       }
     while(is_ && os_ && (bytes_to_write > 0));
+
+    if(bytes_to_write > 0)
+      throw Error("copy_stream: short copy, " +
+                  std::to_string(bytes_to_write) +
+                  " of " + std::to_string(len_) +
+                  " bytes not transferred");
   }
 }

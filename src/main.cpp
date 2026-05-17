@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -19,10 +19,13 @@
 #include "error.hpp"
 #include "log.hpp"
 #include "subcommand.hpp"
+#include "tdo_rsa.h"
 
 #include "CLI11.hpp"
 
+#include <exception>
 #include <locale>
+#include <stdexcept>
 
 
 static
@@ -133,6 +136,11 @@ generate_unpack_argparser(CLI::App        &app_,
     ->default_val("")
     ->check(CLI::ExistingDirectory)
     ->take_last();
+  subcmd->add_option("--layout",options_.layout)
+    ->description("layout metadata output file (default: layout.json in unpacked root)")
+    ->type_name("PATH")
+    ->default_val("")
+    ->take_last();
 
   subcmd->callback(std::bind(Subcommand::unpack,std::cref(options_)));
 }
@@ -145,8 +153,106 @@ generate_pack_argparser(CLI::App      &app_,
   CLI::App *subcmd;
 
   subcmd = app_.add_subcommand("pack","pack a directory into a 3DO disc image");
+  subcmd->add_option("filepath",options_.input)
+    ->description("path to source directory")
+    ->type_name("PATH")
+    ->check(CLI::ExistingDirectory)
+    ->required();
+  subcmd->add_option("-o,--output",options_.output)
+    ->description("output ISO file")
+    ->type_name("PATH")
+    ->required()
+    ->take_last();
+  subcmd->add_option("--layout",options_.layout)
+    ->description("layout metadata input file (default: layout.json in source root when present)")
+    ->type_name("PATH")
+    ->default_val("")
+    ->take_last();
+  subcmd->add_option("--volume-label",options_.volume_label)
+    ->description("disc volume label")
+    ->type_name("TEXT")
+    ->default_val("CD-ROM")
+    ->take_last();
+  subcmd->add_option("--volume-commentary",options_.volume_commentary)
+    ->description("disc volume commentary")
+    ->type_name("TEXT")
+    ->default_val("")
+    ->take_last();
+  subcmd->add_option("--volume-unique-id",options_.volume_unique_identifier)
+    ->description("disc volume unique identifier (0 selects random)")
+    ->type_name("UINT")
+    ->each([&options_](std::string){ options_.volume_unique_identifier_set = true; })
+    ->take_last();
+  subcmd->add_option("--root-unique-id",options_.root_unique_identifier)
+    ->description("root directory unique identifier (0 selects random)")
+    ->type_name("UINT")
+    ->each([&options_](std::string){ options_.root_unique_identifier_set = true; })
+    ->take_last();
+  subcmd->add_flag("--dry-run",options_.dry_run)
+    ->description("validate and report without writing an image");
+  subcmd->add_flag("--no-banner-romtag{false},--no-rsa-appsplash{false}",
+                   options_.banner_romtag)
+     ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
+  subcmd->add_flag("--billstuff-romtag",
+                   options_.billstuff_romtag)
+     ->description("generate an RSA_BILLSTUFF ROMTag");
+  subcmd->add_option("--digest-check-count",
+                     options_.signature_digest_check_count)
+    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
+    ->type_name("UINT")
+    ->check(CLI::Range(0,255))
+    ->default_val("0")
+    ->take_last();
+  subcmd->add_option("--mark",options_.mark)
+    ->description("write a 3dt marker into the output image")
+    ->type_name("BOOL")
+    ->default_val("true")
+    ->take_last();
+  subcmd->add_flag("--sign",options_.sign)
+    ->description("sign the image after packing");
 
   subcmd->callback(std::bind(Subcommand::pack,std::cref(options_)));
+}
+
+static
+void
+generate_repack_argparser(CLI::App         &app_,
+                          Options::Repack &options_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("repack","repack a 3DO disc image compacting avatars and empty space");
+  subcmd->add_option("filepaths",options_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  subcmd->add_option("-o,--output",options_.output)
+    ->description("output image path; requires exactly one input")
+    ->type_name("PATH")
+    ->take_last();
+  subcmd->add_flag("--no-banner-romtag{false},--no-rsa-appsplash{false}",
+                   options_.banner_romtag)
+    ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
+  subcmd->add_flag("--billstuff-romtag",
+                   options_.billstuff_romtag)
+     ->description("generate an RSA_BILLSTUFF ROMTag");
+  subcmd->add_option("--digest-check-count",
+                     options_.signature_digest_check_count)
+    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
+    ->type_name("UINT")
+    ->check(CLI::Range(0,255))
+    ->default_val("0")
+    ->take_last();
+  subcmd->add_option("--mark",options_.mark)
+    ->description("write a 3dt marker into the output image")
+    ->type_name("BOOL")
+    ->default_val("true")
+    ->take_last();
+  subcmd->add_flag("--sign",options_.sign)
+    ->description("sign the image after repacking");
+
+  subcmd->callback(std::bind(Subcommand::repack,std::cref(options_)));
 }
 
 static
@@ -214,6 +320,145 @@ generate_romtags_argparser(CLI::App         &app_,
 
 static
 void
+generate_verify_argparser(CLI::App        &app_,
+                          Options::Verify &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("verify","verify RSA sigs");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  subcmd->add_option("-f,--format",opts_.format)
+    ->description("output format")
+    ->type_name("TEXT")
+    ->default_val("human")
+    ->take_last()
+    ->check(CLI::IsMember({"human","csv","json"}));
+  subcmd->add_flag("--no-digest-table{false}",opts_.digest_table)
+    ->description("skip signature digest table comparison");
+  subcmd->add_flag("--quiet",opts_.quiet)
+    ->description("print only per-image verification status");
+
+  subcmd->callback(std::bind(Subcommand::verify,
+                             std::cref(opts_)));
+}
+
+static
+void
+generate_sign_argparser(CLI::App      &app_,
+                        Options::Sign &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("sign","sign 3DO ISO for retail system use");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to disc images")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  subcmd->add_option("-o,--output",opts_.output)
+    ->description("output image path; requires exactly one input")
+    ->type_name("PATH")
+    ->take_last();
+  subcmd->add_flag("--no-banner-romtag{false},--no-rsa-appsplash{false}",
+                   opts_.banner_romtag)
+    ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
+  subcmd->add_flag("--billstuff-romtag",
+                   opts_.billstuff_romtag)
+     ->description("generate an RSA_BILLSTUFF ROMTag");
+  subcmd->add_flag("--force",opts_.force)
+    ->description("skip signing preflight checks for unusual images");
+  subcmd->add_option("--digest-check-count",
+                     opts_.signature_digest_check_count)
+    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
+    ->type_name("UINT")
+    ->check(CLI::Range(0,255))
+    ->default_val("0")
+    ->take_last();
+  subcmd->add_option("--mark",opts_.mark)
+    ->description("write a 3dt marker into the signed image")
+    ->type_name("BOOL")
+    ->default_val("true")
+    ->take_last();
+
+  subcmd->callback(std::bind(Subcommand::sign,
+                             std::cref(opts_)));
+}
+
+static
+void
+generate_signfile_argparser(CLI::App          &app_,
+                            Options::SignFile &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("sign-file","sign file with 3DO or APP key");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to file to sign")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+  subcmd->add_flag("--append",opts_.append)
+    ->description("append a new signature instead of replacing the existing trailer");
+  subcmd->add_flag("--replace",opts_.replace)
+    ->description("replace the existing signature trailer");
+  subcmd->add_flag("--verify",opts_.verify)
+    ->description("verify the existing signature trailer");
+  subcmd->add_flag("--write",opts_.write)
+    ->description("write the computed signature to the file");
+  subcmd->add_option("--signature-output",opts_.signature_output)
+    ->description("write computed signature bytes to a separate file; requires one input")
+    ->type_name("PATH")
+    ->take_last();
+  subcmd->add_option("--key-name",opts_.key_name)
+    ->default_val(TDO_KEY_APP)
+    ->check(CLI::IsMember({TDO_KEY_APP,TDO_KEY_3DO}));
+
+  subcmd->callback(std::bind(Subcommand::sign_file,
+                             std::cref(opts_)));
+}
+
+static
+void
+generate_decryptfile_argparser(CLI::App             &app_,
+                               Options::DecryptFile &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("decrypt-file","decrypt CD-DIPIR boot payload (`src/dipir/cdipir.c`)");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to file to decrypt")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+
+  subcmd->callback(std::bind(Subcommand::decrypt_file,
+                             std::cref(opts_)));
+}
+
+static
+void
+generate_encryptfile_argparser(CLI::App             &app_,
+                               Options::EncryptFile &opts_)
+{
+  CLI::App *subcmd;
+
+  subcmd = app_.add_subcommand("encrypt-file","encrypt CD-DIPIR boot payload (`src/dipir/cdipir.c`)");
+  subcmd->add_option("filepaths",opts_.filepaths)
+    ->description("path to file to encrypt")
+    ->type_name("PATH")
+    ->check(CLI::ExistingFile)
+    ->required();
+
+  subcmd->callback(std::bind(Subcommand::encrypt_file,
+                             std::cref(opts_)));
+}
+
+static
+void
 generate_argparser(CLI::App &app_,
                    Options  &options_)
 {
@@ -225,10 +470,16 @@ generate_argparser(CLI::App &app_,
   generate_info_argparser(app_,options_.info);
   generate_identify_argparser(app_,options_.identify);
   generate_unpack_argparser(app_,options_.unpack);
-  //  generate_pack_argparser(app_,options_.pack);
+  generate_pack_argparser(app_,options_.pack);
+  generate_repack_argparser(app_,options_.repack);
   generate_rename_argparser(app_,options_.rename);
   generate_to_iso_argparser(app_,options_.to_iso);
   generate_romtags_argparser(app_,options_.romtags);
+  generate_verify_argparser(app_,options_.verify);
+  generate_sign_argparser(app_,options_.sign);
+  generate_signfile_argparser(app_,options_.signfile);
+  generate_decryptfile_argparser(app_,options_.decryptfile);
+  generate_encryptfile_argparser(app_,options_.encryptfile);
 }
 
 static
@@ -264,9 +515,9 @@ main(int    argc_,
     {
       return app.exit(e);
     }
-  catch(const Error &err)
+  catch(const std::exception &e)
     {
-      Log::error(err);
+      Log::error({e.what()});
       return 1;
     }
 

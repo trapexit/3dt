@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,36 +18,56 @@
 
 #pragma once
 
+#include <exception>
 #include <string>
 
-struct Error
+struct Error : public std::exception
 {
   Error()
+    : code(1)
   {
   }
 
   Error(const Error &err_)
-    : str(err_.str)
+    : str(err_.str),
+      code(err_.code)
   {
   }
 
   Error(Error &&err_)
-    : str(std::move(err_.str))
+    : str(std::move(err_.str)),
+      code(err_.code)
   {
   }
 
   Error(const char *str_)
-    : str(str_)
+    : str(str_),
+      code(1)
   {
   }
 
   Error(const std::string &str_)
-    : str(str_)
+    : str(str_),
+      code(1)
   {
   }
 
-  Error& operator=(const Error &err_) { str = err_.str; return *this; }
-  Error& operator=(const std::string &str_) { str = str_; return *this; }
+  Error(const char *str_,
+        const int   code_)
+    : str(str_),
+      code(code_)
+  {
+  }
+
+  Error(const std::string &str_,
+        const int          code_)
+    : str(str_),
+      code(code_)
+  {
+  }
+
+  Error& operator=(const Error &err_) { str = err_.str; code = err_.code; return *this; }
+  Error& operator=(const std::string &str_) { str = str_; code = 1; return *this; }
 
   operator bool() { return !str.empty(); }
   operator const std::string&() const { return str; }
@@ -55,6 +75,8 @@ struct Error
 
   const char *c_str() const { return str.c_str(); }
 
+  const char *what() const noexcept override { return str.c_str(); }
 
   std::string str;
+  int         code;
 };

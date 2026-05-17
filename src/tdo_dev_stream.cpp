@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -16,37 +16,150 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "error_unknown_image_format.hpp"
-#include "fmt.hpp"
 #include "tdo_dev_stream.hpp"
+
+#include "tdo_disc_label.hpp"
 #include "tdo_linked_mem_file_entry.hpp"
+#include "tdo_safe_narrow.hpp"
 
+#include <algorithm>
 #include <array>
-
-#include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <ios>
-#include <cassert>
+#include <limits>
+#include <stdexcept>
 
-
-static constexpr int TDO_SECTOR_SIZE   = 2048;
+static constexpr int TDO_SECTOR_SIZE = 2048;
 static constexpr int CDROM_SECTOR_SIZE = 2352;
 static constexpr int SYNC_PATTERN_SIZE = 12;
-static constexpr std::uint32_t MAX_DIRECTORY_AVATAR_INDEX = ROOT_HIGHEST_AVATAR;
-static constexpr std::uint32_t DIRECTORY_HEADER_SIZE = sizeof(TDO::DirectoryHeader);
-typedef std::array<uint8_t,CDROM_SECTOR_SIZE> CDROMSectorBuf;
-typedef std::array<uint8_t,SYNC_PATTERN_SIZE> CDROMSyncPatternBuf;
-typedef std::array<uint8_t,VOLUME_SYNC_BYTE_LEN> VolumeSyncByteBuf;
+static constexpr u64 MAX_RECOGNITION_SCAN_BYTES = 1024 * 1024;
+static constexpr u32 MAX_DIRECTORY_AVATAR_INDEX = ROOT_HIGHEST_AVATAR;
+static constexpr u32 DIRECTORY_HEADER_SIZE = sizeof(TDO::DirectoryHeader);
+static constexpr u32 M1_MAX_ROMTAG_BLOCK_SIZE = 2048;
+static constexpr u32 M1_RSA_SIGNATURE_SIZE = 64;
+static constexpr u32 M2_MAX_ROMTAG_BLOCK_SIZE = 8192;
+typedef std::array<u8,CDROM_SECTOR_SIZE> CDROMSectorBuf;
+typedef std::array<u8,SYNC_PATTERN_SIZE> CDROMSyncPatternBuf;
+typedef std::array<u8,VOLUME_SYNC_BYTE_LEN> VolumeSyncByteBuf;
 static constexpr CDROMSyncPatternBuf MODE1_SYNC_PATTERN = {0x00,0xFF,0xFF,0xFF,
                                                            0xFF,0xFF,0xFF,0xFF,
                                                            0xFF,0xFF,0xFF,0x00};
 static constexpr VolumeSyncByteBuf VOLUME_SYNC_BYTES = {0x5A,0x5A,0x5A,0x5A,0x5A};
-static constexpr std::array<uint8_t,4> ARM_NOOP = {0xE1,0xA0,0x10,01};
+
+static
+inline
+s64
+_round_up(s64 number_,
+          s64 multiple_)
+{
+  return (((number_ + multiple_ - 1) / multiple_) * multiple_);
+}
+
+static
+inline
+u64
+_div_round_up(u64 number_,
+              u64 multiple_)
+{
+  return ((number_ + multiple_ - 1) / multiple_);
+}
+
+static
+inline
+u64
+_checked_s64_add(u64        lhs_,
+                 u64        rhs_,
+                 const char *msg_)
+{
+  static constexpr u64 S64_MAX_AS_U64 = static_cast<u64>(S64_MAX);
+
+  if((lhs_ > S64_MAX_AS_U64) ||
+     (rhs_ > S64_MAX_AS_U64) ||
+     (lhs_ > (S64_MAX_AS_U64 - rhs_)))
+    throw Error(msg_);
+
+  return (lhs_ + rhs_);
+}
+
+static
+inline
+u64
+_checked_s64_mul(u64        lhs_,
+                 u64        rhs_,
+                 const char *msg_)
+{
+  static constexpr u64 S64_MAX_AS_U64 = static_cast<u64>(S64_MAX);
+
+  if((rhs_ != 0) && (lhs_ > (S64_MAX_AS_U64 / rhs_)))
+    throw Error(msg_);
+
+  return (lhs_ * rhs_);
+}
+
+static
+inline
+s64
+_data_byte_to_file_offset(s64 data_byte_,
+                          u64 data_start_offset_,
+                          u64 device_block_header_,
+                          u64 device_block_data_size_,
+                          u64 device_block_size_)
+{
+  static constexpr const char *MSG = "data offset is too large";
+  u64 block;
+  u64 extra;
+  u64 file_offset;
+  u64 pos;
+
+  if(data_byte_ < 0)
+    throw Error("data offset must be non-negative");
+  if(device_block_data_size_ == 0)
+    throw Error("device block data size must be non-zero");
+
+  pos   = _checked_s64_add(data_byte_,data_start_offset_,MSG);
+  block = (pos / device_block_data_size_);
+  extra = (pos % device_block_data_size_);
+
+  file_offset  = _checked_s64_mul(block,device_block_size_,MSG);
+  file_offset  = _checked_s64_add(file_offset,device_block_header_,MSG);
+  file_offset  = _checked_s64_add(file_offset,extra,MSG);
+
+  return static_cast<s64>(file_offset);
+}
+
+static
+inline
+bool
+_is_m2_volume(const TDO::DiscLabel &dl_)
+{
+  return ((dl_.volume_flags & VOLUME_FLAG_M2) != 0);
+}
+
+static
+inline
+u64
+_disc_label_size_in_bytes(const TDO::DiscLabel &dl_)
+{
+  if(_is_m2_volume(dl_))
+    return sizeof(TDO::ExtDiscLabel);
+
+  return sizeof(TDO::DiscLabel);
+}
 
 static
 inline
 void
-_swap(uint32_t &u32_)
+_validate_m2_romtag_count(u32 count_)
+{
+  if(count_ > (M2_MAX_ROMTAG_BLOCK_SIZE / sizeof(TDO::ROMTag)))
+    throw Error(fmt::format("invalid M2 ROMTag count: {}",count_));
+}
+
+static
+inline
+void
+_swap(u32 &u32_)
 {
   u32_ = __builtin_bswap32(u32_);
 }
@@ -54,79 +167,64 @@ _swap(uint32_t &u32_)
 static
 inline
 void
-_swap(int32_t &i32_)
+_swap(s32 &s32_)
 {
-  i32_ = __builtin_bswap32(i32_);
+  s32_ = __builtin_bswap32(s32_);
 }
 
-static
-inline
-void
-_swap(uint16_t &u16_)
-{
-  u16_ = __builtin_bswap16(u16_);
-}
-
-static
-inline
-void
-_swap(int16_t &i16_)
-{
-  i16_ = __builtin_bswap16(i16_);
-}
-
-static
-inline
-void
-_swap(uint64_t &u64_)
-{
-  u64_ = __builtin_bswap64(u64_);
-}
-
-static
-inline
-void
-_swap(int64_t &i64_)
-{
-  i64_ = __builtin_bswap64(i64_);
-}
-
-TDO::DevStream::DevStream(std::istream &is_)
-  : _device_block_data_size(0),
-    _device_block_header(0),
+TDO::DevStream::DevStream(std::iostream &ios_)
+  : _device_block_header(0),
+    _device_block_data_size(0),
     _device_block_footer(0),
-    _data_offset(0),
-    _is(is_),
-    _initialized(false)
+    _data_start_offset(0),
+    _disc_label_size_in_bytes(0),
+    _disc_label_block(0),
+    _romtags_block(0),
+    _romtags_entry_count(0),
+    _romtags_entry_count_is_explicit(false),
+    _ios(ios_)
 {
-
 }
 
 void
 TDO::DevStream::find_label()
 {
-  int i;
-  char v;
+  static constexpr std::array<char, 6> PATTERN =
+    {RECORD_STD_VOLUME, VOLUME_SYNC_BYTE, VOLUME_SYNC_BYTE,
+     VOLUME_SYNC_BYTE, VOLUME_SYNC_BYTE, VOLUME_SYNC_BYTE};
+  static constexpr u64 CHUNK_SIZE = 65536;
+  static constexpr u64 OVERLAP = PATTERN.size() - 1;
+  std::vector<char> buf(CHUNK_SIZE + OVERLAP);
+  u64 bytes_scanned = 0;
 
-  _is.seekg(0);
-  while(_is && !_is.eof())
+  _ios.seekg(0);
+  while(_ios && !_ios.eof() && (bytes_scanned < MAX_RECOGNITION_SCAN_BYTES))
     {
-      _is.read(&v,1);
-      if(v != RECORD_STD_VOLUME)
-        continue;
+      const u64 seek_pos = (bytes_scanned > OVERLAP) ? bytes_scanned - OVERLAP : 0;
+      _ios.seekg(seek_pos);
 
-      for(i = 0; i < VOLUME_SYNC_BYTE_LEN; i++)
+      const u64 remaining = MAX_RECOGNITION_SCAN_BYTES - bytes_scanned;
+      const u64 to_read = std::min<u64>(CHUNK_SIZE + OVERLAP, remaining + OVERLAP);
+      _ios.read(buf.data(), to_read);
+      const std::streamsize n = _ios.gcount();
+      if(n <= 0)
+        break;
+
+      const u64 scan_limit = n - OVERLAP;
+      for(u64 i = 0; i < scan_limit; i++)
         {
-          _is.read(&v,1);
-          if(v == VOLUME_SYNC_BYTE)
-            continue;
-          break;
+          if(std::memcmp(&buf[i], PATTERN.data(), PATTERN.size()) == 0)
+            {
+              _ios.clear(_ios.rdstate() & std::ios::badbit);
+              _ios.seekg(seek_pos + i);
+              return;
+            }
         }
 
-      _is.seekg(-(i + 1),_is.cur);
-      if(i == 5)
-        break;
+      bytes_scanned += scan_limit;
     }
+
+  throw Error("no OperaFS label was found");
 }
 
 bool
@@ -134,8 +232,8 @@ TDO::DevStream::is_mode1_2352()
 {
   CDROMSectorBuf buf;
 
-  _is.seekg(0);
-  _is.read((char*)&buf[0],buf.size());
+  _ios.seekg(0);
+  _ios.read((char*)&buf[0],buf.size());
 
   const bool has_mode1_sync_pattern =
     (memcmp(&buf[0],&MODE1_SYNC_PATTERN[0],MODE1_SYNC_PATTERN.size()) == 0);
@@ -144,51 +242,47 @@ TDO::DevStream::is_mode1_2352()
   return (has_mode1_sync_pattern && has_mode1_sector_marker);
 }
 
-std::uint32_t
-TDO::DevStream::count_m1_romtags(const std::int64_t pos_)
-{
-  uint32_t count;
-  TDO::ROMTag tag;
-  TDO::PosGuard guard(*this);
-
-  data_block_seek(pos_);
-
-  count = 0;
-  while(true)
-    {
-      read(tag);
-      if((tag.sub_systype == 0) || (tag.type == 0))
-        break;
-      count++;
-    }
-
-  return count;
-}
-
 void
 TDO::DevStream::setup()
 {
-  TDO::DiscLabel label;
+  TDO::DiscLabel dl;
 
   if(is_mode1_2352())
     {
       _device_block_header = 16;
       _device_block_footer = 288;
     }
+  else
+    {
+      _device_block_header = 0;
+      _device_block_footer = 0;
+    }
 
   find_label();
-  if(eof())
-    _throw("unable to find OperaFS in image");
 
   {
-    PosGuard guard(*this);
-    read(label);
-    _device_block_data_size = label.volume_block_size;
+    TDO::PosGuard guard(*this);
+
+    read(dl);
+    _device_block_data_size = dl.volume_block_size;
+    _disc_label_size_in_bytes = ::_disc_label_size_in_bytes(dl);
+    _romtags_entry_count = 0;
+    _romtags_entry_count_is_explicit = false;
+    if(::_is_m2_volume(dl))
+      {
+        read(_romtags_entry_count);
+        ::_validate_m2_romtag_count(_romtags_entry_count);
+        _romtags_entry_count_is_explicit = true;
+      }
   }
 
-  _initialized = true;
+  _data_start_offset = data_byte_tell();
+  _disc_label_block = data_block_tell();
+  _romtags_block = (_disc_label_block +
+                    ::_div_round_up(_disc_label_size_in_bytes,
+                                     _device_block_data_size));
 
-  _data_offset = data_byte_tell();
+  _ios.seekg(0);
 }
 
 static
@@ -200,94 +294,186 @@ is_romfs(TDO::DevStream &stream_)
           (stream_.device_block_footer()    == 0));
 }
 
-static
-bool
-is_konami_m2(TDO::DevStream &stream_)
-{
-  TDO::DiscLabel dl;
-
-  stream_.find_label();
-  const bool found_label = !stream_.eof();
-
-  if(!found_label)
-    return found_label;
-  stream_.read(dl);
-
-  const bool has_expected_volume_flags =
-    (dl.volume_flags == (VOLUME_FLAG_M2 | VOLUME_FLAG_BLESSED));
-  const bool has_expected_volume_identifier =
-    (strcmp(&dl.volume_identifier[0],"cd-rom") == 0);
-  const bool has_expected_rom_tag_count = (dl.num_rom_tags == 9);
-
-  return (has_expected_volume_flags &&
-          has_expected_volume_identifier &&
-          has_expected_rom_tag_count);
-}
-
 bool
 TDO::DevStream::has_romtags()
 {
   TDO::PosGuard pos_guard(*this);
 
-  const bool uses_romfs_layout = ::is_romfs(*this);
-  const bool uses_konami_m2_layout = ::is_konami_m2(*this);
+  if(::is_romfs(*this))
+    return false;
+  if(_romtags_entry_count_is_explicit)
+    return (_romtags_entry_count != 0);
 
-  return (!uses_romfs_layout && !uses_konami_m2_layout);
+  return true;
+}
+
+TDO::DiscLabel
+TDO::DevStream::disc_label()
+{
+  TDO::DiscLabel dl;
+  TDO::PosGuard pos_guard(*this);
+
+  data_block_seek(disc_label_block());
+  read(dl);
+
+  return dl;
+}
+
+u64
+TDO::DevStream::disc_label_size_in_bytes() const
+{
+  return _disc_label_size_in_bytes;
+}
+
+u64
+TDO::DevStream::disc_label_block() const
+{
+  return _disc_label_block;
+}
+
+u64
+TDO::DevStream::_romtags_count_impl()
+{
+  TDO::PosGuard guard(*this);
+
+  if(!has_romtags())
+    return 0;
+
+  data_block_seek(romtags_block());
+  if(_romtags_entry_count_is_explicit)
+    return _romtags_entry_count;
+
+  u64 count = 0;
+  u64 rttlen = 0;
+  while(true)
+    {
+      TDO::ROMTag romtag;
+
+      read(romtag);
+      count++;
+      if(romtag.sub_systype == 0)
+        break;
+
+      rttlen += sizeof(TDO::ROMTag);
+      if(rttlen > (M1_MAX_ROMTAG_BLOCK_SIZE -
+                   M1_RSA_SIGNATURE_SIZE -
+                   sizeof(TDO::ROMTag)))
+        throw Error("invalid OperaFS ROMTag table: missing terminator");
+    }
+
+  return count;
 }
 
 TDO::ROMTagVec
 TDO::DevStream::romtags()
 {
-  std::int64_t pos;
-  TDO::DiscLabel dl;
-  TDO::ROMTagVec tags;
+  TDO::ROMTagVec romtags;
+  TDO::PosGuard guard(*this);
 
   if(!has_romtags())
-    return tags;
+    return romtags;
 
-  find_label();
-  pos = data_block_tell();
-  read(dl);
-
-  if(dl.num_rom_tags == 0)
-    dl.num_rom_tags = count_m1_romtags(pos+1);
-
-  data_block_seek(pos+1);
-  for(uint32_t i = 0; i < dl.num_rom_tags; i++)
+  data_block_seek(romtags_block());
+  if(_romtags_entry_count_is_explicit)
     {
-      TDO::ROMTag tag;
-      read(tag);
-      tags.push_back(tag);
+      for(u32 i = 0; i < _romtags_entry_count; i++)
+        {
+          TDO::ROMTag romtag;
+
+          read(romtag);
+          romtags.emplace_back(romtag);
+        }
+    }
+  else
+    {
+      u64 rttlen;
+
+      rttlen = 0;
+      while(true)
+        {
+          TDO::ROMTag romtag;
+
+          read(romtag);
+          if(romtag.sub_systype == 0)
+            break;
+
+          rttlen += sizeof(TDO::ROMTag);
+          if(rttlen > (M1_MAX_ROMTAG_BLOCK_SIZE -
+                       M1_RSA_SIGNATURE_SIZE -
+                       sizeof(TDO::ROMTag)))
+            throw Error("invalid OperaFS ROMTag table: missing terminator");
+
+          romtags.emplace_back(romtag);
+        }
     }
 
-  return tags;
+  return romtags;
 }
 
-std::uint32_t
+std::optional<TDO::ROMTag>
+TDO::DevStream::romtag(const int type_)
+{
+  TDO::PosGuard guard(*this);
+
+  if(!has_romtags())
+    return {};
+
+  for(const auto &romtag : romtags())
+    if(romtag.type == type_)
+      return romtag;
+
+  return {};
+}
+
+u64
+TDO::DevStream::romtags_block() const
+{
+  return _romtags_block;
+}
+
+u64
+TDO::DevStream::romtags_count()
+{
+  return _romtags_count_impl();
+}
+
+u64
+TDO::DevStream::romtags_size_in_bytes()
+{
+  return (romtags_count() * sizeof(TDO::ROMTag));
+}
+
+u64
 TDO::DevStream::data_offset() const
 {
-  return _data_offset;
+  return _data_start_offset;
 }
 
-std::uint32_t
+u64
+TDO::DevStream::data_start_offset() const
+{
+  return _data_start_offset;
+}
+
+u64
 TDO::DevStream::device_block_header() const
 {
   return _device_block_header;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_data_size() const
 {
   return _device_block_data_size;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_footer() const
 {
   return _device_block_footer;
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_size() const
 {
   return (_device_block_header +
@@ -295,133 +481,144 @@ TDO::DevStream::device_block_size() const
           _device_block_footer);
 }
 
-std::uint32_t
+u64
 TDO::DevStream::device_block_count()
 {
-  assert(_initialized == true);
+  TDO::PosGuard guard(*this);
 
-  PosGuard guard(*this);
-  std::uint64_t pos;
+  // Check failbit on the seek and use file_tell() (which throws on
+  // tellg == -1) rather than letting a failed seek leave tellg at -1.
+  // streamoff(-1) / u64(blocksize) undergoes the usual arithmetic
+  // conversion (signed -> unsigned) producing 0xFFFF... / blocksize,
+  // a huge u64 that silently bypasses downstream end-bound checks
+  // such as safe_romtag_first_data_block's offset+1 >= file_blocks
+  // guard.
+  _ios.seekg(0,_ios.end);
+  if(!_ios.good())
+    throw Error("stream seek to end failed in device_block_count");
 
-  _is.seekg(0,_is.end);
-  pos = _is.tellg();
-  pos /= device_block_size();
-
-  return pos;
+  const s64 pos = file_tell();
+  return (static_cast<u64>(pos) / device_block_size());
 }
 
-std::int64_t
-TDO::DevStream::data_block_to_file_offset(std::int64_t data_block_) const
+s64
+TDO::DevStream::data_block_to_file_offset(s64 data_block_) const
 {
-  assert(_initialized == true);
+  s64 data_byte;
 
-  std::int64_t file_offset;
+  if(data_block_ < 0)
+    throw Error("data block must be non-negative");
 
-  file_offset = _data_offset;
-  file_offset += (data_block_ * device_block_size());
-  file_offset += _device_block_header;
+  data_byte = _checked_s64_mul(data_block_,
+                               _device_block_data_size,
+                               "data block offset is too large");
 
-  return file_offset;
+  return _data_byte_to_file_offset(data_byte,
+                                   _data_start_offset,
+                                   _device_block_header,
+                                   _device_block_data_size,
+                                   device_block_size());
 }
 
-std::int64_t
-TDO::DevStream::file_offset_to_data_block(const std::int64_t file_offset_) const
-{
-  assert(_initialized == true);
-
-  std::int64_t block;
-  std::int64_t extra;
-  std::int64_t file_offset;
-
-  file_offset = file_offset_;
-  block       = (file_offset / device_block_size());
-  extra       = (file_offset % device_block_size());
-
-  file_offset  = (block * _device_block_data_size);
-  file_offset += (extra - _device_block_header);
-  file_offset -= _data_offset;
-
-  return (file_offset / _device_block_data_size);
-}
-
-std::int64_t
+s64
 TDO::DevStream::file_tell() const
 {
-  return _is.tellg();
+  s64 rv;
+
+  rv = _ios.tellg();
+  if(rv == -1)
+    throw Error("stream position error");
+
+  return rv;
 }
 
-std::int64_t
-TDO::DevStream::data_byte_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::_file_pos_to_data_byte_pos(const s64 pos_) const
 {
-  assert(_initialized == true);
+  static constexpr const char *MSG = "file position is out of range";
+  u64 pos;
+  u64 block;
+  u64 extra;
+  u64 result;
 
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
+  // Mirror the structure of _data_byte_to_file_offset above: enforce
+  // pos_ >= 0 explicitly and do all arithmetic in u64. The previous
+  // implementation mixed an s64 destination variable with u64 member
+  // operands, which produced two wrap hazards:
+  //  - (extra - _device_block_header) wraps to ~U64_MAX when pos_
+  //    lands inside the 16-byte block header of a mode-1/2352 image.
+  //  - (pos -= _data_start_offset) wraps when pos_ falls before the
+  //    start of the data region.
+  // Both used to silently produce a huge positive s64 result.
+  if(pos_ < 0)
+    throw Error("file position must be non-negative");
+  if(device_block_size() == 0)
+    throw Error("device block size must be non-zero");
 
-  pos   = pos_;
+  pos   = static_cast<u64>(pos_);
   block = (pos / device_block_size());
   extra = (pos % device_block_size());
 
-  pos  = (block * _device_block_data_size);
-  pos += (extra - _device_block_header);
-  pos -= _data_offset;
+  if(extra < _device_block_header)
+    throw Error("file position points inside device block header");
 
-  return pos;
+  result  = _checked_s64_mul(block,_device_block_data_size,MSG);
+  result  = _checked_s64_add(result,extra - _device_block_header,MSG);
+  if(result < _data_start_offset)
+    throw Error("file position is before start of data region");
+  result -= _data_start_offset;
+
+  return TDO::checked_narrow_u64_to_s64(result,"data byte position");
 }
 
-std::int64_t
+s64
+TDO::DevStream::data_byte_tell(const s64 pos_) const
+{
+  return _file_pos_to_data_byte_pos(pos_);
+}
+
+s64
 TDO::DevStream::data_byte_tell() const
 {
-  std::int64_t pos;
-
-  pos = file_tell();
-
-  return data_byte_tell(pos);
+  return data_byte_tell(file_tell());
 }
 
-std::int64_t
-TDO::DevStream::data_block_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::data_block_tell(const s64 pos_) const
 {
-  assert(_initialized == true);
-
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
-
-  pos   = pos_;
-  block = (pos / device_block_size());
-  extra = (pos % device_block_size());
-
-  pos  = (block * _device_block_data_size);
-  pos += (extra - _device_block_header);
-  pos -= _data_offset;
-
-  return (pos / _device_block_data_size);
+  return (_file_pos_to_data_byte_pos(pos_) / _device_block_data_size);
 }
 
-std::int64_t
+s64
 TDO::DevStream::data_block_tell() const
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = file_tell();
 
   return data_block_tell(pos);
 }
 
-std::int64_t
-TDO::DevStream::device_block_tell(const std::int64_t pos_) const
+s64
+TDO::DevStream::device_block_tell(const s64 pos_) const
 {
-  assert(_initialized == true);
+  // Match the protective shape of _file_pos_to_data_byte_pos: reject
+  // a negative pos_ rather than letting s64/u64 mixed division
+  // reinterpret it as a huge u64 quotient that the caller silently
+  // accepts. The block-count quotient itself is bounded by pos_ so a
+  // direct cast back to s64 is safe once non-negative.
+  if(pos_ < 0)
+    throw Error("file position must be non-negative");
+  if(device_block_size() == 0)
+    throw Error("device block size must be non-zero");
 
-  return (pos_ / device_block_size());
+  return static_cast<s64>(static_cast<u64>(pos_) / device_block_size());
 }
 
-std::int64_t
+s64
 TDO::DevStream::device_block_tell() const
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos = file_tell();
 
@@ -429,35 +626,30 @@ TDO::DevStream::device_block_tell() const
 }
 
 void
-TDO::DevStream::file_seek(const std::int64_t pos_)
+TDO::DevStream::file_seek(const s64 pos_)
 {
-  _is.seekg(pos_);
+  _ios.seekg(pos_);
+  _ios.seekp(pos_);
 }
 
 void
-TDO::DevStream::data_byte_seek(const std::int64_t pos_)
+TDO::DevStream::data_byte_seek(const s64 pos_)
 {
-  assert(_initialized == true);
+  s64 pos;
 
-  std::int64_t pos;
-  std::int64_t block;
-  std::int64_t extra;
-
-  pos   = (pos_ + _data_offset);
-  block = (pos / _device_block_data_size);
-  extra = (pos % _device_block_data_size);
-
-  pos  = (block * device_block_size());
-  pos += _device_block_header;
-  pos += extra;
+  pos = _data_byte_to_file_offset(pos_,
+                                  _data_start_offset,
+                                  _device_block_header,
+                                  _device_block_data_size,
+                                  device_block_size());
 
   file_seek(pos);
 }
 
 void
-TDO::DevStream::data_byte_skip(const std::int64_t count_)
+TDO::DevStream::data_byte_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = data_byte_tell();
   pos += count_;
@@ -466,9 +658,9 @@ TDO::DevStream::data_byte_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::data_block_seek(const std::int64_t block_)
+TDO::DevStream::data_block_seek(const s64 block_)
 {
-  std::int64_t file_offset;
+  s64 file_offset;
 
   file_offset = data_block_to_file_offset(block_);
 
@@ -476,9 +668,9 @@ TDO::DevStream::data_block_seek(const std::int64_t block_)
 }
 
 void
-TDO::DevStream::data_block_skip(const std::int64_t count_)
+TDO::DevStream::data_block_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = data_block_tell();
   pos += count_;
@@ -487,19 +679,29 @@ TDO::DevStream::data_block_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::device_block_seek(const std::int64_t pos_)
+TDO::DevStream::device_block_seek(const s64 pos_)
 {
-  std::int64_t pos;
+  static constexpr const char *MSG = "device block offset is too large";
+  u64 pos;
 
-  pos = (pos_ * device_block_size());
+  // Mirror _data_byte_to_file_offset / fix to _file_pos_to_data_byte_pos:
+  // reject negative pos_ explicitly so the s64*u64 multiplication does
+  // not silently reinterpret a sign-bit value as a huge u64. Route the
+  // multiply through _checked_s64_mul so an overlarge image-block
+  // index produces an Error rather than a wrapped file offset, and
+  // narrow the u64 back through checked_narrow_u64_to_s64 for symmetry.
+  if(pos_ < 0)
+    throw Error("device block must be non-negative");
 
-  file_seek(pos);
+  pos = _checked_s64_mul(static_cast<u64>(pos_),device_block_size(),MSG);
+
+  file_seek(TDO::checked_narrow_u64_to_s64(pos,"device block file offset"));
 }
 
 void
-TDO::DevStream::device_block_skip(const std::int64_t count_)
+TDO::DevStream::device_block_skip(const s64 count_)
 {
-  std::int64_t pos;
+  s64 pos;
 
   pos  = device_block_tell();
   pos += count_;
@@ -508,18 +710,103 @@ TDO::DevStream::device_block_skip(const std::int64_t count_)
 }
 
 void
-TDO::DevStream::read(char     *buf_,
-                     uint32_t  size_)
+TDO::DevStream::read(char      *buf_,
+                     const u64  size_)
 {
-  const std::streampos pos = _is.tellg();
-
-  if(!_is.good())
+  if(!_ios.good())
     _throw("bad stream state before read");
 
-  _is.read(buf_,size_);
+  _ios.read(buf_,size_);
 
-  if(!_is.good())
+  if(!_ios.good())
     _throw("bad stream state after read");
+}
+
+void
+TDO::DevStream::write(const char *buf_,
+                      const u64   size_)
+{
+  _ios.write(buf_,size_);
+  if(!_ios.good())
+    _throw("bad stream state after write");
+}
+
+void
+TDO::DevStream::read_data_blocks(std::vector<char> &v_,
+                                 const s64          pos_,
+                                 const s64          blocks_)
+{
+  size_t end;
+
+  end = v_.size();
+  v_.resize(end + (device_block_data_size() * blocks_));
+  for(s64 i = 0; i < blocks_; i++)
+    {
+      data_block_seek(pos_ + i);
+      read(&v_[end],device_block_data_size());
+      end += device_block_data_size();
+    }
+}
+
+void
+TDO::DevStream::read_data_bytes_from_block(char     *buf_,
+                                             const s64 block_pos_,
+                                             const s64 bytes_)
+{
+  read_data_bytes(buf_,
+                  (block_pos_ * device_block_data_size()),
+                  bytes_);
+}
+
+void
+TDO::DevStream::read_data_bytes(char     *buf_,
+                               const s64 pos_,
+                               const s64 bytes_)
+{
+  s64 pos;
+  s64 bytes_read;
+  s64 bytes_to_read;
+  s64 block_size;
+
+  bytes_read = 0;
+  block_size = device_block_data_size();
+
+  pos = pos_;
+  for(s64 bytes_left = bytes_; bytes_left > 0;)
+    {
+      data_byte_seek(pos);
+
+      bytes_to_read = (block_size - (pos % block_size));
+      bytes_to_read = std::min(bytes_to_read,bytes_left);
+
+      read(&buf_[bytes_read],bytes_to_read);
+
+      pos        += bytes_to_read;
+      bytes_left -= bytes_to_read;
+      bytes_read += bytes_to_read;
+    }
+}
+
+void
+TDO::DevStream::read_data_bytes_from_block(std::vector<char> &v_,
+                                           const s64          block_pos_,
+                                           const s64          bytes_)
+{
+  s64 vec_end = v_.size();
+  v_.resize(v_.size() + bytes_);
+  read_data_bytes(&v_[vec_end],
+                  (block_pos_ * device_block_data_size()),
+                  bytes_);
+}
+
+void
+TDO::DevStream::read_data_bytes(std::vector<char> &v_,
+                                const s64          pos_,
+                                const s64          bytes_)
+{
+  s64 vec_end = v_.size();
+  v_.resize(v_.size() + bytes_);
+  read_data_bytes(&v_[vec_end],pos_,bytes_);
 }
 
 void
@@ -529,23 +816,49 @@ TDO::DevStream::read(char &c_)
 }
 
 void
-TDO::DevStream::read(uint8_t &u8_)
+TDO::DevStream::write(const char c_)
+{
+  write(&c_,1);
+}
+
+void
+TDO::DevStream::read(u8 &u8_)
 {
   read((char*)&u8_,1);
 }
 
 void
-TDO::DevStream::read(uint32_t &u32_)
+TDO::DevStream::write(u8 u8_)
 {
-  read((char*)&u32_,sizeof(uint32_t));
+  write((const char*)&u8_,1);
+}
+
+void
+TDO::DevStream::read(u32 &u32_)
+{
+  read((char*)&u32_,sizeof(u32));
   _swap(u32_);
 }
 
 void
-TDO::DevStream::read(int32_t &i32_)
+TDO::DevStream::write(u32 u32_)
 {
-  read((char*)&i32_,sizeof(int32_t));
-  _swap(i32_);
+  _swap(u32_);
+  write((const char*)&u32_,sizeof(u32));
+}
+
+void
+TDO::DevStream::read(s32 &s32_)
+{
+  read((char*)&s32_,sizeof(s32));
+  _swap(s32_);
+}
+
+void
+TDO::DevStream::write(s32 s32_)
+{
+  _swap(s32_);
+  write((const char*)&s32_,sizeof(s32));
 }
 
 void
@@ -553,12 +866,12 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
 {
   TDO::DiscLabel tmp;
 
-  read(&tmp.record_type,sizeof(tmp.record_type));
-  read(&tmp.volume_sync_bytes[0],sizeof(tmp.volume_sync_bytes));
-  read(&tmp.volume_structure_version,sizeof(tmp.volume_structure_version));
-  read(&tmp.volume_flags,sizeof(tmp.volume_flags));
-  read(&tmp.volume_commentary[0],sizeof(tmp.volume_commentary));
-  read(&tmp.volume_identifier[0],sizeof(tmp.volume_identifier));
+  read(tmp.record_type);
+  read(tmp.volume_sync_bytes);
+  read(tmp.volume_structure_version);
+  read(tmp.volume_flags);
+  read(tmp.volume_commentary);
+  read(tmp.volume_identifier);
   read(tmp.volume_unique_identifier);
   read(tmp.volume_block_size);
   read(tmp.volume_block_count);
@@ -566,21 +879,7 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
   read(tmp.root_directory_block_count);
   read(tmp.root_directory_block_size);
   read(tmp.root_directory_last_avatar_index);
-
-  for(std::size_t i = 0; i < tmp.root_directory_avatar_list.size(); i++)
-    read(tmp.root_directory_avatar_list[i]);
-
-  if(tmp.volume_flags & VOLUME_FLAG_M2)
-    {
-      read(tmp.num_rom_tags);
-      read(tmp.application_id);
-      memset(tmp.reserved,0,sizeof(tmp.reserved));
-    }
-  else
-    {
-      tmp.num_rom_tags = 0;
-      tmp.application_id = 0;
-    }
+  read(tmp.root_directory_avatar_list);
 
   if(tmp.record_type != RECORD_STD_VOLUME)
     _throw("invalid OperaFS disc label: incorrect record type");
@@ -599,7 +898,54 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
   if(tmp.root_directory_last_avatar_index > ROOT_HIGHEST_AVATAR)
     _throw("invalid OperaFS disc label: root directory avatar index exceeds maximum");
 
+  // Bound volume_block_count against the raw file size. Consumers
+  // (signer, verifier) multiply this by BLOCK_SIZE / LOG_BLOCK_SIZE
+  // to derive digest counts and signature-file sizes, so an
+  // unbounded value produces astronomical work and out-of-image
+  // reads. We compare against raw size_in_bytes() rather than the
+  // device block count because geometry may not yet be initialized
+  // when this runs during setup(); the resulting bound is loose
+  // but correct (data bytes are always <= raw bytes).
+  //
+  // size_in_bytes() returns s64 and may be -1 when tellg() fails
+  // (or when the stream geometry is not yet known); casting -1 to
+  // u64 yields 0xFFFF... and silently disables the bound. Inspect
+  // the signed value first and skip the check only when size is
+  // genuinely unavailable.
+  {
+    const u64 vbc = tmp.volume_block_count;
+    const u64 vbs = tmp.volume_block_size;
+    if((vbs > 0) && (vbc > (std::numeric_limits<u64>::max() / vbs)))
+      _throw("invalid OperaFS disc label: volume_block_count overflows volume_block_size math");
+    const s64 raw_bytes_signed = size_in_bytes();
+    if((raw_bytes_signed > 0) && (vbs > 0))
+      {
+        const u64 raw_bytes = static_cast<u64>(raw_bytes_signed);
+        if((vbc * vbs) > raw_bytes)
+          _throw("invalid OperaFS disc label: volume_block_count exceeds image size");
+      }
+  }
+
   dl_ = tmp;
+}
+
+void
+TDO::DevStream::write(const TDO::DiscLabel &dl_)
+{
+  write(dl_.record_type);
+  write(dl_.volume_sync_bytes);
+  write(dl_.volume_structure_version);
+  write(dl_.volume_flags);
+  write(dl_.volume_commentary);
+  write(dl_.volume_identifier);
+  write(dl_.volume_unique_identifier);
+  write(dl_.volume_block_size);
+  write(dl_.volume_block_count);
+  write(dl_.root_unique_identifier);
+  write(dl_.root_directory_block_count);
+  write(dl_.root_directory_block_size);
+  write(dl_.root_directory_last_avatar_index);
+  write(dl_.root_directory_avatar_list);
 }
 
 void
@@ -613,17 +959,17 @@ TDO::DevStream::read(TDO::DirectoryHeader &dh_)
   read(tmp.first_free_byte);
   read(tmp.first_entry_offset);
 
-  const std::uint32_t dev_block_count = device_block_count();
+  const u64 dev_block_count = device_block_count();
 
   if(tmp.next_block < -1)
     _throw("unsafe OperaFS directory metadata: invalid next_block");
   if(tmp.prev_block < -1)
     _throw("unsafe OperaFS directory metadata: invalid prev_block");
   if((tmp.next_block != -1) &&
-     (static_cast<std::uint32_t>(tmp.next_block) >= dev_block_count))
+     (static_cast<u64>(tmp.next_block) >= dev_block_count))
     _throw("unsafe OperaFS directory metadata: next_block exceeds device bounds");
   if((tmp.prev_block != -1) &&
-     (static_cast<std::uint32_t>(tmp.prev_block) >= dev_block_count))
+     (static_cast<u64>(tmp.prev_block) >= dev_block_count))
     _throw("unsafe OperaFS directory metadata: prev_block exceeds device bounds");
   if(tmp.first_free_byte < DIRECTORY_HEADER_SIZE)
     _throw("unsafe OperaFS directory metadata: first_free_byte overlaps header");
@@ -639,7 +985,7 @@ void
 TDO::DevStream::read(TDO::DirectoryRecord &dr_)
 {
   TDO::DirectoryRecord tmp;
-  std::array<std::uint32_t, MAX_DIRECTORY_AVATAR_INDEX + 1> avatar_list;
+  std::array<u32,MAX_DIRECTORY_AVATAR_INDEX + 1> avatar_list;
 
   read(tmp.flags);
   read(tmp.unique_identifier);
@@ -649,25 +995,22 @@ TDO::DevStream::read(TDO::DirectoryRecord &dr_)
   read(tmp.block_count);
   read(tmp.burst);
   read(tmp.gap);
-  read(tmp.filename,sizeof(tmp.filename));
+  read(tmp.filename,32);
   read(tmp.last_avatar_index);
 
   if(tmp.last_avatar_index > MAX_DIRECTORY_AVATAR_INDEX)
-    _throw("impossible OperaFS directory record last_avatar_index: %d > %d",
-           tmp.last_avatar_index, MAX_DIRECTORY_AVATAR_INDEX);
+    _throw("impossible OperaFS directory record last_avatar_index: {} > {}",
+           tmp.last_avatar_index,MAX_DIRECTORY_AVATAR_INDEX);
 
-  for(std::uint32_t i = 0; i <= tmp.last_avatar_index; i++)
+  for(u32 i = 0; i <= tmp.last_avatar_index; i++)
     read(avatar_list[i]);
 
   tmp.avatar_list.assign(avatar_list.begin(),
                          avatar_list.begin() + (tmp.last_avatar_index + 1));
 
-  const std::uint32_t avatar_count = tmp.last_avatar_index + 1;
-  const std::uint32_t data_block_size = device_block_data_size();
+  const u32 avatar_count = tmp.last_avatar_index + 1;
+  const u32 data_block_size = device_block_data_size();
 
-  if(tmp.last_avatar_index > MAX_DIRECTORY_AVATAR_INDEX)
-    _throw("impossible OperaFS directory record last_avatar_index: {} > {}",
-           tmp.last_avatar_index,MAX_DIRECTORY_AVATAR_INDEX);
   if(tmp.avatar_list.size() != avatar_count)
     _throw("impossible OperaFS directory record avatar count: avatar_list.size()={} last_avatar_index+1={}",
            tmp.avatar_list.size(),avatar_count);
@@ -676,9 +1019,12 @@ TDO::DevStream::read(TDO::DirectoryRecord &dr_)
   if((data_block_size == 0) || ((tmp.block_size % data_block_size) != 0))
     _throw("unsafe OperaFS directory record metadata: invalid block_size alignment");
 
-  const std::uint32_t dev_block_count = device_block_count();
-  const std::uint64_t max_byte_count =
-    static_cast<std::uint64_t>(tmp.block_size) * static_cast<std::uint64_t>(tmp.block_count);
+  const u64 dev_block_count = device_block_count();
+  const u64 record_dev_block_count =
+    (static_cast<u64>(tmp.block_count) *
+     (static_cast<u64>(tmp.block_size) / data_block_size));
+  const u64 max_byte_count =
+    static_cast<u64>(tmp.block_size) * static_cast<u64>(tmp.block_count);
 
   if((tmp.block_count == 0) && (avatar_count > 1))
     _throw("unsafe OperaFS directory record metadata: avatars without blocks");
@@ -688,11 +1034,19 @@ TDO::DevStream::read(TDO::DirectoryRecord &dr_)
     _throw("unsafe OperaFS directory record metadata: byte_count exceeds block capacity");
 
   if(tmp.block_count != 0)
-    for(std::uint32_t avatar : tmp.avatar_list)
-      {
-        if(avatar >= dev_block_count)
-          _throw("unsafe OperaFS directory record metadata: avatar exceeds device bounds");
-      }
+    {
+      if(record_dev_block_count > dev_block_count)
+        _throw("unsafe OperaFS directory record metadata: block_count exceeds device bounds");
+
+      for(u32 avatar : tmp.avatar_list)
+        {
+          if(avatar >= dev_block_count)
+            _throw("unsafe OperaFS directory record metadata: avatar exceeds device bounds");
+          if(static_cast<u64>(avatar) >
+             (dev_block_count - record_dev_block_count))
+            _throw("unsafe OperaFS directory record metadata: avatar extent exceeds device bounds");
+        }
+    }
 
   dr_ = tmp;
 }
@@ -717,6 +1071,25 @@ TDO::DevStream::read(TDO::ROMTag &tag_)
 }
 
 void
+TDO::DevStream::write(const TDO::ROMTag &tag_)
+{
+  write(tag_.sub_systype);
+  write(tag_.type);
+  write(tag_.version);
+  write(tag_.revision);
+  write(tag_.flags);
+  write(tag_.type_specific);
+  write(tag_.reserved1);
+  write(tag_.reserved2);
+  write(tag_.offset);
+  write(tag_.size);
+  write(tag_.reserved3[0]);
+  write(tag_.reserved3[1]);
+  write(tag_.reserved3[2]);
+  write(tag_.reserved3[3]);
+}
+
+void
 TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
 {
   TDO::LinkedMemFileEntry tmp;
@@ -729,7 +1102,7 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
   read(tmp.byte_count);
   read(tmp.unique_identifier);
   read(tmp.type);
-  read(tmp.filename, sizeof(tmp.filename));
+  read(tmp.filename,sizeof(tmp.filename));
 
   if((tmp.fingerprint != FINGERPRINT_FILEBLOCK) &&
      (tmp.fingerprint != FINGERPRINT_FREEBLOCK) &&
@@ -749,4 +1122,51 @@ TDO::DevStream::read(TDO::LinkedMemFileEntry &lmfe_)
            "block count without byte count");
 
   lmfe_ = tmp;
+}
+
+s64
+TDO::DevStream::size_in_bytes()
+{
+  s64 size;
+  TDO::PosGuard guard(this);
+
+  _ios.seekg(0,_ios.end);
+  size = _ios.tellg();
+
+  return size;
+}
+
+s64
+TDO::DevStream::size_in_device_blocks()
+{
+  const s64 bytes = size_in_bytes();
+  // size_in_bytes() returns -1 when tellg() fails. Letting the s64
+  // value mix with the u64 device_block_size() in division promotes
+  // -1 to 0xFFFF... via usual arithmetic conversion and yields a
+  // huge positive count (~9e15) that silently feeds downstream
+  // u32-narrowed sinks (e.g. signer dl.volume_block_count). Propagate
+  // the failure sentinel instead.
+  if(bytes < 0)
+    return bytes;
+  return (bytes / static_cast<s64>(device_block_size()));
+}
+
+void
+TDO::DevStream::resize_multiple(s64 multiple_)
+{
+  s64 size;
+  s64 rounded_size;
+  TDO::PosGuard guard(this);
+
+  _ios.seekg(0,_ios.end);
+  size = _ios.tellg();
+
+  rounded_size = _round_up(size,multiple_);
+  if(rounded_size == size)
+    return;
+
+  _ios.seekp(rounded_size - 1);
+  _ios.put(0);
+  if(!_ios)
+    throw Error("failed to resize stream");
 }

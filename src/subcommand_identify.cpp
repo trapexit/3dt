@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -154,18 +154,15 @@ namespace
   }
 
   static
-  Error
+  void
   identify(const PrintFunc &printfunc_,
            const fs::path  &filepath_,
-           std::istream    &is_)
+           std::iostream   &ios_)
   {
-    Error err;
     PrintData data;
     TDO::DiscIdentifier identifier;
 
-    err = identifier.identify(is_);
-    if(err)
-      return err;
+    identifier.identify(ios_);
 
     data.filename        = filepath_;
     data.label           = identifier.label;
@@ -175,8 +172,6 @@ namespace
     data.partial_matches = identifier.partial_matches;
 
     printfunc_(data);
-
-    return {};
   }
 
   static
@@ -184,18 +179,18 @@ namespace
   identify(const PrintFunc &printfunc_,
            const fs::path  &filepath_)
   {
-    Error err;
-    std::ifstream ifs;
+    std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
-      return Log::error_stream_open(filepath_);
+    fs.open(filepath_,std::ios::binary|std::ios::in);
+    if(!fs.good())
+      {
+        Log::error_stream_open(filepath_);
+        throw Error("failed to open");
+      }
 
-    err = ::identify(printfunc_,filepath_,ifs);
-    if(err)
-      Log::error(err);
+    ::identify(printfunc_,filepath_,fs);
 
-    ifs.close();
+    fs.close();
   }
 
   static
@@ -216,11 +211,26 @@ namespace Subcommand
   void
   identify(const Options::Identify &options_)
   {
+    bool failed;
     PrintFunc printfunc;
 
     printfunc = get_print_func(options_.format);
+    failed = false;
 
     for(auto &filepath : options_.filepaths)
-      ::identify(printfunc,filepath);
+      {
+        try
+          {
+            ::identify(printfunc,filepath);
+          }
+        catch(const std::exception &e)
+          {
+            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+            failed = true;
+          }
+      }
+
+    if(failed)
+      throw Error("identify failed");
   }
 }

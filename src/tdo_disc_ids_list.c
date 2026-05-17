@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -487,8 +487,8 @@ TDOID_LIST[] =
    {"Starblade (Japan)","CD-ROM",0x249C7B52,281600,0x04A9273A,258,481596532},
    {"Stellar 7 - Draxon's Revenge (Japan)","CD-ROM",0x33334588,153600,0x34E8AB94,224,264184852},
    {"Stellar 7 - Draxon's Revenge (USA)","CD-ROM",0x1CB7640F,148480,0x31CB70CE,230,259035034},
-   {"Step Aerobics (USA)","CD-ROM",0x20E944D9,286720,0x1D0D4C17,165,551046554},
-   {"Storage Manager - Memory Kanri (Japan)","CD-ROM",0x12CA2BE4,1536,0x33C4471C,199,1593381},
+    {"Step Aerobics (USA)","CD-ROM",0x20E944D9,286720,0x1D0D4C17,165,551046554},
+    {"Storage Manager - Memory Kanri (Japan)","CD-ROM",0x12CA2BE4,1536,0x33C4471C,199,1265701},
    {"Strahl (Japan)","CD-ROM",0x373AC22B,275968,0x257A414B,603,535761213},
    {"Strahl (USA)","CD-ROM",0x087289AC,322560,0x1653DE65,629,626694731},
    {"Striker - World Cup Special (Europe)","CD-ROM",0x23E71C78,204800,0x3A11BCB9,931,289305025},

@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,7 @@ namespace TDO
     FilesystemStats();
 
   public:
-    Error collect(DevStream &reader_);
+    void collect(DevStream &reader_);
 
   public:
     uint32_t file_count;

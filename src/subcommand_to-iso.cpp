@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -50,7 +50,6 @@ namespace Subcommand
   void
   to_iso(const Options::ToISO &options_)
   {
-    Error err;
     std::uint64_t blocks;
     std::ofstream ofs;
     fs::path output_path;
@@ -59,20 +58,25 @@ namespace Subcommand
 
     output_path = get_output_path(options_);
     if(output_path == options_.input)
-      return Log::error({"input == output"});
+      {
+        Log::error({"input == output"});
+        throw Error("to-iso failed");
+      }
 
-    err = stream.open(options_.input);
-    if(err)
-      return Log::error(err);
+    stream.open(options_.input);
 
     if(!stream.good())
-      return  Log::error_stream_open(options_.input);
+      {
+        Log::error_stream_open(options_.input);
+        throw Error("to-iso failed");
+      }
 
     ofs.open(output_path,std::ios::binary|std::ios::trunc);
     if(!ofs.good())
       {
         stream.close();
-        return Log::error_stream_open(output_path);
+        Log::error_stream_open(output_path);
+        throw Error("to-iso failed");
       }
 
     const std::uint64_t leading_blocks =
@@ -92,7 +96,10 @@ namespace Subcommand
 
             ofs.write(buf.data(),buf.size());
             if(ofs.bad())
-              return Log::error({"write failed"});
+              {
+                Log::error({"write failed"});
+                throw Error("to-iso failed");
+              }
 
             fmt::print("\r{}: block {} of {} written",
                        output_path,
@@ -102,7 +109,8 @@ namespace Subcommand
       }
     catch(const Error &err)
       {
-        return Log::error(err);
+        Log::error(err);
+        throw Error("to-iso failed");
       }
 
     fmt::print("\n");

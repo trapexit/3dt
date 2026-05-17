@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -61,30 +61,18 @@ TDO::DiscIdentifier::DiscIdentifier()
 {
 }
 
-Error
-TDO::DiscIdentifier::identify(std::istream &is_)
+void
+TDO::DiscIdentifier::identify(std::iostream &ios_)
 {
-  try
-    {
-      Error err;
-      TDO::DevStream stream(is_);
+  TDO::DevStream stream(ios_);
 
-      stream.setup();
+  stream.setup();
 
-      stream.data_byte_seek(0);
-      stream.read(label);
+  stream.data_byte_seek(0);
+  stream.read(label);
 
-      err = fsstats.collect(stream);
-      if(err)
-        return err;
+  fsstats.collect(stream);
 
-      ::find_matches(label,fsstats,full_matches,partial_matches);
-      disc_image_ext = ::get_ext_based_on_type(stream);
-
-      return {};
-    }
-  catch(const Error &err)
-    {
-      return err;
-    }
+  ::find_matches(label,fsstats,full_matches,partial_matches);
+  disc_image_ext = ::get_ext_based_on_type(stream);
 }
