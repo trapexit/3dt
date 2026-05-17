@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -20,8 +20,11 @@
 #include "error.hpp"
 #include "tdo_directory_header.hpp"
 #include "tdo_directory_record.hpp"
+#include "tdo_disc_format.hpp"
 #include "tdo_disc_label.hpp"
 #include "tdo_disc_unpacker.hpp"
+
+#include "fmt.hpp"
 
 #include <fstream>
 #include <cctype>
@@ -32,10 +35,10 @@ namespace fs = std::filesystem;
 class TDO::DiscUnpacker::Impl final : public TDO::FSWalker::Callbacks
 {
 public:
-  Impl(std::istream                &is_,
+  Impl(std::iostream               &ios_,
        TDO::DiscUnpacker::Callback &cb_)
     : _cb(cb_),
-      _walker(is_,*this),
+      _walker(ios_,*this),
       _dstpath()
   {
   }
@@ -45,31 +48,34 @@ public:
   }
 
 public:
-  Error
+  void
   unpack(const fs::path &dstpath_)
   {
     _dstpath = dstpath_;
-    return _walker.walk();
+    _walker.walk();
   }
 
 public:
   void
   begin()
   {
+    _cb.begin();
   }
 
   void
   end()
   {
+    _cb.end();
   }
 
 
 public:
   void
-  operator()(const std::filesystem::path&,
-             const TDO::DirectoryHeader&,
-             TDO::DevStream&)
+  operator()(const std::filesystem::path &path_,
+             const TDO::DirectoryHeader  &header_,
+             TDO::DevStream              &stream_)
   {
+    _cb.directory(path_,header_,stream_.file_tell() - sizeof(TDO::DirectoryHeader),stream_);
   }
 
   void
@@ -103,13 +109,30 @@ public:
 
             stream_.data_block_seek(sector);
             n = std::min(record_.block_size,bytes_left);
-            util::copy_stream(stream_.istream(),os,n);
+            util::copy_stream(stream_.iostream(),os,n);
             bytes_left -= n;
           }
 
         os.close();
       }
     _cb.after(path_,record_,0);
+  }
+
+  Error
+  invalid_filename(const std::filesystem::path &parent_,
+                   const std::string           &filename_,
+                   const TDO::DirectoryRecord  &record_,
+                   const std::uint32_t          dr_file_pos_,
+                   const Error                 &err_,
+                   TDO::DevStream              &stream_)
+  {
+    const fs::path path = TDO::display_path(parent_,filename_);
+
+    _cb.before(path,record_,dr_file_pos_,stream_);
+    _cb.after(path,record_,1);
+    fmt::print(stderr,"3dt: {} - {}\n",err_.str,path.generic_string());
+
+    return Error();
   }
 
 private:
@@ -122,21 +145,21 @@ private:
 
 namespace TDO
 {
-  DiscUnpacker::DiscUnpacker(std::istream &is_,
-                             Callback     &cb_)
+  DiscUnpacker::DiscUnpacker(std::iostream &ios_,
+                             Callback      &cb_)
   {
-    _impl = std::make_unique<Impl>(is_,cb_);
+    _impl = std::make_unique<Impl>(ios_,cb_);
   }
 
   DiscUnpacker::~DiscUnpacker()
   {
   }
 
-  Error
+  void
   DiscUnpacker::unpack(const fs::path &dstpath_)
   {
     fs::create_directories(dstpath_);
 
-    return _impl->unpack(dstpath_);
+    _impl->unpack(dstpath_);
   }
 }

@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -31,12 +31,28 @@ typedef TDO::FSWalker::Callbacks Callbacks;
 
 
 static
+bool
+romtag_size_is_byte_count(const TDO::ROMTag &tag_)
+{
+  switch(tag_.type)
+    {
+    case RSA_BLOCKS_ALWAYS:
+      return false;
+    }
+
+  return true;
+}
+
+static
 void
 update_record(const TDO::ROMTagVec &tags_,
               TDO::DirectoryRecord &dr_)
 {
   for(const auto &tag : tags_)
     {
+      if(!romtag_size_is_byte_count(tag))
+        continue;
+
       for(uint32_t i = 0; i <= dr_.last_avatar_index; i++)
         {
           if(tag.offset+1 == dr_.avatar_list[i])
@@ -83,6 +99,57 @@ decode_v1_filename(const TDO::DirectoryRecord &dr_,
 }
 
 static
+std::string
+display_path(const fs::path &path_)
+{
+  if(path_.empty())
+    return "/";
+  return path_.generic_string();
+}
+
+static
+Error
+validate_v1_dir_block_link(const char              *name_,
+                           const std::int32_t      block_,
+                           const std::uint32_t     block_count_,
+                           const fs::path         &path_)
+{
+  const std::string path = display_path(path_);
+
+  if(block_ < -1)
+    return {std::string("invalid OperaFS directory header ") + name_ +
+            " for " + path};
+  if((block_ != -1) && (static_cast<std::uint32_t>(block_) >= block_count_))
+    return {std::string("invalid OperaFS directory header ") + name_ +
+            " for " + path};
+
+  return Error();
+}
+
+static
+Error
+validate_v1_dir_block_prev(const TDO::DirectoryHeader &header_,
+                           const std::int32_t         expected_prev_block_,
+                           const std::uint32_t        block_count_,
+                           const fs::path            &path_)
+{
+  Error err;
+  const std::string path = display_path(path_);
+
+  err = validate_v1_dir_block_link("prev_block",
+                                   header_.prev_block,
+                                   block_count_,
+                                   path_);
+  if(err)
+    return err;
+
+  if(header_.prev_block != expected_prev_block_)
+    return {"invalid OperaFS directory header prev_block for " + path};
+
+  return Error();
+}
+
+static
 Error
 validate_v1_dir_block_bounds(const std::int64_t block_start_,
                              const std::uint32_t block_size_,
@@ -105,11 +172,13 @@ validate_v1_dir_block_bounds(const std::int64_t block_start_,
 class Impl
 {
 public:
-  Impl(std::istream &is_,
-       Callbacks    &callbacks_)
+  Impl(std::iostream &ios_,
+       Callbacks     &callbacks_,
+       bool           use_existing_romtags_)
 
     : _callbacks(callbacks_),
-      _stream(is_)
+      _stream(ios_),
+      _use_existing_romtags(use_existing_romtags_)
   {
 
   }
@@ -122,11 +191,18 @@ public:
                       const std::int64_t    active_dir_end_,
                       const std::int64_t    dh_data_byte_pos_,
                       const std::uint32_t   dir_block_size_,
-                      const fs::path       &path_)
+                      const std::uint32_t   block_count_,
+                      const std::int32_t    prev_block_,
+                      const fs::path       &path_,
+                      std::int32_t         &next_block_,
+                      bool                 &last_in_dir_)
   {
     TDO::DirectoryHeader dh;
     std::int64_t data_byte_pos;
     Error err;
+
+    next_block_ = -1;
+    last_in_dir_ = false;
 
     if(dir_block_size_ < sizeof(TDO::DirectoryHeader))
       return {"invalid OperaFS directory block: smaller than directory header"};
@@ -134,6 +210,11 @@ public:
     data_byte_pos = dh_data_byte_pos_;
     _stream.data_byte_seek(data_byte_pos);
     _stream.read(dh);
+
+    err = validate_v1_dir_block_prev(dh,prev_block_,block_count_,path_);
+    if(err)
+      return err;
+    next_block_ = dh.next_block;
 
     _callbacks(path_,dh,_stream);
 
@@ -149,7 +230,11 @@ public:
     if(err)
       return err;
     if(data_byte_pos == first_free_byte_pos)
-      return Error();
+      {
+        if(next_block_ == -1)
+          last_in_dir_ = true;
+        return Error();
+      }
 
     _stream.data_byte_seek(data_byte_pos);
 
@@ -183,28 +268,43 @@ public:
         update_record(romtags_,dr);
         err = decode_v1_filename(dr,decoded_filename);
         if(err)
-          return err;
-
-        {
-          TDO::PosGuard guard(_stream);
-          _callbacks(path_ / decoded_filename,dr,dr_file_pos,_stream);
-        }
-
-        if(dr.is_directory())
           {
-            const std::int64_t child_dir_byte_pos =
-              static_cast<std::int64_t>(dr.avatar_list[0]) * label_.volume_block_size;
-
-            if((child_dir_byte_pos >= active_dir_byte_pos_) && (child_dir_byte_pos < active_dir_end_))
-              return {"invalid OperaFS directory recursion target: non-advancing child directory block"};
-
-            err = walk_v1_dir(label_,romtags_,dr,path_ / decoded_filename);
+            TDO::PosGuard guard(_stream);
+            err = _callbacks.invalid_filename(path_,
+                                              decoded_filename,
+                                              dr,
+                                              dr_file_pos,
+                                              err,
+                                              _stream);
             if(err)
               return err;
           }
+        else
+          {
+            {
+              TDO::PosGuard guard(_stream);
+              _callbacks(path_ / decoded_filename,dr,dr_file_pos,_stream);
+            }
+
+            if(dr.is_directory())
+              {
+                const std::int64_t child_dir_byte_pos =
+                  static_cast<std::int64_t>(dr.avatar_list[0]) * label_.volume_block_size;
+
+                if((child_dir_byte_pos >= active_dir_byte_pos_) && (child_dir_byte_pos < active_dir_end_))
+                  return {"invalid OperaFS directory recursion target: non-advancing child directory block"};
+
+                err = walk_v1_dir(label_,romtags_,dr,path_ / decoded_filename);
+                if(err)
+                  return err;
+              }
+          }
 
         if(dr.last_in_dir())
-          break;
+          {
+            last_in_dir_ = true;
+            break;
+          }
         if(dr.last_in_block())
           break;
         if(_stream.data_byte_tell() >= first_free_byte_pos)
@@ -224,19 +324,37 @@ public:
               const std::uint32_t   dir_block_count_,
               const fs::path       &path_)
   {
-    std::int64_t  dh_data_byte_pos;
     const std::int64_t active_dir_byte_pos = (dir_block_ * label_.volume_block_size);
     const std::int64_t active_dir_end =
       active_dir_byte_pos + (static_cast<std::int64_t>(dir_block_size_) * dir_block_count_);
     TDO::PosGuard pos_guard(_stream);
+    std::int32_t block;
+    std::int32_t prev_block;
+    std::vector<bool> visited;
 
     if((dir_block_count_ != 0) && (dir_block_size_ == 0))
       return {"invalid OperaFS directory metadata: zero directory block size"};
+    if(dir_block_count_ == 0)
+      return Error();
 
-    dh_data_byte_pos = active_dir_byte_pos;
-    for(std::uint32_t block = 0; block < dir_block_count_; block++)
+    visited.resize(dir_block_count_,false);
+    block = 0;
+    prev_block = -1;
+    while(block != -1)
       {
         Error err;
+        std::int32_t next_block;
+        std::int64_t dh_data_byte_pos;
+        bool last_in_dir;
+
+        if(static_cast<std::uint32_t>(block) >= dir_block_count_)
+          return {"invalid OperaFS directory header next_block for " + display_path(path_)};
+        if(visited[block])
+          return {"invalid OperaFS directory header next_block loop for " + display_path(path_)};
+        visited[block] = true;
+
+        dh_data_byte_pos =
+          active_dir_byte_pos + (static_cast<std::int64_t>(dir_block_size_) * block);
 
         err = walk_v1_dir_block(label_,
                                 romtags_,
@@ -244,10 +362,27 @@ public:
                                 active_dir_end,
                                 dh_data_byte_pos,
                                 dir_block_size_,
-                                path_);
+                                dir_block_count_,
+                                prev_block,
+                                path_,
+                                next_block,
+                                last_in_dir);
         if(err)
           return err;
-        dh_data_byte_pos += dir_block_size_;
+        if(last_in_dir)
+          break;
+
+        err = validate_v1_dir_block_link("next_block",
+                                         next_block,
+                                         dir_block_count_,
+                                         path_);
+        if(err)
+          return err;
+        if(next_block == -1)
+          break;
+
+        prev_block = block;
+        block = next_block;
       }
 
     return Error();
@@ -331,9 +466,10 @@ public:
 
     _stream.setup();
 
-    _stream.read(dl);
+    dl = _stream.disc_label();
 
-    romtags = _stream.romtags();
+    if(_use_existing_romtags)
+      romtags = _stream.romtags();
 
     _callbacks.begin();
     switch(dl.volume_structure_version)
@@ -355,36 +491,36 @@ public:
 private:
   Callbacks      &_callbacks;
   TDO::DevStream  _stream;
+  bool            _use_existing_romtags;
 };
 
 namespace TDO
 {
-  FSWalker::FSWalker(std::istream &is_,
-                     Callbacks    &callbacks_)
+  FSWalker::FSWalker(std::iostream &ios_,
+                     Callbacks     &callbacks_,
+                     bool           use_existing_romtags_)
     : _callbacks(callbacks_),
-      _is(is_)
+      _ios(ios_),
+      _use_existing_romtags(use_existing_romtags_)
   {
   }
 
   FSWalker::FSWalker(DevStream &stream_,
-                     Callbacks &callbacks_)
+                     Callbacks &callbacks_,
+                     bool       use_existing_romtags_)
     : _callbacks(callbacks_),
-      _is(stream_.istream())
+      _ios(stream_.iostream()),
+      _use_existing_romtags(use_existing_romtags_)
   {
   }
 
-  Error
+  void
   FSWalker::walk()
   {
-    try
-      {
-        Impl impl(_is,_callbacks);
+    Impl impl(_ios,_callbacks,_use_existing_romtags);
 
-        return impl.walk();
-      }
-    catch(const Error &err)
-      {
-        return err;
-      }
+    Error err = impl.walk();
+    if(err)
+      throw err;
   }
 }

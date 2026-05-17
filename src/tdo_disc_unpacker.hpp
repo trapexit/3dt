@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,8 @@ namespace TDO
 
       virtual ~Callback() = default;
 
+      virtual void begin() {};
+      virtual void end() {};
       virtual void before(const std::filesystem::path &path,
                           const TDO::DirectoryRecord  &record,
                           const uint32_t               record_pos,
@@ -46,15 +48,19 @@ namespace TDO
       virtual void after(const std::filesystem::path &path,
                          const TDO::DirectoryRecord  &record,
                          const int                    err) = 0;
+      virtual void directory(const std::filesystem::path &path,
+                             const TDO::DirectoryHeader &header,
+                             const uint32_t              header_pos,
+                             TDO::DevStream             &stream) {};
     };
 
   public:
-    DiscUnpacker(std::istream &is,
-                 Callback     &cb);
+    DiscUnpacker(std::iostream &s,
+                 Callback      &cb);
     ~DiscUnpacker();
 
   public:
-    Error unpack(const std::filesystem::path &dstpath);
+    void unpack(const std::filesystem::path &dstpath);
 
   private:
     class Impl;

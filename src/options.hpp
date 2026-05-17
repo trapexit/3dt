@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -52,22 +53,42 @@ public:
   {
     PathVec     filepaths;
     Path        output;
+    Path        layout;
     std::string format;
   };
 
   struct Pack
   {
+    Path        input;
+    Path        output;
+    Path        layout;
+    std::string volume_commentary;
+    std::string volume_label;
+    bool        banner_romtag = true;
+    bool        dry_run = false;
+    bool        mark = true;
+    bool        sign = false;
+    bool        root_unique_identifier_set = false;
+    bool        volume_unique_identifier_set = false;
+    uint32_t    root_unique_identifier = 0;
+    uint32_t    signature_digest_check_count = 0;
+    uint32_t    volume_unique_identifier = 0;
+  };
+
+  struct Repack
+  {
+    PathVec     filepaths;
+    Path        output;
+    bool        banner_romtag = true;
+    bool        mark = true;
+    bool        sign = false;
+    uint32_t    signature_digest_check_count = 0;
   };
 
   struct Rename
   {
     PathVec filepaths;
     bool    take_first;
-  };
-
-  struct Crc32b
-  {
-    PathVec filepaths;
   };
 
   struct ToISO
@@ -82,13 +103,51 @@ public:
     std::string format;
   };
 
+  struct Verify
+  {
+    PathVec     filepaths;
+    std::string format = "human";
+    bool        digest_table = true;
+    bool        quiet = false;
+  };
+
+  struct Sign
+  {
+    PathVec  filepaths;
+    Path     output;
+    bool     banner_romtag = true;
+    bool     force = false;
+    bool     mark = true;
+    uint32_t signature_digest_check_count = 0;
+  };
+
+  struct SignFile
+  {
+    PathVec     filepaths;
+    Path        signature_output;
+    std::string key_name;
+    bool        append = false;
+    bool        replace = false;
+    bool        verify = false;
+    bool        write = false;
+  };
+
+  struct DecryptFile
+  {
+    PathVec     filepaths;
+  };
+
   List     list     = {};
   Info     info     = {};
   Identify identify = {};
   Unpack   unpack   = {};
   Pack     pack     = {};
+  Repack   repack   = {};
   Rename   rename   = {};
-  Crc32b   crc32b   = {};
   ToISO    to_iso   = {};
   ROMTags  romtags  = {};
+  Verify   verify   = {};
+  Sign     sign     = {};
+  SignFile signfile = {};
+  DecryptFile decryptfile = {};
 };

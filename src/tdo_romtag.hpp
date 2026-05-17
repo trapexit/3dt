@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -20,11 +20,13 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 
 namespace TDO
 {
   struct ROMTag
   {
+  public:
     uint8_t sub_systype;
     uint8_t type;
     uint8_t version;
@@ -36,6 +38,10 @@ namespace TDO
     uint32_t offset;
     uint32_t size;
     uint32_t reserved3[4];
+
+  public:
+    static std::string type_str(const uint8_t);
+    std::string type_str() const;
   };
 
   typedef std::vector<TDO::ROMTag> ROMTagVec;

@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -28,8 +28,12 @@ namespace Subcommand
   void identify(const Options::Identify &options);
   void unpack(const Options::Unpack &options);
   void pack(const Options::Pack &options);
+  void repack(const Options::Repack &options);
   void rename(const Options::Rename &options);
-  void crc32b(const Options::Crc32b &options);
   void to_iso(const Options::ToISO &options);
   void romtags(const Options::ROMTags &options);
+  void verify(const Options::Verify &options);
+  void sign(const Options::Sign &options);
+  void sign_file(const Options::SignFile &);
+  void decrypt_file(const Options::DecryptFile &);
 }
