@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -25,7 +25,7 @@
 #include <fstream>
 
 namespace fs = std::filesystem;
-typedef std::function<void(const fs::path&,const TDO::DirectoryRecord&,const uint32_t,TDO::DevStream&)> Printer;
+typedef std::function<void(const std::string&,const TDO::DirectoryRecord&,const uint32_t,TDO::DevStream&)> Printer;
 
 
 static
@@ -51,6 +51,24 @@ starts_with(const fs::path &base_,
 }
 
 static
+std::string
+display_path(const fs::path    &parent_,
+             const std::string &filename_)
+{
+  std::string path;
+
+  path = parent_.generic_string();
+  if(!path.empty() && !filename_.empty() && (filename_[0] != '/'))
+    path += "/";
+  if(filename_.empty())
+    path += "<invalid empty filename>";
+  else
+    path += filename_;
+
+  return path;
+}
+
+static
 void
 default_header()
 {
@@ -59,7 +77,7 @@ default_header()
 
 static
 void
-default_printer(const fs::path             &filepath_,
+default_printer(const std::string          &filepath_,
                 const TDO::DirectoryRecord &record_,
                 const uint32_t              record_pos_,
                 TDO::DevStream             &stream_)
@@ -90,7 +108,7 @@ offset_header()
 
 static
 void
-file_offset_printer(const fs::path             &filepath_,
+file_offset_printer(const std::string          &filepath_,
                     const TDO::DirectoryRecord &record_,
                     const uint32_t              record_pos_,
                     TDO::DevStream             &stream_)
@@ -118,7 +136,7 @@ file_offset_printer(const fs::path             &filepath_,
 
 static
 void
-block_offset_printer(const fs::path             &filepath_,
+block_offset_printer(const std::string          &filepath_,
                      const TDO::DirectoryRecord &record_,
                      const uint32_t              record_pos_,
                      TDO::DevStream             &stream_)
@@ -192,7 +210,27 @@ public:
     if(!starts_with(base_filter,filepath_))
       return;
 
-    _printer(filepath_,record_,record_pos_,stream_);
+    _printer(filepath_.generic_string(),record_,record_pos_,stream_);
+  }
+
+  Error
+  invalid_filename(const std::filesystem::path &parent_,
+                   const std::string           &filename_,
+                   const TDO::DirectoryRecord  &record_,
+                   const uint32_t               record_pos_,
+                   const Error                 &err_,
+                   TDO::DevStream              &stream_)
+  {
+    std::string filepath;
+
+    if(!starts_with(base_filter,parent_))
+      return Error();
+
+    filepath = display_path(parent_,filename_);
+    _printer(filepath,record_,record_pos_,stream_);
+    fmt::print(stderr,"3dt: {} - {}\n",err_.str,filepath);
+
+    return Error();
   }
 
 public:
@@ -208,18 +246,24 @@ namespace Subcommand
   list(const Options::List &opts_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream fs;
     ListCallbacks callbacks(opts_);
-    TDO::FSWalker walker(ifs,callbacks);
+    TDO::FSWalker walker(fs,callbacks);
 
-    ifs.open(opts_.filepath,std::ios::binary);
-    if(!ifs.good())
-      return  Log::error_stream_open(opts_.filepath);
+    fs.open(opts_.filepath,std::ios::binary|std::ios::in);
+    if(!fs.good())
+      {
+        Log::error_stream_open(opts_.filepath);
+        throw Error("list failed");
+      }
 
     err = walker.walk();
     if(err)
-      Log::error(err);
+      {
+        Log::error(err);
+        throw Error("list failed");
+      }
 
-    ifs.close();
+    fs.close();
   }
 }

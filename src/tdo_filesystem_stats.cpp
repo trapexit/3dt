@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -57,6 +57,20 @@ public:
   {
     file_count++;
     total_data_size += record_.byte_count;
+  }
+
+  Error
+  invalid_filename(const std::filesystem::path&,
+                   const std::string&,
+                   const TDO::DirectoryRecord &record_,
+                   const uint32_t,
+                   const Error&,
+                   TDO::DevStream&)
+  {
+    file_count++;
+    total_data_size += record_.byte_count;
+
+    return {};
   }
 
 public:

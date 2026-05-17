@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -78,11 +78,11 @@ namespace
                label_.root_directory_last_avatar_index);
     for(unsigned int i = 0; i <= label_.root_directory_last_avatar_index; i++)
       fmt::print("   - {}\n",label_.root_directory_avatar_list[i]);
-    if(label_.volume_flags & VOLUME_FLAG_M2)
-      fmt::print(" - num_rom_tags: {}\n"
-                 " - application_id: {}\n",
-                 label_.num_rom_tags,
-                 label_.application_id);
+    // if(label_.volume_flags & VOLUME_FLAG_M2)
+    //   fmt::print(" - num_rom_tags: {}\n"
+    //              " - application_id: {}\n",
+    //              label_.num_rom_tags,
+    //              label_.application_id);
     fmt::print(" - file_count: {}\n"
 
                " - total_data_size: {}\n",
@@ -212,7 +212,7 @@ namespace
   }
 
   static
-  void
+  Error
   info(const PrintFunc &printfunc_,
        const fs::path  &filepath_)
   {
@@ -221,16 +221,27 @@ namespace
 
     err = stream.open(filepath_);
     if(err)
-      return Log::error(err);
+      {
+        Log::error(err);
+        return err;
+      }
 
     if(!stream.good())
-      return Log::error_stream_open(filepath_);
+      {
+        Log::error_stream_open(filepath_);
+        return {"failed to open"};
+      }
 
     err = ::info(printfunc_,stream);
     if(err)
-      return Log::error(err);
+      {
+        Log::error(err);
+        return err;
+      }
 
     stream.close();
+
+    return {};
   }
 
 }
@@ -240,11 +251,19 @@ namespace Subcommand
   void
   info(const Options::Info &options_)
   {
+    bool failed;
     PrintFunc printfunc;
 
     printfunc = get_print_function(options_);
+    failed = false;
 
     for(auto &filepath : options_.filepaths)
-      ::info(printfunc,filepath);
+      {
+        if(::info(printfunc,filepath))
+          failed = true;
+      }
+
+    if(failed)
+      throw Error("info failed");
   }
 }

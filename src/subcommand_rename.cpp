@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -56,12 +56,12 @@ namespace l
   Error
   rename(const fs::path &filepath_,
          const bool      take_first_,
-         std::istream   &is_)
+         std::iostream  &ios_)
   {
     Error err;
     TDO::DiscIdentifier identifier;
 
-    err = identifier.identify(is_);
+    err = identifier.identify(ios_);
     if(err)
       return err;
 
@@ -80,25 +80,30 @@ namespace l
   }
 
   static
-  void
+  Error
   rename(const fs::path &filepath_,
          const bool      take_first_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
+    fs.open(filepath_,std::ios::binary|std::ios::in);
+    if(!fs.good())
       {
         Log::error_stream_open(filepath_);
-        return;
+        return {"failed to open"};
       }
 
-    err = l::rename(filepath_,take_first_,ifs);
+    err = l::rename(filepath_,take_first_,fs);
     if(err)
-      Log::error(err);
+      {
+        Log::error(err);
+        return err;
+      }
 
-    ifs.close();
+    fs.close();
+
+    return {};
   }
 }
 
@@ -107,7 +112,16 @@ namespace Subcommand
   void
   rename(const Options::Rename &options_)
   {
+    bool failed;
+
+    failed = false;
     for(auto &filepath : options_.filepaths)
-      l::rename(filepath,options_.take_first);
+      {
+        if(l::rename(filepath,options_.take_first))
+          failed = true;
+      }
+
+    if(failed)
+      throw Error("rename failed");
   }
 }

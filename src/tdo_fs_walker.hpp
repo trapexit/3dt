@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,9 @@
 #include <filesystem>
 #include <functional>
 #include <istream>
+#include <string>
 
-
+// TODO: Add way to exit walk
 namespace TDO
 {
   class FSWalker
@@ -33,28 +34,40 @@ namespace TDO
   public:
     struct Callbacks
     {
-      virtual void begin() = 0;
-      virtual void end() = 0;
+      virtual void begin() {};
+      virtual void end() {};
       virtual void operator()(const std::filesystem::path&,
                               const TDO::DirectoryHeader&,
-                              TDO::DevStream&) = 0;
+                              TDO::DevStream&) {};
       virtual void operator()(const std::filesystem::path&,
                               const TDO::DirectoryRecord&,
                               const uint32_t,
-                              TDO::DevStream&) = 0;
+                              TDO::DevStream&) {};
+      virtual Error invalid_filename(const std::filesystem::path&,
+                                     const std::string&,
+                                     const TDO::DirectoryRecord&,
+                                     const uint32_t,
+                                     const Error &err,
+                                     TDO::DevStream&)
+      {
+        return err;
+      };
     };
 
   public:
-    FSWalker(std::istream &is,
-             Callbacks    &callbacks);
+    FSWalker(std::iostream &ios,
+             Callbacks     &callbacks,
+             bool           use_existing_romtags = true);
     FSWalker(DevStream &stream,
-             Callbacks &callbacks);
+             Callbacks &callbacks,
+             bool       use_existing_romtags = true);
 
   public:
     Error walk();
 
   private:
-    Callbacks    &_callbacks;
-    std::istream &_is;
+    Callbacks     &_callbacks;
+    std::iostream &_ios;
+    bool           _use_existing_romtags;
   };
 }

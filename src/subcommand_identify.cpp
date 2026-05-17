@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -157,13 +157,13 @@ namespace
   Error
   identify(const PrintFunc &printfunc_,
            const fs::path  &filepath_,
-           std::istream    &is_)
+           std::iostream   &ios_)
   {
     Error err;
     PrintData data;
     TDO::DiscIdentifier identifier;
 
-    err = identifier.identify(is_);
+    err = identifier.identify(ios_);
     if(err)
       return err;
 
@@ -180,22 +180,30 @@ namespace
   }
 
   static
-  void
+  Error
   identify(const PrintFunc &printfunc_,
            const fs::path  &filepath_)
   {
     Error err;
-    std::ifstream ifs;
+    std::fstream fs;
 
-    ifs.open(filepath_,std::ios::binary);
-    if(!ifs.good())
-      return Log::error_stream_open(filepath_);
+    fs.open(filepath_,std::ios::binary|std::ios::in);
+    if(!fs.good())
+      {
+        Log::error_stream_open(filepath_);
+        return {"failed to open"};
+      }
 
-    err = ::identify(printfunc_,filepath_,ifs);
+    err = ::identify(printfunc_,filepath_,fs);
     if(err)
-      Log::error(err);
+      {
+        Log::error(err);
+        return err;
+      }
 
-    ifs.close();
+    fs.close();
+
+    return {};
   }
 
   static
@@ -216,11 +224,19 @@ namespace Subcommand
   void
   identify(const Options::Identify &options_)
   {
+    bool failed;
     PrintFunc printfunc;
 
     printfunc = get_print_func(options_.format);
+    failed = false;
 
     for(auto &filepath : options_.filepaths)
-      ::identify(printfunc,filepath);
+      {
+        if(::identify(printfunc,filepath))
+          failed = true;
+      }
+
+    if(failed)
+      throw Error("identify failed");
   }
 }

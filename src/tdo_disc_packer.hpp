@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -16,3 +16,59 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#pragma once
+
+#include "error.hpp"
+#include "tdo_disc_label.hpp"
+#include "types_ints.h"
+
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace TDO
+{
+  enum class DiscManifestEntryKind
+  {
+    Normal,
+    DiscLabel,
+    ROMTags,
+    Signatures,
+  };
+
+  struct DiscManifestEntry
+  {
+    typedef std::unique_ptr<DiscManifestEntry> Ptr;
+
+    std::filesystem::path              src_path;
+    std::string                        name;
+    DiscManifestEntryKind              kind;
+    bool                               directory;
+    u32                                unique_identifier;
+    u32                                type;
+    u32                                flags;
+    u32                                block_size;
+    u32                                byte_count;
+    u32                                data_byte_count;
+    u32                                block_count;
+    u32                                burst;
+    u32                                gap;
+    u32                                start_block;
+    u32                                record_file_offset;
+    u32                                record_size;
+    std::vector<u32>                   avatar_list;
+    std::vector<DiscManifestEntry::Ptr> children;
+  };
+
+  struct DiscManifest
+  {
+    std::filesystem::path output;
+    TDO::DiscLabel        disc_label;
+    u32                   total_blocks;
+    bool                  replay_layout;
+    DiscManifestEntry     root;
+  };
+
+  Error pack_disc_image(const DiscManifest &manifest);
+}

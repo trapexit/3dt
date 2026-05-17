@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -62,14 +62,16 @@ TDO::DiscIdentifier::DiscIdentifier()
 }
 
 Error
-TDO::DiscIdentifier::identify(std::istream &is_)
+TDO::DiscIdentifier::identify(std::iostream &ios_)
 {
   try
     {
       Error err;
-      TDO::DevStream stream(is_);
+      TDO::DevStream stream(ios_);
 
-      stream.setup();
+      err = stream.setup();
+      if(err)
+        return err;
 
       stream.data_byte_seek(0);
       stream.read(label);

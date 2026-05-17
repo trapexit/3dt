@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -16,11 +16,9 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "fmt.hpp"
+#include "version.hpp"
 
-#define MAJOR 1
-#define MINOR 1
-#define PATCH 1
+#include "fmt.hpp"
 
 namespace Subcommand
 {
@@ -28,13 +26,16 @@ namespace Subcommand
   version()
   {
     fmt::print("3dt v{}.{}.{}\n\n"
-               "https://github.com/trapexit/3dt\n\n"
-               "ISC License (ISC)\n\n"
+               "https://github.com/trapexit/3dt\n"
+               "\n"
+               "ISC License (ISC)\n"
+               "\n"
                "Copyright 2022, Antonio SJ Musumeci <trapexit@spawn.link>\n\n"
                "Permission to use, copy, modify, and/or distribute this software for\n"
                "any purpose with or without fee is hereby granted, provided that the\n"
                "above copyright notice and this permission notice appear in all\n"
-               "copies.\n\n"
+               "copies.\n"
+               "\n"
                "THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL\n"
                "WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED\n"
                "WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE\n"
@@ -44,8 +45,8 @@ namespace Subcommand
                "TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n"
                "PERFORMANCE OF THIS SOFTWARE.\n\n"
                ,
-               MAJOR,
-               MINOR,
-               PATCH);
+               VERSION_MAJOR,
+               VERSION_MINOR,
+               VERSION_PATCH);
   }
 }

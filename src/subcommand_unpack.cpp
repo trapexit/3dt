@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -17,18 +17,140 @@
 */
 
 #include "fmt.hpp"
+#include "json.hpp"
 #include "log.hpp"
 #include "options.hpp"
 #include "tdo_disc_unpacker.hpp"
 
 #include "CSVWriter.h"
 
+#include <array>
+#include <cstring>
 #include <fstream>
+#include <sstream>
+#include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 
 namespace
 {
+  using json = nlohmann::json;
+
+  static constexpr const char *DEFAULT_LAYOUT_FILENAME = "layout.json";
+
+  static
+  std::string
+  array_string(const std::array<char,32> &arr_)
+  {
+    const char *begin;
+    const char *end;
+
+    begin = &arr_[0];
+    end = static_cast<const char*>(memchr(begin,'\0',arr_.size()));
+    if(end == nullptr)
+      end = begin + arr_.size();
+
+    return std::string(begin,end);
+  }
+
+  static
+  std::string
+  bytes_hex(const char *data_,
+            const u64   size_)
+  {
+    std::string rv;
+
+    rv.reserve(size_ * 2);
+    for(u64 i = 0; i < size_; i++)
+      rv += fmt::format("{:02X}",static_cast<unsigned char>(data_[i]));
+
+    return rv;
+  }
+
+  static
+  std::string
+  fixed_string(const char *data_,
+               const u64   size_)
+  {
+    const char *end;
+
+    end = static_cast<const char*>(memchr(data_,'\0',size_));
+    if(end == nullptr)
+      end = data_ + size_;
+
+    return std::string(data_,end);
+  }
+
+  static
+  json
+  avatar_list_json(const std::vector<u32> &avatar_list_)
+  {
+    json avatars = json::array();
+
+    for(auto avatar : avatar_list_)
+      avatars.emplace_back(avatar);
+
+    return avatars;
+  }
+
+  static
+  json
+  disc_label_json(const TDO::DiscLabel &label_)
+  {
+    json sync = json::array();
+    json root_avatars = json::array();
+
+    for(auto c : label_.volume_sync_bytes)
+      sync.emplace_back(static_cast<u8>(c));
+    for(u32 i = 0; i <= label_.root_directory_last_avatar_index; i++)
+      root_avatars.emplace_back(label_.root_directory_avatar_list[i]);
+
+    return {
+      {"record_type",static_cast<u8>(label_.record_type)},
+      {"volume_sync_bytes",sync},
+      {"volume_structure_version",static_cast<u8>(label_.volume_structure_version)},
+      {"volume_flags",static_cast<u8>(label_.volume_flags)},
+      {"volume_commentary",array_string(label_.volume_commentary)},
+      {"volume_identifier",array_string(label_.volume_identifier)},
+      {"volume_unique_identifier",label_.volume_unique_identifier},
+      {"volume_block_size",label_.volume_block_size},
+      {"volume_block_count",label_.volume_block_count},
+      {"root_unique_identifier",label_.root_unique_identifier},
+      {"root_directory_block_count",label_.root_directory_block_count},
+      {"root_directory_block_size",label_.root_directory_block_size},
+      {"root_directory_last_avatar_index",label_.root_directory_last_avatar_index},
+      {"root_directory_avatar_list",root_avatars}
+    };
+  }
+
+  static
+  json
+  romtags_json(TDO::DevStream &stream_)
+  {
+    json tags = json::array();
+
+    for(const auto &tag : stream_.romtags())
+      {
+        tags.push_back({
+          {"sub_systype",tag.sub_systype},
+          {"type",tag.type},
+          {"type_name",tag.type_str()},
+          {"version",tag.version},
+          {"revision",tag.revision},
+          {"flags",tag.flags},
+          {"type_specific",tag.type_specific},
+          {"reserved1",tag.reserved1},
+          {"reserved2",tag.reserved2},
+          {"offset",tag.offset},
+          {"size",tag.size},
+          {"reserved3",{tag.reserved3[0],tag.reserved3[1],tag.reserved3[2],tag.reserved3[3]}}
+        });
+      }
+
+    return tags;
+  }
+
   struct CSVPrinter final : public TDO::DiscUnpacker::Callback
   {
     void
@@ -79,7 +201,7 @@ namespace
       dir_char      = (record_.is_directory() ? 'd' : '-');
       readonly_char = (record_.is_readonly() ? 'r' : '-');
       for_fs_char   = (record_.is_for_fs() ? 'f' : '-');
-      avatar = (stream_.data_offset() + (record_.avatar_list[0] * stream_.device_block_size()));
+      avatar = (stream_.data_start_offset() + (record_.avatar_list[0] * stream_.device_block_size()));
       fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
                  dir_char,
                  readonly_char,
@@ -101,6 +223,107 @@ namespace
     }
   };
 
+  struct LayoutWriter final : public TDO::DiscUnpacker::Callback
+  {
+    LayoutWriter(TDO::DiscUnpacker::Callback::Ptr printer_,
+                 std::ostream                    &os_)
+      : _printer(std::move(printer_)),
+        _os(os_),
+        _initialized(false)
+    {
+    }
+
+    void
+    init(TDO::DevStream &stream_)
+    {
+      if(_initialized)
+        return;
+
+      _initialized = true;
+      _manifest = {
+        {"format","3dt-operafs-layout"},
+        {"version",1},
+        {"image",{
+          {"container",stream_.device_block_header() == 0 ? "iso2048" : "mode1_2352"},
+          {"file_size",stream_.size_in_bytes()},
+          {"data_start_offset",stream_.data_start_offset()},
+          {"device_block_size",stream_.device_block_size()},
+          {"device_block_header",stream_.device_block_header()},
+          {"device_block_data_size",stream_.device_block_data_size()},
+          {"device_block_footer",stream_.device_block_footer()},
+          {"disc_label_block",stream_.disc_label_block()},
+          {"romtags_block",stream_.romtags_block()}
+        }},
+        {"disc_label",disc_label_json(stream_.disc_label())},
+        {"rom_tags",romtags_json(stream_)},
+        {"entries",json::array()}
+      };
+    }
+
+    void
+    directory(const fs::path              &path_,
+              const TDO::DirectoryHeader &header_,
+              const uint32_t              header_pos_,
+              TDO::DevStream             &stream_)
+    {
+      (void)path_;
+      (void)header_;
+      (void)header_pos_;
+      init(stream_);
+    }
+
+    void
+    before(const fs::path             &path_,
+           const TDO::DirectoryRecord &record_,
+           const uint32_t              record_pos_,
+           TDO::DevStream             &stream_)
+    {
+      init(stream_);
+      _printer->before(path_,record_,record_pos_,stream_);
+      _manifest["entries"].push_back({
+        {"path",path_.generic_string()},
+        {"kind",record_.is_directory() ? "directory" : "file"},
+        {"record_file_offset",record_pos_},
+        {"record_data_offset",stream_.data_byte_tell(record_pos_)},
+        {"record_size",68 + (record_.avatar_list.size() * sizeof(u32))},
+        {"flags",record_.flags},
+        {"unique_identifier",record_.unique_identifier},
+        {"type",record_.type},
+        {"block_size",record_.block_size},
+        {"byte_count",record_.byte_count},
+        {"block_count",record_.block_count},
+        {"burst",record_.burst},
+        {"gap",record_.gap},
+        {"filename",fixed_string(record_.filename,sizeof(record_.filename))},
+        {"filename_raw_hex",bytes_hex(record_.filename,sizeof(record_.filename))},
+        {"last_avatar_index",record_.last_avatar_index},
+        {"avatar_list",avatar_list_json(record_.avatar_list)},
+        {"start_block",record_.avatar_list.empty() ? 0 : record_.avatar_list[0]}
+      });
+    }
+
+    void
+    after(const fs::path             &path_,
+          const TDO::DirectoryRecord &record_,
+          const int                   err_)
+    {
+      _printer->after(path_,record_,err_);
+    }
+
+    void
+    end()
+    {
+      _os << _manifest.dump(2) << '\n';
+      _printer->end();
+    }
+
+  private:
+    TDO::DiscUnpacker::Callback::Ptr _printer;
+    std::ostream                    &_os;
+    json                             _manifest;
+    bool                             _initialized;
+  };
+
   TDO::DiscUnpacker::Callback::Ptr
   get_printer(const std::string &format_)
   {
@@ -108,6 +331,17 @@ namespace
       return std::make_unique<CSVPrinter>();
 
     return std::make_unique<HumanPrinter>();
+  }
+
+  static
+  fs::path
+  layout_path_for(const Options::Unpack &options_,
+                  const fs::path        &dstpath_)
+  {
+    if(!options_.layout.empty())
+      return options_.layout;
+
+    return (dstpath_ / DEFAULT_LAYOUT_FILENAME);
   }
 }
 
@@ -117,30 +351,60 @@ namespace Subcommand
   unpack(const Options::Unpack &options_)
   {
     Error err;
+    bool failed;
     fs::path dstpath;
-    std::ifstream ifs;
-    TDO::DiscUnpacker::Ptr unpacker;
-    TDO::DiscUnpacker::Callback::Ptr printer;
+    std::fstream fs;
 
-    printer  = get_printer(options_.format);
-    unpacker = std::make_unique<TDO::DiscUnpacker>(ifs,*printer);
+    if(!options_.layout.empty() && (options_.filepaths.size() != 1))
+      {
+        Log::error({"--layout requires exactly one input image"});
+        throw Error("unpack failed");
+      }
 
+    failed = false;
     for(auto &srcpath : options_.filepaths)
       {
-        ifs.open(srcpath,std::ios::binary);
-        if(ifs.bad())
+        fs::path layout_path;
+        std::ofstream layout_os;
+        TDO::DiscUnpacker::Ptr unpacker;
+        TDO::DiscUnpacker::Callback::Ptr printer;
+
+        fs.open(srcpath,fs.binary|fs.in);
+        if(fs.bad())
           {
             Log::error_stream_open(srcpath);
+            failed = true;
             continue;
           }
 
         dstpath = options_.output / (srcpath.filename().concat(".unpacked"));
+        fs::create_directories(dstpath);
+
+        layout_path = layout_path_for(options_,dstpath);
+        layout_os.open(layout_path,std::ios::trunc);
+        if(!layout_os)
+          {
+            Log::error({"failed to open layout output file: " + layout_path.string()});
+            fs.close();
+            failed = true;
+            continue;
+          }
+
+        printer = get_printer(options_.format);
+        printer = std::make_unique<LayoutWriter>(std::move(printer),layout_os);
+        unpacker = std::make_unique<TDO::DiscUnpacker>(fs,*printer);
 
         err = unpacker->unpack(dstpath);
         if(err)
-          Log::error(err);
+          {
+            Log::error(err);
+            failed = true;
+          }
 
-        ifs.close();
+        fs.close();
       }
+
+    if(failed)
+      throw Error("unpack failed");
   }
 }

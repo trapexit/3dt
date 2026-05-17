@@ -1,7 +1,7 @@
 /*
   ISC License
 
-  Copyright (c) 2021, Antonio SJ Musumeci <trapexit@spawn.link>
+  Copyright (c) 2025, Antonio SJ Musumeci <trapexit@spawn.link>
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +21,7 @@
 namespace TDO
 {
   FileStream::FileStream()
-    : DevStream(_ifs)
+    : DevStream(_fs)
   {
 
   }
@@ -32,23 +32,20 @@ namespace TDO
   }
 
   Error
-  FileStream::open(const std::filesystem::path &filepath_)
+  FileStream::open(const std::filesystem::path &filepath_,
+                   const std::ios::openmode     mode_)
   {
+    Error err;
+
     close();
 
-    _ifs.open(filepath_,std::ios::binary);
-    if(!_ifs.good())
-      return {};
-
-    try
-      {
-        setup();
-      }
-    catch(const Error &err)
-      {
-        close();
-        return err;
-      }
+    _fs.open(filepath_,std::ios::binary|mode_);
+    if(!_fs)
+      return "failed to open";
+    
+    err = setup();
+    if(err)
+      return err;
 
     _filepath = filepath_;
 
@@ -62,16 +59,16 @@ namespace TDO
     return _filepath;
   }
 
-  std::istream&
-  FileStream::istream()
+  std::iostream&
+  FileStream::iostream()
   {
-    return _ifs;
+    return _fs;
   }
 
   void
   FileStream::close()
   {
-    if(_ifs.is_open())
-      _ifs.close();
+    if(_fs.is_open())
+      _fs.close();
   }
 }
