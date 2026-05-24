@@ -898,32 +898,16 @@ TDO::DevStream::read(TDO::DiscLabel &dl_)
   if(tmp.root_directory_last_avatar_index > ROOT_HIGHEST_AVATAR)
     _throw("invalid OperaFS disc label: root directory avatar index exceeds maximum");
 
-  // Bound volume_block_count against the raw file size. Consumers
-  // (signer, verifier) multiply this by BLOCK_SIZE / LOG_BLOCK_SIZE
-  // to derive digest counts and signature-file sizes, so an
-  // unbounded value produces astronomical work and out-of-image
-  // reads. We compare against raw size_in_bytes() rather than the
-  // device block count because geometry may not yet be initialized
-  // when this runs during setup(); the resulting bound is loose
-  // but correct (data bytes are always <= raw bytes).
-  //
-  // size_in_bytes() returns s64 and may be -1 when tellg() fails
-  // (or when the stream geometry is not yet known); casting -1 to
-  // u64 yields 0xFFFF... and silently disables the bound. Inspect
-  // the signed value first and skip the check only when size is
-  // genuinely unavailable.
+  // Reject only overflow here. Some otherwise-readable images declare
+  // a volume_block_count slightly larger than the file. Read-only
+  // commands can still inspect those images as long as referenced data
+  // is present; write/sign paths perform stricter size validation where
+  // it is required.
   {
     const u64 vbc = tmp.volume_block_count;
     const u64 vbs = tmp.volume_block_size;
     if((vbs > 0) && (vbc > (std::numeric_limits<u64>::max() / vbs)))
       _throw("invalid OperaFS disc label: volume_block_count overflows volume_block_size math");
-    const s64 raw_bytes_signed = size_in_bytes();
-    if((raw_bytes_signed > 0) && (vbs > 0))
-      {
-        const u64 raw_bytes = static_cast<u64>(raw_bytes_signed);
-        if((vbc * vbs) > raw_bytes)
-          _throw("invalid OperaFS disc label: volume_block_count exceeds image size");
-      }
   }
 
   dl_ = tmp;
