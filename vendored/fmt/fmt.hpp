@@ -18,23 +18,20 @@
 
 #pragma once
 
-#include "options.hpp"
+#define FMT_HEADER_ONLY
+#include "fmt/core.h"
+#include "fmt/printf.h"
 
-namespace Subcmd
+#include <filesystem>
+
+template<>
+struct fmt::formatter<std::filesystem::path> : formatter<std::string>
 {
-  void version();
-  void info(const Options::Info &options);
-  void list(const Options::List &options);
-  void identify(const Options::Identify &options);
-  void unpack(const Options::Unpack &options);
-  void pack(const Options::Pack &options);
-  void repack(const Options::Repack &options);
-  void rename(const Options::Rename &options);
-  void to_iso(const Options::ToISO &options);
-  void romtags(const Options::ROMTags &options);
-  void verify(const Options::Verify &options);
-  void sign(const Options::Sign &options);
-  void sign_file(const Options::SignFile &);
-  void decrypt_file(const Options::DecFile &);
-  void encrypt_file(const Options::EncFile &);
-}
+  template <typename FormatContext>
+  auto
+  format(const std::filesystem::path &path_,
+         FormatContext               &ctx_) const
+  {
+    return formatter<std::string>::format(path_.string(),ctx_);
+  }
+};

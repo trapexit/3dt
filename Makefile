@@ -1,39 +1,62 @@
-COMPILER_PREFIX =
-PLATFORM = unix
-EXE = 3dt
+FILENAME := 3dt
+
+ifdef TARGET
+  EXE := $(FILENAME)_$(TARGET)
+else
+  EXE := $(FILENAME)
+endif
 
 JOBS := $(shell nproc)
+PUID := $(shell id -u)
+PGID := $(shell id -g)
 
 OUTPUT = build/$(EXE)
 
 .DEFAULT_GOAL := all
 
-CC    = $(COMPILER_PREFIX)-gcc
-CXX   = $(COMPILER_PREFIX)-g++
-STRIP = $(COMPILER_PREFIX)-strip
+CC    ?= gcc
+CXX   ?= g++
+STRIP ?= strip
 
 ifeq ($(NDEBUG),1)
-BUILD_MODE := release
-OPT := -Os -static
+OPT := -O3 -flto -static
+LDFLAGS += -Wl,--strip-all
 else
-BUILD_MODE := debug
-OPT := -O0 -ggdb
+OPT := -O0 -ggdb -ftrapv
 endif
 
 ifeq ($(SANITIZE),1)
-BUILD_MODE := $(BUILD_MODE)-sanitize
-OPT += -fsanitize=undefined
+OPT += -fsanitize=address,undefined
 endif
 
-CFLAGS = $(OPT) -Wall
-CXXFLAGS = $(OPT) -Wall -std=c++17
+VENDORED_DIRS := vendored/ $(wildcard vendored/*/)
+VENDORED_FLAGS := $(addprefix -I, $(VENDORED_DIRS))
+
+CFLAGS = $(OPT) -Wall -Wextra -Wpedantic -Wshadow -Wno-error=date-time $(VENDORED_FLAGS)
+CXXFLAGS = $(OPT) -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -std=c++17 $(VENDORED_FLAGS)
 CPPFLAGS ?= -MMD -MP
+VENDORED_CFLAGS = $(CFLAGS) \
+	-Wno-\#pragma-messages \
+	-Wno-date-time \
+	-Wno-ignored-qualifiers \
+	-Wno-invalid-utf8 \
+	-Wno-shift-negative-value \
+	-Wno-sign-compare \
+	-Wno-strict-prototypes \
+	-Wno-type-limits \
+	-Wno-unused-parameter
 
 SRCS_C   := $(wildcard src/*.c)
+VENDORED_C := $(wildcard vendored/*/*.c)
 SRCS_CXX := $(wildcard src/*.cpp)
 
-BUILDDIR = build/$(PLATFORM)/$(BUILD_MODE)
+ifdef TARGET
+  BUILDDIR = build/$(TARGET)
+else
+  BUILDDIR = build
+endif
 OBJS := $(SRCS_C:src/%.c=$(BUILDDIR)/%.c.o)
+OBJS += $(VENDORED_C:vendored/%.c=$(BUILDDIR)/vendored/%.c.o)
 OBJS += $(SRCS_CXX:src/%.cpp=$(BUILDDIR)/%.cpp.o)
 DEPS  = $(OBJS:.o=.d)
 
@@ -74,23 +97,58 @@ strip: $(OUTPUT)
 $(BUILDDIR)/%.c.o: src/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+$(BUILDDIR)/vendored/%.c.o: vendored/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(VENDORED_CFLAGS) -c $< -o $@
+
 $(BUILDDIR)/%.cpp.o: src/%.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -rfv build/
 
-distclean:
-	git clean -xfd
+distclean: clean
+	git clean -fdx
 
 builddir:
 	mkdir -p $(BUILDDIR)
 
-release:
-	$(MAKE) -f Makefile -j$(JOBS) NDEBUG=1 strip
-	$(MAKE) -f Makefile.win32 -j$(JOBS) strip
-	$(MAKE) -f Makefile.win64 -j$(JOBS) strip
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
 
-.PHONY: clean distclean builddir release
+install: $(OUTPUT)
+	install -Dm755 $(OUTPUT) $(DESTDIR)$(BINDIR)/$(EXE)
+
+release-base: clean
+	$(MAKE) NDEBUG=1 -j$(JOBS) \
+		CC="zig cc -target x86_64-linux-musl" \
+		CXX="zig c++ -target x86_64-linux-musl" \
+		STRIP="zig llvm-strip" \
+		TARGET="x86_64-linux-musl"
+	$(MAKE) NDEBUG=1 -j$(JOBS) \
+		CC="zig cc -target aarch64-linux-musl" \
+		CXX="zig c++ -target aarch64-linux-musl" \
+		STRIP="zig llvm-strip" \
+		TARGET="aarch64-linux-musl"
+	$(MAKE) NDEBUG=1 -j$(JOBS) \
+		CC="zig cc -target x86_64-windows-gnu" \
+		CXX="zig c++ -target x86_64-windows-gnu" \
+		STRIP="zig llvm-strip" \
+		TARGET="x86_64-windows-gnu.exe" OPT="-O3 -static"
+	$(MAKE) NDEBUG=1 -j$(JOBS) \
+		CC="zig cc -target aarch64-macos" \
+		CXX="zig c++ -target aarch64-macos" \
+		STRIP="zig llvm-strip" \
+		TARGET="aarch64-macos" OPT="-O3"
+
+release:
+	podman build -t localhost/cxxbuilder buildtools/
+	podman run --rm --userns=keep-id \
+		-e HOME=/tmp \
+		-e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache \
+		-e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache \
+		-v ${PWD}:/src:Z localhost/cxxbuilder "/src/buildtools/podman-make-release"
+
+.PHONY: all clean distclean builddir release release-base strip install
 
 -include $(DEPS)

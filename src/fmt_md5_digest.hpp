@@ -11,7 +11,7 @@ struct fmt::formatter<md5_digest_t> : formatter<std::string>
   template <typename FormatContext>
   auto
   format(const md5_digest_t  digest_,
-         FormatContext      &ctx_)
+         FormatContext      &ctx_) const
   {
     std::string s;
 

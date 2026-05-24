@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd /src
+make release-base

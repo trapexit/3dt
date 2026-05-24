@@ -459,8 +459,8 @@ generate_signfile_argparser(CLI::App          &app_,
 
 static
 void
-generate_decryptfile_argparser(CLI::App             &app_,
-                               Options::DecryptFile &opts_)
+generate_decryptfile_argparser(CLI::App         &app_,
+                               Options::DecFile &opts_)
 {
   CLI::App *subcmd;
 
@@ -479,8 +479,8 @@ generate_decryptfile_argparser(CLI::App             &app_,
 
 static
 void
-generate_encryptfile_argparser(CLI::App             &app_,
-                               Options::EncryptFile &opts_)
+generate_encryptfile_argparser(CLI::App         &app_,
+                               Options::EncFile &opts_)
 {
   CLI::App *subcmd;
 

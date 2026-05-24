@@ -34,6 +34,8 @@ namespace TDO
   public:
     struct Callbacks
     {
+      virtual ~Callbacks() = default;
+
       virtual void begin() {};
       virtual void end() {};
       virtual void operator()(const std::filesystem::path&,

@@ -77,7 +77,7 @@ _decrypt_file(std::fstream &fs_)
 }
 
 void
-Subcmd::decrypt_file(const Options::DecryptFile &opts_)
+Subcmd::decrypt_file(const Options::DecFile &opts_)
 {
   bool failed;
 

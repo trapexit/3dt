@@ -77,7 +77,7 @@ _encrypt_file(std::fstream &fs_)
 }
 
 void
-Subcmd::encrypt_file(const Options::EncryptFile &opts_)
+Subcmd::encrypt_file(const Options::EncFile &opts_)
 {
   bool failed;
 

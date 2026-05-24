@@ -80,8 +80,8 @@ static
 void
 default_printer(const std::string          &filepath_,
                 const TDO::DirectoryRecord &record_,
-                const uint32_t              record_pos_,
-                TDO::DevStream             &stream_)
+                const uint32_t,
+                TDO::DevStream&)
 {
   char dir_char;
   char readonly_char;

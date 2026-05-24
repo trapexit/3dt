@@ -51,10 +51,10 @@ public:
   }
 
   void
-  operator()(const std::filesystem::path &path_,
+  operator()(const std::filesystem::path&,
              const TDO::DirectoryRecord  &record_,
-             const uint32_t               record_pos_,
-             TDO::DevStream              &stream_)
+             const uint32_t,
+             TDO::DevStream&)
   {
     file_count++;
     total_data_size += record_.byte_count;

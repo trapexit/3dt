@@ -143,18 +143,18 @@ namespace TDO
                          const s64 pos_,
                          const s64 bytes_);
 
-    template<u64 N>
+    template<std::size_t N>
     void
     read(std::array<char,N> &arr_)
     {
       read(&arr_[0],arr_.size());
     }
 
-    template<u64 N>
+    template<std::size_t N>
     void
     read(std::array<u32,N> &arr_)
     {
-      for(u64 i = 0; i < arr_.size(); i++)
+      for(std::size_t i = 0; i < arr_.size(); i++)
         read(arr_[i]);
     }
 
@@ -179,18 +179,18 @@ namespace TDO
                           const s64                byte_pos,
                           const s64                bytes);
 
-    template<u64 N>
+    template<std::size_t N>
     void
     write(const std::array<char,N> &arr_)
     {
       write(&arr_[0],arr_.size());
     }
 
-    template<u64 N>
+    template<std::size_t N>
     void
     write(const std::array<u32,N> &arr_)
     {
-      for(u64 i = 0; i < arr_.size(); i++)
+      for(std::size_t i = 0; i < arr_.size(); i++)
         write(arr_[i]);
     }
 
@@ -208,7 +208,7 @@ namespace TDO
       std::string msg;
 
       msg = fmt::format(fmt_,std::forward<Args>(args_)...);
-      msg += fmt::format(" at offset {}",_ios.tellg());
+      msg += fmt::format(" at offset {}",static_cast<std::streamoff>(_ios.tellg()));
 
       throw Error(msg);
     }
