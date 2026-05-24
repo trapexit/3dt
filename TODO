@@ -1,6 +1,0 @@
-* dump romtag referenced stuff
-* pack image
-* sign image - WIP
-* decrypt file (boot_code) - DONE
-* ROM listing is broken
-* slayer.iso, starfighter.iso broken?? bin files broken?

@@ -47,7 +47,7 @@ help:
 	@echo "Targets:"
 	@echo "  all       (default) Build debug binary"
 	@echo "  clean     Remove build/ directory"
-	@echo "  distclean Remove all files not tracked by git"
+	@echo "  distclean Remove everything not in git"
 	@echo "  strip     Strip debug symbols from binary"
 	@echo "  release   Build stripped binaries for Unix, Win32, Win64"
 	@echo "  help      Show this help message"
