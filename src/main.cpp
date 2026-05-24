@@ -36,7 +36,10 @@ generate_version_argparser(CLI::App &app_)
 
   subcmd = app_.add_subcommand("version","print 3dt version");
 
-  subcmd->callback(std::bind(Subcmd::version));
+  subcmd->callback([]()
+                  {
+                    Subcmd::version();
+                  });
 }
 
 static
@@ -62,7 +65,10 @@ generate_list_argparser(CLI::App      &app_,
     ->take_last()
     ->check(CLI::IsMember({"default","file-offsets","block-offsets"}));
 
-  subcmd->callback(std::bind(Subcmd::list,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::list(options_);
+                  });
 }
 
 static
@@ -85,7 +91,10 @@ generate_info_argparser(CLI::App      &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv","cheader"}));
 
-  subcmd->callback(std::bind(Subcmd::info,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::info(options_);
+                  });
 }
 
 static
@@ -108,7 +117,10 @@ generate_identify_argparser(CLI::App          &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv"}));
 
-  subcmd->callback(std::bind(Subcmd::identify,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::identify(options_);
+                  });
 }
 
 static
@@ -142,7 +154,10 @@ generate_unpack_argparser(CLI::App        &app_,
     ->default_val("")
     ->take_last();
 
-  subcmd->callback(std::bind(Subcmd::unpack,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::unpack(options_);
+                  });
 }
 
 static
@@ -211,7 +226,10 @@ generate_pack_argparser(CLI::App      &app_,
   subcmd->add_flag("--sign",options_.sign)
     ->description("sign the image after packing");
 
-  subcmd->callback(std::bind(Subcmd::pack,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::pack(options_);
+                  });
 }
 
 static
@@ -252,7 +270,10 @@ generate_repack_argparser(CLI::App         &app_,
   subcmd->add_flag("--sign",options_.sign)
     ->description("sign the image after repacking");
 
-  subcmd->callback(std::bind(Subcmd::repack,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::repack(options_);
+                  });
 }
 
 static
@@ -271,7 +292,10 @@ generate_rename_argparser(CLI::App        &app_,
   subcmd->add_flag("-t,--take-first",options_.take_first)
     ->description("if there are multiple matches use the first one found");
 
-  subcmd->callback(std::bind(Subcmd::rename,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::rename(options_);
+                  });
 }
 
 static
@@ -292,7 +316,10 @@ generate_to_iso_argparser(CLI::App       &app_,
     ->type_name("PATH")
     ->check(CLI::NonexistentPath);
 
-  subcmd->callback(std::bind(Subcmd::to_iso,std::cref(options_)));
+  subcmd->callback([&options_]()
+                  {
+                    Subcmd::to_iso(options_);
+                  });
 }
 
 static
@@ -315,7 +342,10 @@ generate_romtags_argparser(CLI::App         &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv"}));
 
-  subcmd->callback(std::bind(Subcmd::romtags,std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::romtags(opts_);
+                  });
 }
 
 static
@@ -342,8 +372,10 @@ generate_verify_argparser(CLI::App        &app_,
   subcmd->add_flag("--quiet",opts_.quiet)
     ->description("print only per-image verification status");
 
-  subcmd->callback(std::bind(Subcmd::verify,
-                             std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::verify(opts_);
+                  });
 }
 
 static
@@ -384,8 +416,10 @@ generate_sign_argparser(CLI::App      &app_,
     ->default_val("true")
     ->take_last();
 
-  subcmd->callback(std::bind(Subcmd::sign,
-                             std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::sign(opts_);
+                  });
 }
 
 static
@@ -417,8 +451,10 @@ generate_signfile_argparser(CLI::App          &app_,
     ->default_val(TDO_KEY_APP)
     ->check(CLI::IsMember({TDO_KEY_APP,TDO_KEY_3DO}));
 
-  subcmd->callback(std::bind(Subcmd::sign_file,
-                             std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::sign_file(opts_);
+                  });
 }
 
 static
@@ -435,8 +471,10 @@ generate_decryptfile_argparser(CLI::App             &app_,
     ->check(CLI::ExistingFile)
     ->required();
 
-  subcmd->callback(std::bind(Subcmd::decrypt_file,
-                             std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::decrypt_file(opts_);
+                  });
 }
 
 static
@@ -453,8 +491,10 @@ generate_encryptfile_argparser(CLI::App             &app_,
     ->check(CLI::ExistingFile)
     ->required();
 
-  subcmd->callback(std::bind(Subcmd::encrypt_file,
-                             std::cref(opts_)));
+  subcmd->callback([&opts_]()
+                  {
+                    Subcmd::encrypt_file(opts_);
+                  });
 }
 
 static
