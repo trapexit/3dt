@@ -17,7 +17,7 @@
 */
 
 #include "md5.h"
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 
 #include "options.hpp"
 #include "tdo_dev_stream.hpp"
@@ -1063,7 +1063,7 @@ _print_summary(const std::string                              &format_,
 }
 
 void
-Subcommand::verify(const Options::Verify &opts_)
+Subcmd::verify(const Options::Verify &opts_)
 {
   ::_verify(opts_);
 }

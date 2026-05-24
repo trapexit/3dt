@@ -119,7 +119,7 @@ Applying the decryption routine twice does not generally return the original dat
 
 ### File Decryption Command
 
-The `decrypt-file` subcommand applies this algorithm to entire files:
+The `decrypt-file` subcmd applies this algorithm to entire files:
 This is primarily the CD-DIPIR boot payload path and is the CLI equivalent of
 `DecryptBlock()` in Portfolio OS `src/dipir/cdipir.c`.
 
@@ -151,7 +151,7 @@ Typical boot payload workflow when auditing a 3DO CD-DIPIR image:
 
 ### File Encryption Command
 
-The new `encrypt-file` subcommand is the inverse transform and is intended to
+The new `encrypt-file` subcmd is the inverse transform and is intended to
 return files to the obfuscated form after inspection or patching. In practice,
 this is primarily used for the boot-file path (`System/Kernel/boot_code`).
 

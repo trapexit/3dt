@@ -20,7 +20,7 @@
 #include "tdo_rsa.h"
 
 #include "error.hpp"
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 
 #include "options.hpp"
 
@@ -167,7 +167,7 @@ namespace
 }
 
 void
-Subcommand::sign_file(const Options::SignFile &opts_)
+Subcmd::sign_file(const Options::SignFile &opts_)
 {
   bool failed;
 

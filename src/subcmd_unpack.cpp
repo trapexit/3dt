@@ -111,7 +111,7 @@ namespace
     // once unsigned i wrapped past UINT_MAX, with each iteration
     // emplace_back'ing an OOB value into the JSON manifest until
     // allocation failed). Mirrors the protective shape applied to
-    // subcommand_info.cpp's equivalent loop. Cast through u64 so the
+    // subcmd_info.cpp's equivalent loop. Cast through u64 so the
     // `+ 1` cannot itself wrap when last_idx is UINT32_MAX.
     const auto avatar_capacity = label_.root_directory_avatar_list.size();
     const u32  last_idx        = label_.root_directory_last_avatar_index;
@@ -396,7 +396,7 @@ namespace
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   unpack(const Options::Unpack &options_)

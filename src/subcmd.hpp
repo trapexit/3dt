@@ -20,7 +20,7 @@
 
 #include "options.hpp"
 
-namespace Subcommand
+namespace Subcmd
 {
   void version();
   void info(const Options::Info &options);

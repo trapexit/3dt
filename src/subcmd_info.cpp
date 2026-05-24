@@ -232,7 +232,7 @@ namespace
 
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   info(const Options::Info &options_)

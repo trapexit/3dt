@@ -33,7 +33,7 @@ temp_path_for(const std::filesystem::path &path_)
   // attacker who can pre-populate the slots. Mix in two random_device
   // samples per attempt so the candidate names are not enumerable
   // from the input filename alone. Matches the style used in
-  // create_temp_dir() in subcommand_repack.cpp (commit 9d8659c).
+  // create_temp_dir() in subcmd_repack.cpp (commit 9d8659c).
   std::random_device rd;
   for(std::uint32_t i = 0; i < 1000; i++)
     {
