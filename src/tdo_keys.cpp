@@ -16,8 +16,6 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#define HAVE_C99INCLUDES
-
 #include "bigd.h"
 #include "md5.h"
 

@@ -26,14 +26,14 @@ extern const tdoid_t *TDOID_LIST_END;
 
 const
 tdoid_t*
-tdo_disc_ids_start()
+tdo_disc_ids_start(void)
 {
   return &TDOID_LIST[0];
 }
 
 const
 tdoid_t*
-tdo_disc_ids_end()
+tdo_disc_ids_end(void)
 {
   return TDOID_LIST_END;
 }

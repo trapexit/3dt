@@ -333,9 +333,6 @@ namespace
       throw Error("reserved filename is not supported: " + name_);
     for(char c : name_)
       {
-        const unsigned char uc = static_cast<unsigned char>(c);
-        if(uc < 0x20 || uc == 0x7f)
-          throw Error("filename contains control character: " + printable_filename(name_));
         if(c == '/' || c == '\\')
           throw Error("filename contains path separator: " + printable_filename(name_));
       }

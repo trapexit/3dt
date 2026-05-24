@@ -11,7 +11,7 @@ struct fmt::formatter<rsa512_sig_t> : formatter<std::string>
   template <typename FormatContext>
   auto
   format(const rsa512_sig_t  sig_,
-         FormatContext      &ctx_)
+         FormatContext      &ctx_) const
   {
     std::string s;
 

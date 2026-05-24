@@ -78,7 +78,7 @@ crc32b_continue(const char     *buf_,
                 const uint32_t  len_,
                 const uint32_t  crc_)
 {
-  int i;
+  uint32_t i;
   uint32_t crc;
 
   crc = crc_;

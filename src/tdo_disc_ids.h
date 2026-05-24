@@ -39,8 +39,8 @@ struct tdoid_t
   uint32_t    total_data_size;
 };
 
-const tdoid_t* tdo_disc_ids_start();
-const tdoid_t* tdo_disc_ids_end();
+const tdoid_t* tdo_disc_ids_start(void);
+const tdoid_t* tdo_disc_ids_end(void);
 const tdoid_t* tdo_disc_ids_find_by_vui(const uint32_t  vui,
                                         const tdoid_t  *prev);
 const tdoid_t* tdo_disc_ids_find_by_rui(const uint32_t  rui,

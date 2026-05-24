@@ -41,17 +41,17 @@ namespace TDO
 
       virtual void begin() {};
       virtual void end() {};
-      virtual void before(const std::filesystem::path &path,
-                          const TDO::DirectoryRecord  &record,
-                          const uint32_t               record_pos,
-                          TDO::DevStream              &stream) {};
-      virtual void after(const std::filesystem::path &path,
-                         const TDO::DirectoryRecord  &record,
-                         const int                    err) {};
-      virtual void directory(const std::filesystem::path &path,
-                             const TDO::DirectoryHeader &header,
-                             const uint32_t              header_pos,
-                             TDO::DevStream             &stream) {};
+      virtual void before(const std::filesystem::path&,
+                          const TDO::DirectoryRecord&,
+                          const uint32_t,
+                          TDO::DevStream&) {};
+      virtual void after(const std::filesystem::path&,
+                         const TDO::DirectoryRecord&,
+                         const int) {};
+      virtual void directory(const std::filesystem::path&,
+                             const TDO::DirectoryHeader&,
+                             const uint32_t,
+                             TDO::DevStream&) {};
     };
 
   public:

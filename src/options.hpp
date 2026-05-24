@@ -135,28 +135,30 @@ public:
     bool        write = false;
   };
 
-  struct DecryptFile
+  // DecryptFile is a Windows macro (::sigh::)
+  struct DecFile
   {
     PathVec     filepaths;
   };
 
-  struct EncryptFile
+  // EncryptFile is a Windows macro (::sigh::)
+  struct EncFile
   {
     PathVec     filepaths;
   };
 
-  List     list     = {};
-  Info     info     = {};
-  Identify identify = {};
-  Unpack   unpack   = {};
-  Pack     pack     = {};
-  Repack   repack   = {};
-  Rename   rename   = {};
-  ToISO    to_iso   = {};
-  ROMTags  romtags  = {};
-  Verify   verify   = {};
-  Sign     sign     = {};
-  SignFile signfile = {};
-  DecryptFile decryptfile = {};
-  EncryptFile encryptfile = {};
+  List     list        = {};
+  Info     info        = {};
+  Identify identify    = {};
+  Unpack   unpack      = {};
+  Pack     pack        = {};
+  Repack   repack      = {};
+  Rename   rename      = {};
+  ToISO    to_iso      = {};
+  ROMTags  romtags     = {};
+  Verify   verify      = {};
+  Sign     sign        = {};
+  SignFile signfile    = {};
+  DecFile  decryptfile = {};
+  EncFile  encryptfile = {};
 };

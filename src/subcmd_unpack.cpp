@@ -179,8 +179,8 @@ namespace
     void
     before(const fs::path             &path_,
            const TDO::DirectoryRecord &record_,
-           const uint32_t              record_pos_,
-           TDO::DevStream             &stream_)
+           const uint32_t,
+           TDO::DevStream&)
     {
       CSVWriter csv(",");
 
@@ -195,9 +195,9 @@ namespace
     }
 
     void
-    after(const fs::path             &path_,
-          const TDO::DirectoryRecord &record_,
-          const int                   err_)
+    after(const fs::path&,
+          const TDO::DirectoryRecord&,
+          const int)
     {
 
     }
@@ -255,9 +255,9 @@ namespace
     }
 
     void
-    after(const fs::path             &filepath_,
-          const TDO::DirectoryRecord &record_,
-          const int                   err_)
+    after(const fs::path&,
+          const TDO::DirectoryRecord&,
+          const int)
     {
 
     }
