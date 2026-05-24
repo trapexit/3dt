@@ -73,9 +73,9 @@ The `3dt` command-line tool provides:
 3dt list <disc.iso>              # List disc contents
 3dt info <disc.iso>              # Display disc information
 3dt identify <disc.iso>          # Identify disc by database
-3dt unpack <disc.iso> <dir>      # Extract disc contents
-3dt pack <dir> <disc.iso>        # Build disc image from directory
-3dt rename <disc.iso> <name>     # Rename disc volume
+3dt unpack <disc.iso> -o <dir>   # Extract disc contents
+3dt pack <dir> -o <disc.iso>     # Build disc image from directory
+3dt rename <disc.iso>            # Rename disc image as identified
 3dt romtags <disc.iso>           # Display ROM tags
 3dt verify <disc.iso>            # Verify RSA signatures
 3dt sign <disc.iso>              # Sign disc image
