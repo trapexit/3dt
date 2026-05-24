@@ -206,7 +206,7 @@ namespace
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   identify(const Options::Identify &options_)

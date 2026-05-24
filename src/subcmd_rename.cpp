@@ -97,7 +97,7 @@ namespace l
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   rename(const Options::Rename &options_)

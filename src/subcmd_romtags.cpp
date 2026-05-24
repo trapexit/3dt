@@ -16,7 +16,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 
 #include "options.hpp"
 #include "tdo_romtag.hpp"
@@ -107,7 +107,7 @@ romtags_human(const std::filesystem::path &filepath_,
 }
 
 void
-Subcommand::romtags(const Options::ROMTags &opts_)
+Subcmd::romtags(const Options::ROMTags &opts_)
 {
   bool failed;
   bool printed_header = false;

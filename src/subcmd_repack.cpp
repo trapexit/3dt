@@ -16,7 +16,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 #include "temp_path.hpp"
 #include "tdo_disc_unpacker.hpp"
 #include "tdo_file_stream.hpp"
@@ -121,7 +121,7 @@ namespace
         pack_opts.root_unique_identifier = disc_label.root_unique_identifier;
         pack_opts.root_unique_identifier_set = true;
 
-        Subcommand::pack(pack_opts);
+        Subcmd::pack(pack_opts);
       }
     catch(...)
       {
@@ -141,7 +141,7 @@ namespace
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   repack(const Options::Repack &opts_)

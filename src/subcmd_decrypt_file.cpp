@@ -16,7 +16,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 
 #include "error.hpp"
 #include "options.hpp"
@@ -30,23 +30,23 @@
 
 static
 void
-_encrypt_file(std::fstream &fs_)
+_decrypt_file(std::fstream &fs_)
 {
-  // Mirrors Portfolio OS CD-DIPIR inverse transform for boot payloads in
+  // Mirrors Portfolio OS CD-DIPIR boot-file deobfuscation in
   // `portfolio_os/src/dipir/cdipir.c` (DecryptBlock()).
   std::vector<char> data;
 
   fs_.seekg(0,std::ios::end);
   if(fs_.fail())
-    throw Error("encrypt-file: failed to seek to end of file");
+    throw Error("decrypt-file: failed to seek to end of file");
 
   const std::streampos end_pos = fs_.tellg();
   if(end_pos == std::streampos(-1))
-    throw Error("encrypt-file: failed to read file size");
+    throw Error("decrypt-file: failed to read file size");
 
   fs_.seekg(0,std::ios::beg);
   if(fs_.fail())
-    throw Error("encrypt-file: failed to seek to start of file");
+    throw Error("decrypt-file: failed to seek to start of file");
 
   // OperaFS targets a 32-bit platform; any input file must fit in u32
   // bytes. Route through checked_narrow_s64_to_u32 so an oversized
@@ -55,29 +55,29 @@ _encrypt_file(std::fstream &fs_)
   // bad_alloc from data.resize(SIZE_MAX) or a silent wrap downstream.
   const s64 filesize_signed = static_cast<s64>(end_pos);
   if(filesize_signed < 0)
-    throw Error("encrypt-file: negative file size");
+    throw Error("decrypt-file: negative file size");
   const u32 filesize =
-    TDO::checked_narrow_s64_to_u32(filesize_signed,"encrypt-file file size");
+    TDO::checked_narrow_s64_to_u32(filesize_signed,"decrypt-file file size");
 
   data.resize(filesize);
 
   fs_.read(data.data(),static_cast<std::streamsize>(filesize));
   if(fs_.fail() && !fs_.eof())
-    throw Error("encrypt-file: failed to read file contents");
+    throw Error("decrypt-file: failed to read file contents");
 
-  TDO::encrypt_boot_code_range(data.data(),
+  TDO::decrypt_boot_code_range(data.data(),
                                TDO::boot_code_crypto_aligned_size(data.size()));
 
   fs_.seekp(0,std::ios::beg);
   if(fs_.fail())
-    throw Error("encrypt-file: failed to seek for write");
+    throw Error("decrypt-file: failed to seek for write");
   fs_.write(data.data(),static_cast<std::streamsize>(filesize));
   if(fs_.fail())
-    throw Error("encrypt-file: failed to write file contents");
+    throw Error("decrypt-file: failed to write file contents");
 }
 
 void
-Subcommand::encrypt_file(const Options::EncryptFile &opts_)
+Subcmd::decrypt_file(const Options::DecryptFile &opts_)
 {
   bool failed;
 
@@ -94,11 +94,11 @@ Subcommand::encrypt_file(const Options::EncryptFile &opts_)
           continue;
         }
 
-      _encrypt_file(fs);
+      ::_decrypt_file(fs);
 
       fs.close();
     }
 
   if(failed)
-    throw Error("encrypt-file failed");
+    throw Error("decrypt-file failed");
 }

@@ -20,7 +20,7 @@
 #include "fmt.hpp"
 #include "json.hpp"
 #include "options.hpp"
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 #include "temp_path.hpp"
 #include "tdo_directory_record.hpp"
 #include "tdo_disc_format.hpp"
@@ -1642,7 +1642,7 @@ namespace
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   pack(const Options::Pack &options_)
@@ -1728,7 +1728,7 @@ namespace Subcommand
 
             fmt::print("{}:\n  - Verifying signed image\n",temp_output_path);
             verify_opts.filepaths.emplace_back(temp_output_path);
-            Subcommand::verify(verify_opts);
+            Subcmd::verify(verify_opts);
           }
         else
           {

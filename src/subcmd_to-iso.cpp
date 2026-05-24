@@ -45,7 +45,7 @@ get_output_path(const Options::ToISO &options_)
     }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   to_iso(const Options::ToISO &options_)

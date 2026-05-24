@@ -130,9 +130,9 @@ file_offset_printer(const std::string          &filepath_,
     {
       // OperaFS targets a 32-bit platform; the avatar's file offset
       // must fit in u32. Compute in s64 so we can detect overflow.
-      // The list subcommand surfaces what's in the image, including
+      // The list subcmd surfaces what's in the image, including
       // malformed entries: catch the helper's throw so one bad row
-      // does not abort the whole listing (Subcommand::list has no
+      // does not abort the whole listing (Subcmd::list has no
       // try/catch around walker.walk()), warn to stderr, and display
       // 0 in place of the unrepresentable offset.
       const s64 file_offset =
@@ -299,7 +299,7 @@ public:
 };
 
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   list(const Options::List &opts_)

@@ -16,7 +16,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 #include "tdo_disc_signer.hpp"
 
 #include "fmt.hpp"
@@ -40,7 +40,7 @@ namespace
     Options::Verify verify_opts{};
 
     verify_opts.filepaths.emplace_back(path_);
-    Subcommand::verify(verify_opts);
+    Subcmd::verify(verify_opts);
   }
 
 
@@ -85,7 +85,7 @@ namespace
   }
 }
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   sign(const Options::Sign &opts_)

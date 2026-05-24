@@ -18,7 +18,7 @@
 
 #include "error.hpp"
 #include "log.hpp"
-#include "subcommand.hpp"
+#include "subcmd.hpp"
 #include "tdo_rsa.h"
 
 #include "CLI11.hpp"
@@ -36,7 +36,7 @@ generate_version_argparser(CLI::App &app_)
 
   subcmd = app_.add_subcommand("version","print 3dt version");
 
-  subcmd->callback(std::bind(Subcommand::version));
+  subcmd->callback(std::bind(Subcmd::version));
 }
 
 static
@@ -62,7 +62,7 @@ generate_list_argparser(CLI::App      &app_,
     ->take_last()
     ->check(CLI::IsMember({"default","file-offsets","block-offsets"}));
 
-  subcmd->callback(std::bind(Subcommand::list,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::list,std::cref(options_)));
 }
 
 static
@@ -85,7 +85,7 @@ generate_info_argparser(CLI::App      &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv","cheader"}));
 
-  subcmd->callback(std::bind(Subcommand::info,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::info,std::cref(options_)));
 }
 
 static
@@ -108,7 +108,7 @@ generate_identify_argparser(CLI::App          &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv"}));
 
-  subcmd->callback(std::bind(Subcommand::identify,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::identify,std::cref(options_)));
 }
 
 static
@@ -142,7 +142,7 @@ generate_unpack_argparser(CLI::App        &app_,
     ->default_val("")
     ->take_last();
 
-  subcmd->callback(std::bind(Subcommand::unpack,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::unpack,std::cref(options_)));
 }
 
 static
@@ -211,7 +211,7 @@ generate_pack_argparser(CLI::App      &app_,
   subcmd->add_flag("--sign",options_.sign)
     ->description("sign the image after packing");
 
-  subcmd->callback(std::bind(Subcommand::pack,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::pack,std::cref(options_)));
 }
 
 static
@@ -252,7 +252,7 @@ generate_repack_argparser(CLI::App         &app_,
   subcmd->add_flag("--sign",options_.sign)
     ->description("sign the image after repacking");
 
-  subcmd->callback(std::bind(Subcommand::repack,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::repack,std::cref(options_)));
 }
 
 static
@@ -271,7 +271,7 @@ generate_rename_argparser(CLI::App        &app_,
   subcmd->add_flag("-t,--take-first",options_.take_first)
     ->description("if there are multiple matches use the first one found");
 
-  subcmd->callback(std::bind(Subcommand::rename,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::rename,std::cref(options_)));
 }
 
 static
@@ -292,7 +292,7 @@ generate_to_iso_argparser(CLI::App       &app_,
     ->type_name("PATH")
     ->check(CLI::NonexistentPath);
 
-  subcmd->callback(std::bind(Subcommand::to_iso,std::cref(options_)));
+  subcmd->callback(std::bind(Subcmd::to_iso,std::cref(options_)));
 }
 
 static
@@ -315,7 +315,7 @@ generate_romtags_argparser(CLI::App         &app_,
     ->take_last()
     ->check(CLI::IsMember({"human","csv"}));
 
-  subcmd->callback(std::bind(Subcommand::romtags,std::cref(opts_)));
+  subcmd->callback(std::bind(Subcmd::romtags,std::cref(opts_)));
 }
 
 static
@@ -342,7 +342,7 @@ generate_verify_argparser(CLI::App        &app_,
   subcmd->add_flag("--quiet",opts_.quiet)
     ->description("print only per-image verification status");
 
-  subcmd->callback(std::bind(Subcommand::verify,
+  subcmd->callback(std::bind(Subcmd::verify,
                              std::cref(opts_)));
 }
 
@@ -384,7 +384,7 @@ generate_sign_argparser(CLI::App      &app_,
     ->default_val("true")
     ->take_last();
 
-  subcmd->callback(std::bind(Subcommand::sign,
+  subcmd->callback(std::bind(Subcmd::sign,
                              std::cref(opts_)));
 }
 
@@ -417,7 +417,7 @@ generate_signfile_argparser(CLI::App          &app_,
     ->default_val(TDO_KEY_APP)
     ->check(CLI::IsMember({TDO_KEY_APP,TDO_KEY_3DO}));
 
-  subcmd->callback(std::bind(Subcommand::sign_file,
+  subcmd->callback(std::bind(Subcmd::sign_file,
                              std::cref(opts_)));
 }
 
@@ -435,7 +435,7 @@ generate_decryptfile_argparser(CLI::App             &app_,
     ->check(CLI::ExistingFile)
     ->required();
 
-  subcmd->callback(std::bind(Subcommand::decrypt_file,
+  subcmd->callback(std::bind(Subcmd::decrypt_file,
                              std::cref(opts_)));
 }
 
@@ -453,7 +453,7 @@ generate_encryptfile_argparser(CLI::App             &app_,
     ->check(CLI::ExistingFile)
     ->required();
 
-  subcmd->callback(std::bind(Subcommand::encrypt_file,
+  subcmd->callback(std::bind(Subcmd::encrypt_file,
                              std::cref(opts_)));
 }
 

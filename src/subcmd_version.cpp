@@ -20,7 +20,7 @@
 
 #include "fmt.hpp"
 
-namespace Subcommand
+namespace Subcmd
 {
   void
   version()

@@ -23,13 +23,13 @@
 
 ```
 3dt: 3DO Disc Tool
-Usage: 3dt [OPTIONS] SUBCOMMAND
+  Usage: 3dt [OPTIONS] SUBCMD
 
 Options:
   -h,--help                   Print this help message and exit
   --help-all
 
-Subcommands:
+Subcmds:
   version                     print 3dt version
   list                        list disc content
   info                        prints lowlevel info on disc
@@ -47,7 +47,7 @@ Subcommands:
   encrypt-file                encrypt CD-DIPIR boot payload
 ```
 
-Use `--help` on individual subcommands to get specific subcmd options.
+Use `--help` on individual subcmds to get specific subcmd options.
 
 
 ### list
