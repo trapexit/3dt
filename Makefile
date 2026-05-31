@@ -19,8 +19,13 @@ CXX   ?= g++
 STRIP ?= strip
 
 ifeq ($(NDEBUG),1)
-OPT := -O3 -flto -static
-LDFLAGS += -Wl,--strip-all
+OPT := -Os -flto -ffunction-sections -fdata-sections
+ifeq ($(filter %-macos,$(TARGET)),)
+OPT += -static
+LDFLAGS += -Wl,--gc-sections -Wl,--strip-all
+else
+LDFLAGS += -Wl,-dead_strip -Wl,-S -Wl,-x
+endif
 else
 OPT := -O0 -ggdb -ftrapv
 endif
@@ -72,17 +77,17 @@ help:
 	@echo "  clean     Remove build/ directory"
 	@echo "  distclean Remove everything not in git"
 	@echo "  strip     Strip debug symbols from binary"
-	@echo "  release   Build stripped binaries for Unix, Win32, Win64"
+	@echo "  release   Build containerized release binaries"
 	@echo "  help      Show this help message"
 	@echo ""
 	@echo "Variables:"
-	@echo "  NDEBUG=1      Release build (-Os -static)"
-	@echo "  SANITIZE=1    Add -fsanitize=undefined"
+	@echo "  NDEBUG=1      Release build optimized for size"
+	@echo "  SANITIZE=1    Add -fsanitize=address,undefined"
 	@echo ""
 	@echo "Cross-compile:"
-	@echo "  make -f Makefile.win32    32-bit Windows (MinGW)"
-	@echo "  make -f Makefile.win64    64-bit Windows (MinGW)"
-	@echo "  make -f Makefile.macos    macOS"
+	@echo "  make release              Build all release targets via Podman/Zig"
+	@echo "  make release-base         Build all release targets with local Zig"
+	@echo "  make TARGET=<zig-target>  Build one named output with custom CC/CXX"
 	@echo ""
 	@echo "Output: $(OUTPUT)"
 
@@ -124,22 +129,26 @@ release-base: clean
 		CC="zig cc -target x86_64-linux-musl" \
 		CXX="zig c++ -target x86_64-linux-musl" \
 		STRIP="zig llvm-strip" \
-		TARGET="x86_64-linux-musl"
+		TARGET="x86_64-linux-musl" \
+		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
 		CC="zig cc -target aarch64-linux-musl" \
 		CXX="zig c++ -target aarch64-linux-musl" \
 		STRIP="zig llvm-strip" \
-		TARGET="aarch64-linux-musl"
+		TARGET="aarch64-linux-musl" \
+		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
 		CC="zig cc -target x86_64-windows-gnu" \
 		CXX="zig c++ -target x86_64-windows-gnu" \
 		STRIP="zig llvm-strip" \
-		TARGET="x86_64-windows-gnu.exe" OPT="-O3 -static"
+		TARGET="x86_64-windows-gnu.exe" \
+		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
 		CC="zig cc -target aarch64-macos" \
 		CXX="zig c++ -target aarch64-macos" \
 		STRIP="zig llvm-strip" \
-		TARGET="aarch64-macos" OPT="-O3"
+		TARGET="aarch64-macos" \
+		OPT="-Oz -flto -ffunction-sections -fdata-sections"
 
 release:
 	podman build -t localhost/cxxbuilder buildtools/
