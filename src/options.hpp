@@ -97,6 +97,7 @@ public:
   {
     Path input;
     Path output;
+    bool force = false;
   };
 
   struct ROMTags

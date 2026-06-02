@@ -46,7 +46,7 @@ romtag_size_is_byte_count(const TDO::ROMTag &tag_)
 }
 
 static
-void
+Error
 update_record(const TDO::ROMTagVec &tags_,
               TDO::DirectoryRecord &dr_)
 {
@@ -75,6 +75,18 @@ update_record(const TDO::ROMTagVec &tags_,
         {
           if(tag.offset+1 == avatar)
             {
+              const u64 max_byte_count =
+                static_cast<u64>(dr_.block_count) * static_cast<u64>(dr_.block_size);
+
+              if(tag.size > max_byte_count)
+                {
+                  return {fmt::format("invalid ROMTag size exceeds directory record allocation "
+                                      "(avatar {} size {}b capacity {}b)",
+                                      avatar,
+                                      tag.size,
+                                      max_byte_count)};
+                }
+
               if(matched)
                 {
                   // Multiple ROMTags claim the same DirectoryRecord
@@ -104,6 +116,8 @@ update_record(const TDO::ROMTagVec &tags_,
             }
         }
     }
+
+  return Error();
 }
 
 static
@@ -317,7 +331,9 @@ public:
         if(err)
           return err;
 
-        update_record(romtags_,dr);
+        err = update_record(romtags_,dr);
+        if(err)
+          return err;
         err = decode_v1_filename(dr,decoded_filename);
         if(err)
           {

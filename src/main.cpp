@@ -20,32 +20,38 @@
 #include "log.hpp"
 #include "subcmd.hpp"
 #include "tdo_rsa.h"
+#include "version.hpp"
 
 #include "CLI11.hpp"
 
+#include <algorithm>
 #include <exception>
+#include <iostream>
 #include <locale>
+#include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 
 static
 void
-generate_version_argparser(CLI::App &app_)
+_generate_version_argparser(CLI::App &app_)
 {
   CLI::App *subcmd;
 
   subcmd = app_.add_subcommand("version","print 3dt version");
 
   subcmd->callback([]()
-                  {
-                    Subcmd::version();
-                  });
+  {
+    Subcmd::version();
+  });
 }
 
 static
 void
-generate_list_argparser(CLI::App      &app_,
-                        Options::List &options_)
+_generate_list_argparser(CLI::App      &app_,
+                         Options::List &options_)
 {
   CLI::App *subcmd;
 
@@ -66,15 +72,15 @@ generate_list_argparser(CLI::App      &app_,
     ->check(CLI::IsMember({"default","file-offsets","block-offsets"}));
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::list(options_);
-                  });
+  {
+    Subcmd::list(options_);
+  });
 }
 
 static
 void
-generate_info_argparser(CLI::App      &app_,
-                        Options::Info &options_)
+_generate_info_argparser(CLI::App      &app_,
+                         Options::Info &options_)
 {
   CLI::App *subcmd;
 
@@ -92,15 +98,15 @@ generate_info_argparser(CLI::App      &app_,
     ->check(CLI::IsMember({"human","csv","cheader"}));
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::info(options_);
-                  });
+  {
+    Subcmd::info(options_);
+  });
 }
 
 static
 void
-generate_identify_argparser(CLI::App          &app_,
-                            Options::Identify &options_)
+_generate_identify_argparser(CLI::App          &app_,
+                             Options::Identify &options_)
 {
   CLI::App *subcmd;
 
@@ -118,15 +124,15 @@ generate_identify_argparser(CLI::App          &app_,
     ->check(CLI::IsMember({"human","csv"}));
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::identify(options_);
-                  });
+  {
+    Subcmd::identify(options_);
+  });
 }
 
 static
 void
-generate_unpack_argparser(CLI::App        &app_,
-                          Options::Unpack &options_)
+_generate_unpack_argparser(CLI::App        &app_,
+                           Options::Unpack &options_)
 {
   CLI::App *subcmd;
 
@@ -146,7 +152,6 @@ generate_unpack_argparser(CLI::App        &app_,
     ->description("output directory")
     ->type_name("PATH")
     ->default_val("")
-    ->check(CLI::ExistingDirectory)
     ->take_last();
   subcmd->add_option("--layout",options_.layout)
     ->description("layout metadata output file (default: layout.json in unpacked root)")
@@ -155,15 +160,15 @@ generate_unpack_argparser(CLI::App        &app_,
     ->take_last();
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::unpack(options_);
-                  });
+  {
+    Subcmd::unpack(options_);
+  });
 }
 
 static
 void
-generate_pack_argparser(CLI::App      &app_,
-                        Options::Pack &options_)
+_generate_pack_argparser(CLI::App      &app_,
+                         Options::Pack &options_)
 {
   CLI::App *subcmd;
 
@@ -194,12 +199,14 @@ generate_pack_argparser(CLI::App      &app_,
     ->default_val("")
     ->take_last();
   subcmd->add_option("--volume-unique-id",options_.volume_unique_identifier)
-    ->description("disc volume unique identifier (0 selects random)")
+    ->description("disc volume unique identifier (0 selects random),"
+                  " defaults to crc32b of BannerScreen")
     ->type_name("UINT")
     ->each([&options_](std::string){ options_.volume_unique_identifier_set = true; })
     ->take_last();
   subcmd->add_option("--root-unique-id",options_.root_unique_identifier)
-    ->description("root directory unique identifier (0 selects random)")
+    ->description("root directory unique identifier (0 selects random),"
+                  " defaults to crc32b of LaunchMe")
     ->type_name("UINT")
     ->each([&options_](std::string){ options_.root_unique_identifier_set = true; })
     ->take_last();
@@ -207,10 +214,10 @@ generate_pack_argparser(CLI::App      &app_,
     ->description("validate and report without writing an image");
   subcmd->add_flag("--no-banner-romtag{false},--no-rsa-appsplash{false}",
                    options_.banner_romtag)
-     ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
+    ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
   subcmd->add_flag("--billstuff-romtag",
                    options_.billstuff_romtag)
-     ->description("generate an RSA_BILLSTUFF ROMTag");
+    ->description("generate an RSA_BILLSTUFF ROMTag");
   subcmd->add_option("--digest-check-count",
                      options_.signature_digest_check_count)
     ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
@@ -227,15 +234,15 @@ generate_pack_argparser(CLI::App      &app_,
     ->description("sign the image after packing");
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::pack(options_);
-                  });
+  {
+    Subcmd::pack(options_);
+  });
 }
 
 static
 void
-generate_repack_argparser(CLI::App         &app_,
-                          Options::Repack &options_)
+_generate_repack_argparser(CLI::App        &app_,
+                           Options::Repack &options_)
 {
   CLI::App *subcmd;
 
@@ -254,7 +261,7 @@ generate_repack_argparser(CLI::App         &app_,
     ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
   subcmd->add_flag("--billstuff-romtag",
                    options_.billstuff_romtag)
-     ->description("generate an RSA_BILLSTUFF ROMTag");
+    ->description("generate an RSA_BILLSTUFF ROMTag");
   subcmd->add_option("--digest-check-count",
                      options_.signature_digest_check_count)
     ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
@@ -271,15 +278,15 @@ generate_repack_argparser(CLI::App         &app_,
     ->description("sign the image after repacking");
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::repack(options_);
-                  });
+  {
+    Subcmd::repack(options_);
+  });
 }
 
 static
 void
-generate_rename_argparser(CLI::App        &app_,
-                          Options::Rename &options_)
+_generate_rename_argparser(CLI::App        &app_,
+                           Options::Rename &options_)
 {
   CLI::App *subcmd;
 
@@ -293,15 +300,15 @@ generate_rename_argparser(CLI::App        &app_,
     ->description("if there are multiple matches use the first one found");
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::rename(options_);
-                  });
+  {
+    Subcmd::rename(options_);
+  });
 }
 
 static
 void
-generate_to_iso_argparser(CLI::App       &app_,
-                          Options::ToISO &options_)
+_generate_to_iso_argparser(CLI::App       &app_,
+                           Options::ToISO &options_)
 {
   CLI::App *subcmd;
 
@@ -313,19 +320,20 @@ generate_to_iso_argparser(CLI::App       &app_,
     ->required();
   subcmd->add_option("output",options_.output)
     ->description("output file")
-    ->type_name("PATH")
-    ->check(CLI::NonexistentPath);
+    ->type_name("PATH");
+  subcmd->add_flag("--force",options_.force)
+    ->description("overwrite output file if it already exists");
 
   subcmd->callback([&options_]()
-                  {
-                    Subcmd::to_iso(options_);
-                  });
+  {
+    Subcmd::to_iso(options_);
+  });
 }
 
 static
 void
-generate_romtags_argparser(CLI::App         &app_,
-                           Options::ROMTags &opts_)
+_generate_romtags_argparser(CLI::App         &app_,
+                            Options::ROMTags &opts_)
 {
   CLI::App *subcmd;
 
@@ -343,15 +351,15 @@ generate_romtags_argparser(CLI::App         &app_,
     ->check(CLI::IsMember({"human","csv"}));
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::romtags(opts_);
-                  });
+  {
+    Subcmd::romtags(opts_);
+  });
 }
 
 static
 void
-generate_verify_argparser(CLI::App        &app_,
-                          Options::Verify &opts_)
+_generate_verify_argparser(CLI::App        &app_,
+                           Options::Verify &opts_)
 {
   CLI::App *subcmd;
 
@@ -373,15 +381,15 @@ generate_verify_argparser(CLI::App        &app_,
     ->description("print only per-image verification status");
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::verify(opts_);
-                  });
+  {
+    Subcmd::verify(opts_);
+  });
 }
 
 static
 void
-generate_sign_argparser(CLI::App      &app_,
-                        Options::Sign &opts_)
+_generate_sign_argparser(CLI::App      &app_,
+                         Options::Sign &opts_)
 {
   CLI::App *subcmd;
 
@@ -400,7 +408,7 @@ generate_sign_argparser(CLI::App      &app_,
     ->description("do not generate an RSA_APPSPLASH ROMTag for BannerScreen");
   subcmd->add_flag("--billstuff-romtag",
                    opts_.billstuff_romtag)
-     ->description("generate an RSA_BILLSTUFF ROMTag");
+    ->description("generate an RSA_BILLSTUFF ROMTag");
   subcmd->add_flag("--force",opts_.force)
     ->description("skip signing preflight checks for unusual images");
   subcmd->add_option("--digest-check-count",
@@ -417,15 +425,15 @@ generate_sign_argparser(CLI::App      &app_,
     ->take_last();
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::sign(opts_);
-                  });
+  {
+    Subcmd::sign(opts_);
+  });
 }
 
 static
 void
-generate_signfile_argparser(CLI::App          &app_,
-                            Options::SignFile &opts_)
+_generate_signfile_argparser(CLI::App          &app_,
+                             Options::SignFile &opts_)
 {
   CLI::App *subcmd;
 
@@ -452,15 +460,15 @@ generate_signfile_argparser(CLI::App          &app_,
     ->check(CLI::IsMember({TDO_KEY_APP,TDO_KEY_3DO}));
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::sign_file(opts_);
-                  });
+  {
+    Subcmd::sign_file(opts_);
+  });
 }
 
 static
 void
-generate_decryptfile_argparser(CLI::App         &app_,
-                               Options::DecFile &opts_)
+_generate_decryptfile_argparser(CLI::App         &app_,
+                                Options::DecFile &opts_)
 {
   CLI::App *subcmd;
 
@@ -472,15 +480,15 @@ generate_decryptfile_argparser(CLI::App         &app_,
     ->required();
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::decrypt_file(opts_);
-                  });
+  {
+    Subcmd::decrypt_file(opts_);
+  });
 }
 
 static
 void
-generate_encryptfile_argparser(CLI::App         &app_,
-                               Options::EncFile &opts_)
+_generate_encryptfile_argparser(CLI::App         &app_,
+                                Options::EncFile &opts_)
 {
   CLI::App *subcmd;
 
@@ -492,39 +500,39 @@ generate_encryptfile_argparser(CLI::App         &app_,
     ->required();
 
   subcmd->callback([&opts_]()
-                  {
-                    Subcmd::encrypt_file(opts_);
-                  });
+  {
+    Subcmd::encrypt_file(opts_);
+  });
 }
 
 static
 void
-generate_argparser(CLI::App &app_,
-                   Options  &options_)
+_generate_argparser(CLI::App &app_,
+                    Options  &options_)
 {
   app_.set_help_all_flag("--help-all");
   app_.require_subcommand();
 
-  generate_version_argparser(app_);
-  generate_list_argparser(app_,options_.list);
-  generate_info_argparser(app_,options_.info);
-  generate_identify_argparser(app_,options_.identify);
-  generate_unpack_argparser(app_,options_.unpack);
-  generate_pack_argparser(app_,options_.pack);
-  generate_repack_argparser(app_,options_.repack);
-  generate_rename_argparser(app_,options_.rename);
-  generate_to_iso_argparser(app_,options_.to_iso);
-  generate_romtags_argparser(app_,options_.romtags);
-  generate_verify_argparser(app_,options_.verify);
-  generate_sign_argparser(app_,options_.sign);
-  generate_signfile_argparser(app_,options_.signfile);
-  generate_decryptfile_argparser(app_,options_.decryptfile);
-  generate_encryptfile_argparser(app_,options_.encryptfile);
+  _generate_version_argparser(app_);
+  _generate_list_argparser(app_,options_.list);
+  _generate_info_argparser(app_,options_.info);
+  _generate_identify_argparser(app_,options_.identify);
+  _generate_unpack_argparser(app_,options_.unpack);
+  _generate_pack_argparser(app_,options_.pack);
+  _generate_repack_argparser(app_,options_.repack);
+  _generate_rename_argparser(app_,options_.rename);
+  _generate_to_iso_argparser(app_,options_.to_iso);
+  _generate_romtags_argparser(app_,options_.romtags);
+  _generate_verify_argparser(app_,options_.verify);
+  _generate_sign_argparser(app_,options_.sign);
+  _generate_signfile_argparser(app_,options_.signfile);
+  _generate_decryptfile_argparser(app_,options_.decryptfile);
+  _generate_encryptfile_argparser(app_,options_.encryptfile);
 }
 
 static
 void
-set_locale()
+_set_locale()
 {
   try
     {
@@ -541,11 +549,19 @@ main(int    argc_,
      char **argv_)
 {
   Options options;
-  CLI::App app("3dt: 3DO Disc Tool");
+  CLI::App app("3dt: 3DO Disc Tool (v" VERSION ")");
 
-  set_locale();
+  app.name("Usage: 3dt");
 
-  generate_argparser(app,options);
+  _set_locale();
+
+  _generate_argparser(app,options);
+
+  if(argc_ == 1)
+    {
+      std::cout << app.help() << std::endl;
+      return 0;
+    }
 
   try
     {

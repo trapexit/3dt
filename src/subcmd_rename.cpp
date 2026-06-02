@@ -45,7 +45,10 @@ namespace l
 
     std::filesystem::rename(filepath_,newfilepath,ec);
     if(ec)
-      return fmt::format("error renaming {} -> {}",filepath_,newfilepath);
+      return fmt::format("error renaming {} -> {}: {}",
+                         filepath_,
+                         newfilepath,
+                         ec.message());
 
     fmt::print("{}: renamed to {}\n",filepath_,newfilepath);
 
@@ -67,7 +70,11 @@ namespace l
 
     if((identifier.full_matches.size() == 1) || (take_first_ == true))
       {
-        l::rename(filepath_,identifier.full_matches[0],identifier.disc_image_ext);
+        Error err = l::rename(filepath_,
+                              identifier.full_matches[0],
+                              identifier.disc_image_ext);
+        if(err)
+          throw err;
         return;
       }
 

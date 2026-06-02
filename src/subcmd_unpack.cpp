@@ -25,10 +25,12 @@
 #include "CSVWriter.h"
 
 #include <array>
+#include <cctype>
 #include <cstring>
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -39,6 +41,27 @@ namespace
   using json = nlohmann::json;
 
   static constexpr const char *DEFAULT_LAYOUT_FILENAME = "layout.json";
+
+  static
+  std::string
+  lowercase(const std::string &str_)
+  {
+    std::string rv;
+
+    rv.reserve(str_.size());
+    for(unsigned char c : str_)
+      rv.push_back(std::tolower(c));
+
+    return rv;
+  }
+
+  static
+  bool
+  is_default_layout_filename(const fs::path &path_)
+  {
+    return (path_.parent_path().empty() &&
+            (lowercase(path_.filename().string()) == DEFAULT_LAYOUT_FILENAME));
+  }
 
   static
   std::string
@@ -318,6 +341,8 @@ namespace
     {
       init(stream_);
       _printer->before(path_,record_,record_pos_,stream_);
+      if(!record_.is_directory() && is_default_layout_filename(path_))
+        _default_layout_payload_paths.emplace_back(path_);
       _manifest["entries"].push_back({
         {"path",path_.generic_string()},
         {"kind",record_.is_directory() ? "directory" : "file"},
@@ -361,17 +386,40 @@ namespace
 
       os.open(layout_path_,std::ios::trunc);
       if(!os)
-        {
-          Log::error({"failed to open layout output file: " + layout_path_.string()});
-          return;
-        }
+        throw Error("failed to open layout output file: " + layout_path_.string());
 
       os << _manifest.dump(2) << '\n';
+      if(!os)
+        throw Error("failed to write layout output file: " + layout_path_.string());
+      os.close();
+      if(os.fail())
+        throw Error("failed to close layout output file: " + layout_path_.string());
+    }
+
+    bool
+    default_layout_payload_conflicts(const fs::path &dstpath_,
+                                     const fs::path &layout_path_) const
+    {
+      for(const auto &path : _default_layout_payload_paths)
+        {
+          std::error_code ec;
+          const fs::path extracted_path = dstpath_ / path;
+
+          if(extracted_path == layout_path_)
+            return true;
+
+          const bool equivalent = fs::equivalent(extracted_path,layout_path_,ec);
+          if(!ec && equivalent)
+            return true;
+        }
+
+      return false;
     }
 
   private:
     TDO::DiscUnpacker::Callback::Ptr _printer;
     json                             _manifest;
+    std::vector<fs::path>            _default_layout_payload_paths;
     bool                             _initialized;
   };
 
@@ -427,7 +475,11 @@ namespace Subcmd
             continue;
           }
 
-        dstpath = options_.output / (srcpath.filename().concat(".unpacked"));
+        if(options_.output.empty())
+          dstpath = srcpath.string() + ".unpacked";
+        else
+          dstpath = options_.output;
+
         fs::create_directories(dstpath);
 
         layout_path = layout_path_for(options_,dstpath);
@@ -443,6 +495,13 @@ namespace Subcmd
         try
           {
             unpacker->unpack(dstpath);
+            if(options_.layout.empty() &&
+               layout_writer->default_layout_payload_conflicts(dstpath,layout_path))
+              {
+                throw Error("default layout output conflicts with extracted file: " +
+                            layout_path.string() +
+                            "; pass --layout outside the unpacked root");
+              }
             layout_writer->write(layout_path);
           }
         catch(const std::exception &e)
