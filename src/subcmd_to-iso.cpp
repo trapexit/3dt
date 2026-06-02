@@ -25,6 +25,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <system_error>
 
 namespace fs = std::filesystem;
 
@@ -45,6 +46,33 @@ get_output_path(const Options::ToISO &options_)
     }
 }
 
+static
+bool
+existing_paths_equivalent(const fs::path &lhs_,
+                          const fs::path &rhs_)
+{
+  std::error_code ec;
+
+  const bool lhs_exists = fs::exists(lhs_,ec);
+  if(ec)
+    throw Error("failed to check input path: " + lhs_.string() + ": " + ec.message());
+
+  ec.clear();
+  const bool rhs_exists = fs::exists(rhs_,ec);
+  if(ec)
+    throw Error("failed to check output path: " + rhs_.string() + ": " + ec.message());
+
+  if(!lhs_exists || !rhs_exists)
+    return false;
+
+  ec.clear();
+  const bool equivalent = fs::equivalent(lhs_,rhs_,ec);
+  if(ec)
+    throw Error("failed to compare input and output paths: " + ec.message());
+
+  return equivalent;
+}
+
 namespace Subcmd
 {
   void
@@ -57,9 +85,15 @@ namespace Subcmd
     std::array<char,2048> buf;
 
     output_path = get_output_path(options_);
-    if(output_path == options_.input)
+    if((output_path == options_.input) ||
+       existing_paths_equivalent(options_.input,output_path))
       {
         Log::error({"input == output"});
+        throw Error("to-iso failed");
+      }
+    if(!options_.force && fs::exists(output_path))
+      {
+        Log::error({"output already exists: " + output_path.string()});
         throw Error("to-iso failed");
       }
 

@@ -31,6 +31,7 @@
 #include "tdo_fs_walker.hpp"
 #include "tdo_rsa.h"
 #include "tdo_safe_narrow.hpp"
+#include "crc32b_file.hpp"
 
 #include <algorithm>
 #include <array>
@@ -170,20 +171,64 @@ namespace
     return distribution(random_device);
   }
 
+  static void reject_symlink(const fs::directory_entry &);
+
+  fs::path
+  _find_lowercase(const fs::path    &basepath_,
+                  const std::string &filename_)
+  {
+    std::string filename;
+
+    filename = lowercase(filename_);
+
+    for(const auto &dirent : fs::directory_iterator(basepath_))
+      {
+        reject_symlink(dirent);
+        if(!dirent.is_regular_file())
+          continue;
+        if(lowercase(dirent.path().filename().string()) != filename)
+          continue;
+
+        return dirent.path();
+      }
+
+    throw std::runtime_error(filename + " not found");
+
+    return {};
+  }
+
+  fs::path
+  _find_launchme(const fs::path &basepath_)
+  {
+    return _find_lowercase(basepath_,"launchme");
+  }
+
+  fs::path
+  _find_bannerscreen(const fs::path &basepath_)
+  {
+    return _find_lowercase(basepath_,"bannerscreen");
+  }
+
   static
   void
   apply_pack_unique_identifiers(const Options::Pack &options_,
-                                TDO::DiscManifest  &manifest_,
+                                TDO::DiscManifest   &manifest_,
                                 const bool          preserve_unspecified_ = false)
   {
     if(!preserve_unspecified_ || options_.volume_unique_identifier_set)
       manifest_.disc_label.volume_unique_identifier =
-        options_.volume_unique_identifier != 0 ?
-        options_.volume_unique_identifier : random_unique_identifier();
+        (options_.volume_unique_identifier_set ?
+         (options_.volume_unique_identifier != 0 ?
+          options_.volume_unique_identifier :
+          random_unique_identifier()) :
+         crc32b_file(_find_bannerscreen(options_.input)));
     if(!preserve_unspecified_ || options_.root_unique_identifier_set)
       manifest_.disc_label.root_unique_identifier =
-        options_.root_unique_identifier != 0 ?
-        options_.root_unique_identifier : random_unique_identifier();
+        (options_.root_unique_identifier_set ?
+         (options_.root_unique_identifier != 0 ?
+          options_.root_unique_identifier :
+          random_unique_identifier()) :
+         crc32b_file(_find_launchme(options_.input)));
     manifest_.root.unique_identifier = manifest_.disc_label.root_unique_identifier;
   }
 
@@ -652,7 +697,7 @@ namespace
 
     dst_.fill(0);
     value = json_.value(key_,std::string());
-    memcpy(&dst_[0],value.c_str(),std::min<std::size_t>(value.size(),dst_.size() - 1));
+    memcpy(&dst_[0],value.data(),std::min<std::size_t>(value.size(),dst_.size()));
   }
 
   static
@@ -848,7 +893,7 @@ namespace
     ordered.reserve(children.size());
     for(auto &child : children)
       ordered.emplace_back(layout_order(*child,entry_path_ / child->name,layout_),
-                             std::move(child));
+                           std::move(child));
 
     std::sort(ordered.begin(),
               ordered.end(),
@@ -876,7 +921,7 @@ namespace
   {
     if((entry_.block_count > 0) && (entry_.block_size == 0))
       throw Error("layout entry has zero block size: " +
-                               display_path(entry_path_));
+                  display_path(entry_path_));
 
     if(entry_.directory)
       {
@@ -885,10 +930,10 @@ namespace
         required_blocks = TDO::directory_block_count(entry_);
         if(entry_.block_count < required_blocks)
           throw Error("layout directory allocation too small: " +
-                                   display_path(entry_path_) + " needs " +
-                                   std::to_string(required_blocks) +
-                                   " blocks but has " +
-                                   std::to_string(entry_.block_count));
+                      display_path(entry_path_) + " needs " +
+                      std::to_string(required_blocks) +
+                      " blocks but has " +
+                      std::to_string(entry_.block_count));
         entry_.byte_count = TDO::checked_narrow_u64_to_u32(static_cast<u64>(entry_.block_count) * entry_.block_size,
                                                            "directory byte count");
       }
@@ -910,14 +955,14 @@ namespace
         capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
         if(source_size > capacity)
           throw Error("layout byte count exceeds allocation: " +
-                                   display_path(entry_path_));
+                      display_path(entry_path_));
         required_blocks = block_count_for_size(source_size,entry_.block_size);
         if(entry_.block_count < required_blocks)
           throw Error("layout file allocation too small: " +
-                                   display_path(entry_path_) + " needs " +
-                                   std::to_string(required_blocks) +
-                                   " blocks but has " +
-                                   std::to_string(entry_.block_count));
+                      display_path(entry_path_) + " needs " +
+                      std::to_string(required_blocks) +
+                      " blocks but has " +
+                      std::to_string(entry_.block_count));
 
         entry_.byte_count = TDO::checked_narrow_u64_to_u32(source_size,"file byte count");
         entry_.data_byte_count = entry_.byte_count;
@@ -1070,8 +1115,8 @@ namespace
         base_blocks = TDO::checked_narrow_u64_to_u32(acc,"base block count");
         sig_blocks  = required_signature_blocks(base_blocks);
         num_digests = signature_digest_count_for_volume(
-                        TDO::checked_narrow_u64_to_u32(static_cast<u64>(base_blocks) + sig_blocks,
-                                                       "volume block count"));
+                                                        TDO::checked_narrow_u64_to_u32(static_cast<u64>(base_blocks) + sig_blocks,
+                                                                                       "volume block count"));
         record_size = TDO::signature_record_size_for_digest_count(num_digests);
       }
 
@@ -1149,7 +1194,7 @@ namespace
       {
         if((entry_.block_count != 1) || avatars_.empty())
           throw Error("layout cannot resize special file: " +
-                                   display_path(entry_path_));
+                      display_path(entry_path_));
         if(avatars_[0] != 0)
           throw Error("layout cannot relocate Disc label; it must use block 0");
       }
@@ -1157,7 +1202,7 @@ namespace
       {
         if((entry_.block_count > 1) || avatars_.empty())
           throw Error("layout cannot resize special file: " +
-                                   display_path(entry_path_));
+                      display_path(entry_path_));
         if(avatars_[0] != 1)
           throw Error("layout cannot relocate rom_tags; it must use block 1");
       }
@@ -1257,9 +1302,9 @@ namespace
               continue;
 
             throw Error("layout block overlap: " +
-                                     lhs.label + " blocks " + range_string(lhs) +
-                                     " overlaps " +
-                                     rhs.label + " blocks " + range_string(rhs));
+                        lhs.label + " blocks " + range_string(lhs) +
+                        " overlaps " +
+                        rhs.label + " blocks " + range_string(rhs));
           }
       }
   }
@@ -1561,15 +1606,15 @@ namespace
     manifest.disc_label.volume_sync_bytes.fill(VOLUME_SYNC_BYTE);
     manifest.disc_label.volume_structure_version = VOLUME_STRUCTURE_OPERA_READONLY;
     manifest.disc_label.volume_flags = 0;
-    if(options_.volume_commentary.size() >= VOLUME_COM_LEN)
+    if(options_.volume_commentary.size() > VOLUME_COM_LEN)
       throw Error("volume commentary is too long for OperaFS");
     memcpy(&manifest.disc_label.volume_commentary[0],
-           options_.volume_commentary.c_str(),
+           options_.volume_commentary.data(),
            options_.volume_commentary.size());
-    if(options_.volume_label.size() >= VOLUME_ID_LEN)
+    if(options_.volume_label.size() > VOLUME_ID_LEN)
       throw Error("volume label is too long for OperaFS");
     memcpy(&manifest.disc_label.volume_identifier[0],
-           options_.volume_label.c_str(),
+           options_.volume_label.data(),
            options_.volume_label.size());
     manifest.disc_label.volume_block_size = TDO::BLOCK_SIZE;
     manifest.disc_label.root_directory_block_size = TDO::BLOCK_SIZE;
@@ -1697,6 +1742,16 @@ namespace Subcmd
                                  (options_.sign ?
                                   "packed and signed" :
                                   "packed"));
+          }
+
+        if(!options_.sign)
+          {
+            TDO::recreate_layout_special_files(temp_output_path,
+                                               false,
+                                               false,
+                                               options_.banner_romtag,
+                                               options_.billstuff_romtag,
+                                               digest_check_count);
           }
 
         if(recreate_layout_specials)

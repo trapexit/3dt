@@ -20,7 +20,24 @@
 
 #include "tdo_dev_stream.hpp"
 
+#include <array>
+#include <cstring>
 #include <string>
+
+static
+std::string
+label_string(const std::array<char,32> &arr_)
+{
+  const char *begin;
+  const char *end;
+
+  begin = arr_.data();
+  end = static_cast<const char*>(memchr(begin,'\0',arr_.size()));
+  if(end == nullptr)
+    end = begin + arr_.size();
+
+  return std::string(begin,end);
+}
 
 static
 std::string
@@ -44,9 +61,12 @@ find_matches(const TDO::DiscLabel       &label_,
              TDO::IDVec                 &partial_matches_)
 {
   TDO::ID id;
+  std::string volume_id;
+
+  volume_id = label_string(label_.volume_identifier);
 
   id.name               = NULL;
-  id.volume_id          = &label_.volume_identifier[0];
+  id.volume_id          = volume_id.c_str();
   id.volume_unique_id   = label_.volume_unique_identifier;
   id.volume_block_count = label_.volume_block_count;
   id.root_unique_id     = label_.root_unique_identifier;

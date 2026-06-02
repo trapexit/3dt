@@ -25,6 +25,7 @@
 #include "options.hpp"
 
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -40,7 +41,15 @@ namespace
   std::string
   label_string(const std::array<char,32> &arr_)
   {
-    return std::string(arr_.data());
+    const char *begin;
+    const char *end;
+
+    begin = arr_.data();
+    end = static_cast<const char*>(memchr(begin,'\0',arr_.size()));
+    if(end == nullptr)
+      end = begin + arr_.size();
+
+    return std::string(begin,end);
   }
 
   static

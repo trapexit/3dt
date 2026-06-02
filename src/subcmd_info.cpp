@@ -27,9 +27,12 @@
 
 #include "fmt.hpp"
 
+#include <array>
+#include <cstring>
 #include <fstream>
 #include <filesystem>
 #include <functional>
+#include <string>
 
 namespace fs = std::filesystem;
 
@@ -40,6 +43,21 @@ typedef std::function<void(const fs::path&,
 
 namespace
 {
+  static
+  std::string
+  label_string(const std::array<char,32> &arr_)
+  {
+    const char *begin;
+    const char *end;
+
+    begin = arr_.data();
+    end = static_cast<const char*>(memchr(begin,'\0',arr_.size()));
+    if(end == nullptr)
+      end = begin + arr_.size();
+
+    return std::string(begin,end);
+  }
+
   static
   void
   print_human(const fs::path       &filepath_,
@@ -67,8 +85,8 @@ namespace
                label_.volume_sync_bytes[0],
                label_.volume_structure_version,
                label_.volume_flags,
-               &label_.volume_commentary[0],
-               &label_.volume_identifier[0],
+               label_string(label_.volume_commentary),
+               label_string(label_.volume_identifier),
                label_.volume_unique_identifier,
                label_.volume_block_size,
                label_.volume_block_count,
@@ -120,8 +138,8 @@ namespace
     CSVWriter csv(",");
 
     csv << filepath_.filename().string();
-    csv << &label_.volume_commentary[0];
-    csv << &label_.volume_identifier[0];
+    csv << label_string(label_.volume_commentary);
+    csv << label_string(label_.volume_identifier);
     csv << fmt::format("0x{:08X}",label_.volume_unique_identifier);
     csv << fmt::format("{}",label_.volume_block_size);
     csv << fmt::format("{}",label_.volume_block_count);
@@ -145,7 +163,7 @@ namespace
     CSVWriter csv(",");
 
     csv << filepath_.filename().stem();
-    csv << fs::path(&label_.volume_identifier[0]);
+    csv << fs::path(label_string(label_.volume_identifier));
     csv << fmt::format("0x{:08X}",label_.volume_unique_identifier);
     csv << fmt::format("{}",label_.volume_block_count);
     csv << fmt::format("0x{:08X}",label_.root_unique_identifier);
