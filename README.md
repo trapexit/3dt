@@ -8,10 +8,10 @@
 * identify discs and ROMs
 * rename image based on identification
 * unpack disc and ROM OperaFS contents
-* convert raw disc images to .iso
-* supports reading CD-ROM Mode 1 images and 2048 byte/sector ISOs
 * pack directories into 3DO disc images
 * repack existing images and compact free space
+* convert raw disc images to .iso
+* supports reading CD-ROM Mode 1 images and 2048 byte/sector ISOs
 * sign and re-sign 3DO images
 * verify 3DO signatures
 * encrypt or decrypt 3DO obfuscation payloads (primarily the boot file)
@@ -22,14 +22,16 @@
 ### --help
 
 ```
-3dt: 3DO Disc Tool
-  Usage: 3dt [OPTIONS] SUBCMD
+3dt: 3DO Disc Tool (v1.2.0)
 
-Options:
-  -h,--help                   Print this help message and exit
-  --help-all
 
-Subcmds:
+Usage: 3dt [OPTIONS] SUBCOMMANDS
+
+OPTIONS:
+  -h,     --help              Print this help message and exit
+          --help-all
+
+SUBCOMMANDS:
   version                     print 3dt version
   list                        list disc content
   info                        prints lowlevel info on disc
@@ -37,17 +39,26 @@ Subcmds:
   unpack                      unpack disc image
   pack                        pack a directory into a 3DO disc image
   repack                      repack a 3DO disc image compacting avatars and empty space
-  verify                      verify RSA sigs
-  sign                        sign 3DO ISO for retail system use
-  sign-file                   sign file with 3DO or APP key
   rename                      rename disc image as identified
   to-iso                      convert a .bin or similar disc image to .iso
   romtags                     print out image romtags
-  decrypt-file                decrypt CD-DIPIR boot payload
-  encrypt-file                encrypt CD-DIPIR boot payload
+  verify                      verify RSA sigs
+  sign                        sign 3DO ISO for retail system use
+  sign-file                   sign file with 3DO or APP key
+  decrypt-file                decrypt CD-DIPIR boot payload (`src/dipir/cdipir.c`)
+  encrypt-file                encrypt CD-DIPIR boot payload (`src/dipir/cdipir.c`)
 ```
 
-Use `--help` on individual subcmds to get specific subcmd options.
+Use `--help` on individual subcommands to get specific subcommand options.
+
+
+### version
+
+Print the 3dt version.
+
+```
+3dt version
+```
 
 
 ### list
@@ -70,6 +81,10 @@ drf        2048 0x03afa069 *dir Attic Simple
 
 You can choose from a few output formats:
 
+`list` supports `--format=default`, `--format=file-offsets`, and
+`--format=block-offsets`. A second positional argument filters output to paths
+with that prefix.
+
 ```
 $ 3dt list --format=block-offsets SHADOW\ -\ War\ of\ Succession\ \(USA\).iso  | head
 Flags      Size         ID Type  RecOffset     Avatar Filename
@@ -88,6 +103,7 @@ Flags      Size         ID Type  RecOffset     Avatar Filename
 ### info
 
 Prints out the disc's "disc label", file count, and total data byte size.
+Use `--format=human`, `--format=csv`, or `--format=cheader` to change output.
 
 ```
 $ 3dt info ./PO\'ed.iso
@@ -125,6 +141,7 @@ help in uniquly identifying images. If you come across an unknown
 image (which isn't just random homebrew) please file a
 [ticket](https://github.com/trapexit/3dt/issues) with the details from
 `info` command.
+Use `--format=human` or `--format=csv` to change output.
 
 ```
 $ 3dt identify ./PO\'ed.iso
@@ -145,6 +162,9 @@ This will copy the files from the disc image to your local storage
 device. It will create a directory based on the file name with
 ".unpacked" appended unless the `-o,--output` option is used to change
 the directory it unpacks to.
+Use `--format=human` or `--format=csv` to change logging output. A
+`layout.json` file is written in the unpacked root by default; use `--layout`
+to choose another path.
 
 
 ```
@@ -166,6 +186,8 @@ $ 3dt unpack ./PO\'ed.iso
 ### rename
 
 If a match is found for the image it will rename the file based on the name in the internal database.
+Multiple inputs are supported. Use `--take-first` when an image has multiple
+matches and the first match should be used automatically.
 
 ```
 $ 3dt rename ./POed.iso
@@ -176,6 +198,7 @@ $ 3dt rename ./POed.iso
 ### to-iso
 
 This, like many other tools, will take a raw CDROM image such as a .bin file from a .bin/.cue set and create a .iso file.
+The output path is optional. Use `--force` to overwrite an existing output file.
 
 ```
 $ 3dt to-iso ./PO\'ed\ \(USA\,\ Europe\).bin
@@ -196,6 +219,7 @@ PO'ed (USA, Europe).iso:
 ### romtags
 
 Print rom tags
+Use `--format=human` or `--format=csv` to change output.
 
 ```
 $ 3dt romtags Wolfenstein\ 3D\ \(USA\).iso
@@ -257,11 +281,18 @@ Common options:
 - `--volume-label` / `--volume-commentary`: set label metadata
 - `--volume-unique-id` / `--root-unique-id`: set identifiers
 - `--dry-run`: validate layout and allocations without writing the image
-- `--mark`: write 3dt marker metadata
+- `--mark`: write a 3dt marker into the output image
 - `--sign`: run signing as part of pack
 - `--digest-check-count`: tune signature digest check policy
-- `--no-banner-romtag`: disable RSA_APPSPLASH romtag generation
-- `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by default)
+- `--no-banner-romtag` / `--no-rsa-appsplash`: disable RSA_APPSPLASH romtag generation
+- `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by
+  default, really has no impact but was set in all original titles)
+
+By default, `pack` derives the volume unique identifier from the CRC32 of
+`BannerScreen` and the root unique identifier from the CRC32 of `LaunchMe`.
+If `BannerScreen` is not present, the volume unique identifier is generated
+randomly. Passing `--volume-unique-id` or `--root-unique-id` overrides the
+derived value; passing `0` explicitly selects a random identifier.
 
 
 ### repack
@@ -272,7 +303,9 @@ Rebuild an image while compacting avatars and reclaiming free space.
 3dt repack game.iso --output game-repacked.iso
 ```
 
-Repack also supports `--sign` and the same romtag/signature options as `pack`.
+Repack supports multiple input images. `--output` requires exactly one input.
+Repack also supports `--sign`, `--mark`, `--digest-check-count`,
+`--no-banner-romtag` / `--no-rsa-appsplash`, and `--billstuff-romtag`.
 
 
 ### sign
@@ -283,7 +316,9 @@ Sign an existing image for retail playback.
 3dt sign game.iso --output game-signed.iso
 ```
 
-Useful flags include `--force` for unusual source layouts, `--mark`, `--digest-check-count`, and `--billstuff-romtag`.
+`--output` requires exactly one input. Useful flags include `--force` for
+unusual source layouts, `--mark`, `--digest-check-count`,
+`--no-banner-romtag` / `--no-rsa-appsplash`, and `--billstuff-romtag`.
 
 
 ### verify
@@ -294,12 +329,17 @@ Validate signed images and report status.
 3dt verify --format=csv game.iso
 ```
 
-Output formats are `human`, `csv`, and `json`; add `--no-digest-table` to skip digest-table checks.
+Output formats are `human`, `csv`, and `json`; add `--no-digest-table` to skip
+digest-table checks or `--quiet` to print only per-image verification status.
 
 
 ### sign-file
 
 Sign, verify, or emit signatures for a file payload.
+Use `--append` to append a new signature trailer, `--replace` to replace the
+existing trailer, `--write` to update the input file, `--signature-output` to
+write signature bytes separately, and `--key-name=app` or `--key-name=3do` to
+choose the signing key.
 
 ```
 3dt sign-file --verify boot_code
@@ -308,10 +348,9 @@ Sign, verify, or emit signatures for a file payload.
 
 ### decrypt-file
 
-Decrypt signed 3DO file payloads.
-This is mainly used for the boot file (`system/kernel/boot_code`, sometimes
-referred to as `boot_file`) when working with CD-DIPIR-protected images.
-In practice that is the primary real-world use.
+Decrypt CD-DIPIR boot payloads. This is mainly used for the boot file
+(`system/kernel/boot_code`, sometimes referred to as `boot_file`) when working
+with CD-DIPIR-protected images. In practice that is the primary real-world use.
 This maps to the Portfolio OS `src/dipir/cdipir.c` boot flow (`DecryptBlock()`).
 Re-run `3dt encrypt-file` on the same file once edits are complete.
 
@@ -321,7 +360,7 @@ Re-run `3dt encrypt-file` on the same file once edits are complete.
 
 ### encrypt-file
 
-Encrypt a file using the same boot-file obfuscation transform.
+Encrypt CD-DIPIR boot payloads using the same boot-file obfuscation transform.
 This is effectively the inverse operation of `decrypt-file` and is used when
 you need to restore the encrypted form (typically for `system/kernel/boot_code`).
 The inverse transform corresponds to Portfolio OS CD-DIPIR boot-file logic in
