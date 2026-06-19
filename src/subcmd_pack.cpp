@@ -42,6 +42,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <unordered_map>
@@ -203,10 +204,22 @@ namespace
     return _find_lowercase(basepath_,"launchme");
   }
 
-  fs::path
-  _find_bannerscreen(const fs::path &basepath_)
+  static
+  std::optional<fs::path>
+  _try_find_bannerscreen(const fs::path &basepath_)
   {
-    return _find_lowercase(basepath_,"bannerscreen");
+    for(const auto &dirent : fs::directory_iterator(basepath_))
+      {
+        reject_symlink(dirent);
+        if(!dirent.is_regular_file())
+          continue;
+        if(lowercase(dirent.path().filename().string()) != "bannerscreen")
+          continue;
+
+        return dirent.path();
+      }
+
+    return std::nullopt;
   }
 
   static
@@ -216,12 +229,21 @@ namespace
                                 const bool          preserve_unspecified_ = false)
   {
     if(!preserve_unspecified_ || options_.volume_unique_identifier_set)
-      manifest_.disc_label.volume_unique_identifier =
-        (options_.volume_unique_identifier_set ?
-         (options_.volume_unique_identifier != 0 ?
-          options_.volume_unique_identifier :
-          random_unique_identifier()) :
-         crc32b_file(_find_bannerscreen(options_.input)));
+      {
+        if(options_.volume_unique_identifier_set)
+          {
+            manifest_.disc_label.volume_unique_identifier =
+              (options_.volume_unique_identifier != 0 ?
+               options_.volume_unique_identifier :
+               random_unique_identifier());
+          }
+        else
+          {
+            const auto bannerscreen = _try_find_bannerscreen(options_.input);
+            manifest_.disc_label.volume_unique_identifier =
+              (bannerscreen ? crc32b_file(*bannerscreen) : random_unique_identifier());
+          }
+      }
     if(!preserve_unspecified_ || options_.root_unique_identifier_set)
       manifest_.disc_label.root_unique_identifier =
         (options_.root_unique_identifier_set ?
