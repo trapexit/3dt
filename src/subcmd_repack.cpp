@@ -54,6 +54,17 @@ namespace
 
   static
   fs::path
+  default_output_path(const fs::path &input_)
+  {
+    fs::path rv;
+
+    rv = input_;
+    rv.replace_extension(".iso");
+    return rv;
+  }
+
+  static
+  fs::path
   create_temp_dir(const fs::path &base_)
   {
     std::random_device rd;
@@ -165,7 +176,7 @@ namespace Subcmd
       {
         fs::path target;
 
-        target = opts_.output.empty() ? filepath : opts_.output;
+        target = opts_.output.empty() ? default_output_path(filepath) : opts_.output;
         try
           {
             repack_one(filepath,target,opts_);
