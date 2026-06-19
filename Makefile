@@ -142,13 +142,13 @@ release-base: clean
 		CXX="zig c++ -target x86_64-windows-gnu" \
 		STRIP="zig llvm-strip" \
 		TARGET="x86_64-windows-gnu.exe" \
-		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
+		OPT="-Oz -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
 		CC="zig cc -target aarch64-macos" \
 		CXX="zig c++ -target aarch64-macos" \
 		STRIP="zig llvm-strip" \
 		TARGET="aarch64-macos" \
-		OPT="-Oz -flto -ffunction-sections -fdata-sections"
+		OPT="-Oz -ffunction-sections -fdata-sections"
 
 release:
 	podman build -t localhost/cxxbuilder buildtools/
