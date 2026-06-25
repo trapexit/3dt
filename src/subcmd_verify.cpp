@@ -24,6 +24,7 @@
 #include "tdo_disc_format.hpp"
 #include "tdo_disc_label.hpp"
 #include "tdo_romtag.hpp"
+#include "tdo_romtag_metadata.hpp"
 #include "tdo_boot_code_crypto.hpp"
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
@@ -39,8 +40,11 @@
 #include "types_ints.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
+#include <filesystem>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -135,6 +139,210 @@ public:
     return {};
   }
 };
+
+struct ROMTagMetadataRecord
+{
+  bool                  found = false;
+  std::filesystem::path path;
+  TDO::DirectoryRecord  record;
+};
+
+static
+std::string
+lowercase_path(const std::filesystem::path &path_)
+{
+  std::string path;
+
+  path = path_.generic_string();
+  std::transform(path.begin(),path.end(),path.begin(),
+                 [](const unsigned char ch_) {
+                   return static_cast<char>(std::tolower(ch_));
+                 });
+
+  return path;
+}
+
+class ROMTagMetadataRecordCollector final : public TDO::FSWalker::Callbacks
+{
+public:
+  ROMTagMetadataRecord boot_code;
+  ROMTagMetadataRecord misc_code;
+  ROMTagMetadataRecord os_code;
+  ROMTagMetadataRecord launchme;
+
+public:
+  void
+  operator()(const std::filesystem::path &filepath_,
+             const TDO::DirectoryRecord  &record_,
+             const uint32_t,
+             TDO::DevStream&)
+  {
+    collect(filepath_,record_);
+  }
+
+private:
+  void
+  collect(const std::filesystem::path &filepath_,
+          const TDO::DirectoryRecord  &record_)
+  {
+    ROMTagMetadataRecord *metadata;
+    const std::string lc_filepath = lowercase_path(filepath_);
+
+    metadata = nullptr;
+    if(lc_filepath == "system/kernel/boot_code")
+      metadata = &boot_code;
+    else if(lc_filepath == "system/kernel/misc_code")
+      metadata = &misc_code;
+    else if(lc_filepath == "system/kernel/os_code")
+      metadata = &os_code;
+    else if(lc_filepath == "launchme")
+      metadata = &launchme;
+
+    if(metadata == nullptr)
+      return;
+
+    metadata->found = true;
+    metadata->path = filepath_;
+    metadata->record = record_;
+  }
+};
+
+static
+bool
+_read_metadata_record_data(TDO::DevStream              &s_,
+                           const ROMTagMetadataRecord  &metadata_,
+                           std::vector<char>           &data_)
+{
+  const TDO::DirectoryRecord &record = metadata_.record;
+
+  if(record.avatar_list.empty())
+    {
+      _vprint("   - error: {} has no avatars\n",
+              metadata_.path.generic_string());
+      return false;
+    }
+  if(!_range_in_image(s_,s_.size_in_bytes(),record.avatar_list[0],record.byte_count))
+    {
+      _vprint("   - error: {} is outside image bounds\n",
+              metadata_.path.generic_string());
+      return false;
+    }
+
+  s_.read_data_bytes_from_block(data_,
+                                record.avatar_list[0],
+                                record.byte_count);
+
+  return true;
+}
+
+static
+bool
+_verify_romtag_version_revision_fallback(TDO::DevStream              &s_,
+                                         const std::optional<TDO::ROMTag> &romtag_,
+                                         const ROMTagMetadataRecord  &metadata_)
+{
+  const TDO::ROMTagVersionRevisionFallback *fallback;
+  std::vector<char> data;
+
+  if(!romtag_ || !metadata_.found)
+    return true;
+  if(TDO::romtag_has_version_revision(*romtag_))
+    return true;
+  if(!_read_metadata_record_data(s_,metadata_,data))
+    return false;
+
+  fallback = TDO::find_romtag_version_revision_fallback(romtag_->type,data);
+  if(fallback == nullptr)
+    return true;
+
+  _vprint("   - error: {} ROMTag version/revision is {}.{} for {}; known file hash {} expects {}.{}\n",
+          romtag_->type_str(),
+          romtag_->version,
+          romtag_->revision,
+          metadata_.path.generic_string(),
+          fallback->md5,
+          fallback->version,
+          fallback->revision);
+
+  return false;
+}
+
+static
+bool
+_verify_blocks_always_romtag(const std::optional<TDO::ROMTag> &romtag_,
+                             const ROMTagMetadataRecord       &metadata_)
+{
+  bool matched;
+  u32 expected_offset;
+  u32 expected_size;
+  const TDO::DirectoryRecord &record = metadata_.record;
+
+  if(!romtag_ || !metadata_.found)
+    return true;
+
+  matched = true;
+  if(record.avatar_list.empty())
+    {
+      _vprint("   - error: {} has no avatars\n",
+              metadata_.path.generic_string());
+      return false;
+    }
+  if(record.avatar_list[0] == 0)
+    {
+      _vprint("   - error: {} has invalid avatar 0\n",
+              metadata_.path.generic_string());
+      return false;
+    }
+
+  expected_offset = record.avatar_list[0] - 1;
+  expected_size = record.byte_count;
+  if(romtag_->offset != expected_offset)
+    {
+      _vprint("   - error: BLOCKS_ALWAYS ROMTag offset is {}; expected {} for {}\n",
+              romtag_->offset,
+              expected_offset,
+              metadata_.path.generic_string());
+      matched = false;
+    }
+  if(romtag_->size != expected_size)
+    {
+      _vprint("   - error: BLOCKS_ALWAYS ROMTag size is {}; expected {} for {}\n",
+              romtag_->size,
+              expected_size,
+              metadata_.path.generic_string());
+      matched = false;
+    }
+
+  return matched;
+}
+
+static
+bool
+_verify_romtag_metadata(TDO::DevStream &s_)
+{
+  bool matched;
+  ROMTagMetadataRecordCollector records;
+  TDO::FSWalker fsw(s_,records,false);
+
+  _vprint(" - Verifying ROMTag metadata\n");
+
+  fsw.walk();
+
+  matched = true;
+  matched &= _verify_romtag_version_revision_fallback(s_,
+                                                     s_.romtag(RSA_NEWKNEWNEWGNUBOOT),
+                                                     records.boot_code);
+  matched &= _verify_romtag_version_revision_fallback(s_,
+                                                     s_.romtag(RSA_MISCCODE),
+                                                     records.misc_code);
+  matched &= _verify_romtag_version_revision_fallback(s_,
+                                                     s_.romtag(RSA_OS),
+                                                     records.os_code);
+  matched &= _verify_blocks_always_romtag(s_.romtag(RSA_BLOCKS_ALWAYS),
+                                          records.launchme);
+
+  return matched;
+}
 
 static
 void
@@ -1019,6 +1227,20 @@ _verify_rsa_sigs(TDO::DevStream &s_)
       saw_invalid = true;
     }
   matched &= _verify_romtag_assets(s_,saw_unsigned,saw_invalid);
+  try
+    {
+      if(!_verify_romtag_metadata(s_))
+        {
+          matched = false;
+          saw_invalid = true;
+        }
+    }
+  catch(const std::exception &e)
+    {
+      _vprint(" - error verifying ROMTag metadata: {}\n",e.what());
+      matched = false;
+      saw_invalid = true;
+    }
 
   if(matched)
     return VerifyStatus::Valid;
