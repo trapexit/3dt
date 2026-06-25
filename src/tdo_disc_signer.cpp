@@ -27,6 +27,7 @@
 #include "tdo_disc_format.hpp"
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
+#include "tdo_romtag_metadata.hpp"
 #include "tdo_rsa.h"
 #include "tdo_safe_narrow.hpp"
 #include "version.hpp"
@@ -50,6 +51,8 @@ namespace
   static constexpr u64 AIF_HEADER_RO_SIZE_OFFSET = 0x14;
   static constexpr u64 AIF_HEADER_RW_SIZE_OFFSET = 0x18;
   static constexpr u64 AIF_HEADER_DEBUG_SIZE_OFFSET = 0x1c;
+  static constexpr u64 AIF_3DO_SIGNATURE_OFFSET_OFFSET = 0xb0;
+  static constexpr u64 AIF_3DO_SIGNATURE_LEN_OFFSET = 0xb4;
 
   // Compute the digest count for a given volume_block_count, rejecting
   // values that would overflow the digest math. This is the shared core
@@ -100,6 +103,17 @@ namespace
   }
 
   static
+  void
+  write_u32_be(std::array<char, sizeof(u32)> &out_,
+               const u32                      value_)
+  {
+    out_[0] = static_cast<char>((value_ >> 24) & 0xff);
+    out_[1] = static_cast<char>((value_ >> 16) & 0xff);
+    out_[2] = static_cast<char>((value_ >> 8) & 0xff);
+    out_[3] = static_cast<char>((value_ >> 0) & 0xff);
+  }
+
+  static
   std::optional<u64>
   arm_bl_target(const u32 instruction_,
                 const u64 instruction_offset_)
@@ -115,7 +129,7 @@ namespace
       immediate |= 0xff000000;
 
     target = static_cast<s64>(instruction_offset_) + 8 +
-             (static_cast<s64>(immediate) << 2);
+      (static_cast<s64>(immediate) << 2);
     if(target < 0)
       return {};
 
@@ -212,29 +226,32 @@ namespace
 
   static
   std::optional<u64>
-  boot_code_romtag_size(const std::vector<char> &encrypted_data_)
+  boot_code_romtag_size_from_decrypted(const std::vector<char> &data_)
   {
     u64 signed_size;
-    u64 aligned_size;
-    std::vector<char> data;
     std::optional<u64> executable_size;
 
-    data = encrypted_data_;
-    aligned_size = TDO::boot_code_crypto_aligned_size(data.size());
-    TDO::decrypt_boot_code_range(data.data(),aligned_size);
-
-    executable_size = aif_executable_size(data);
+    executable_size = aif_executable_size(data_);
     if(!executable_size)
       return {};
 
     signed_size = TDO::round_up(*executable_size,sizeof(u32)) + (RSA512_SIG_SIZE * 2);
-    if(signed_size > data.size())
+    if(signed_size > data_.size())
       return {};
-    if((signed_size < data.size()) &&
-       !is_zero_range(data,signed_size,data.size()))
+    if((signed_size < data_.size()) &&
+       !is_zero_range(data_,signed_size,data_.size()))
       return {};
 
     return signed_size;
+  }
+
+  static
+  void
+  decrypt_boot_code_data(std::vector<char> &data_)
+  {
+    const u64 aligned_size = TDO::boot_code_crypto_aligned_size(data_.size());
+
+    TDO::decrypt_boot_code_range(data_.data(),aligned_size);
   }
 
   static
@@ -258,11 +275,83 @@ namespace
 
   static
   void
-  apply_boot_romtag_version(TDO::ROMTag &romtag_,
-                            const u64    record_size_)
+  apply_boot_romtag_version(TDO::ROMTag             &romtag_,
+                            const std::vector<char> &decrypted_data_)
   {
-    romtag_.version = ((record_size_ < 8192) ? 1 : 2);
-    romtag_.revision = 0;
+    static constexpr u64 ITEMNODE_VERSION_OFFSET = 0x94;
+
+    // M2 ROM recipes read Opera boot version/revision from AIF offsets
+    // 0x94/0x95.  Some shipped encrypted boot_code payloads leave those
+    // bytes zero after decryption; those cases are handled by the
+    // hash-based fallback table.
+    if(decrypted_data_.size() >= (ITEMNODE_VERSION_OFFSET + 2))
+      {
+        romtag_.version =
+          static_cast<u8>(decrypted_data_[ITEMNODE_VERSION_OFFSET]);
+        romtag_.revision =
+          static_cast<u8>(decrypted_data_[ITEMNODE_VERSION_OFFSET + 1]);
+      }
+  }
+
+  static
+  void
+  apply_romtag_version_revision_fallback(TDO::DevStream              &stream_,
+                                         TDO::ROMTag                &romtag_,
+                                         const TDO::DirectoryRecord &record_)
+  {
+    std::vector<char> data;
+    const TDO::ROMTagVersionRevisionFallback *fallback;
+
+    // For byte-count types the fallback table keys on the full on-disc
+    // payload; the in-memory record_.byte_count may be stale since
+    // boot_code size correction (update_record_sizes above) updates the
+    // on-disc record but not this const reference -- so prefer
+    // romtag_.size, which carries the corrected byte count for boot_code
+    // and equals record_.byte_count for the other byte-count types.
+    // RSA_BLOCKS_ALWAYS stores block_count (not bytes) in romtag_.size,
+    // so fall back to record_.byte_count for it.
+    const u64 data_size = (romtag_.type == RSA_BLOCKS_ALWAYS)
+      ? record_.byte_count
+      : romtag_.size;
+
+    if(TDO::romtag_has_version_revision(romtag_))
+      return;
+    if(data_size > static_cast<u64>(std::numeric_limits<s64>::max()))
+      throw Error("ROMTag version/revision fallback file is too large");
+
+    stream_.read_data_bytes_from_block(data,
+                                       record_.avatar_list[0],
+                                       static_cast<s64>(data_size));
+    fallback = TDO::find_romtag_version_revision_fallback(romtag_.type,data);
+    if(fallback == nullptr)
+      {
+        // The hash oracle missed. This happens, among other cases, when
+        // re-signing an image this tool already mutated: for RSA_OS and
+        // RSA_MISCCODE, set_aif_signature_metadata rewrites the AIF
+        // _3DO_Signature/_3DO_SignatureLen at payload offsets 0xb0/0xb4,
+        // so the on-disc bytes hashed here no longer match the
+        // retail-keyed fallback table. As a last resort, preserve the
+        // version/revision already recorded in the on-disc ROMTag table
+        // for this type, keeping the regenerated ROMTag stable across
+        // sign runs (sign -> verify -> sign idempotency). On retail
+        // discs this is the retail-authored value; on re-signed images
+        // it is the value a prior sign established -- both authoritative.
+        const std::optional<TDO::ROMTag> existing = stream_.romtag(romtag_.type);
+        if(existing && TDO::romtag_has_version_revision(*existing))
+          {
+            romtag_.version   = existing->version;
+            romtag_.revision = existing->revision;
+          }
+        return;
+      }
+
+    romtag_.version = fallback->version;
+    romtag_.revision = fallback->revision;
+    fmt::print("    - using known {} version/revision {}.{} for file hash {}\n",
+               TDO::ROMTag::type_str(romtag_.type),
+               romtag_.version,
+               romtag_.revision,
+               fallback->md5);
   }
 
   static
@@ -505,6 +594,55 @@ namespace
     }
   };
 
+  static
+  void
+  set_aif_signature_metadata(TDO::FileStream &stream_,
+                             std::vector<char> &data_,
+                             const u64       first_block_,
+                             const u32       signature_offset_,
+                             const u32       signature_len_,
+                             const char      *label_)
+  {
+    // Portfolio OS's 0x80-byte AIFHeader is followed by _3DOBinHeader;
+    // _3DO_Signature and _3DO_SignatureLen are at payload-relative
+    // offsets 0xb0/0xb4. rsadipir.c uses _3DO_Signature as the length
+    // to hash and as the offset from the AIF start to the signature.
+    std::array<char, sizeof(u32)> bytes{};
+
+    if(data_.size() < (AIF_3DO_SIGNATURE_LEN_OFFSET + sizeof(u32)))
+      return;
+
+    if((static_cast<u64>(signature_offset_) + signature_len_) > data_.size())
+      return;
+
+    stream_.data_byte_seek((first_block_ * TDO::BLOCK_SIZE) +
+                           AIF_3DO_SIGNATURE_OFFSET_OFFSET);
+    write_u32_be(bytes,signature_offset_);
+    std::memcpy(data_.data() + AIF_3DO_SIGNATURE_OFFSET_OFFSET,
+                bytes.data(),
+                bytes.size());
+    stream_.write(bytes.data(),bytes.size());
+
+    stream_.data_byte_seek((first_block_ * TDO::BLOCK_SIZE) +
+                           AIF_3DO_SIGNATURE_LEN_OFFSET);
+    write_u32_be(bytes,signature_len_);
+    std::memcpy(data_.data() + AIF_3DO_SIGNATURE_LEN_OFFSET,
+                bytes.data(),
+                bytes.size());
+    stream_.write(bytes.data(),bytes.size());
+
+    if(label_)
+      fmt::print("  - Setting AIF signature metadata for {}\n",label_);
+  }
+
+  static
+  bool
+  romtag_type_is_aif_payload(const u8 romtag_type_)
+  {
+    return ((romtag_type_ == RSA_OS) ||
+            (romtag_type_ == RSA_MISCCODE));
+  }
+
   class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
   {
   public:
@@ -554,8 +692,13 @@ namespace
           romtag.type_specific = digest_check_count;
           break;
         case RSA_BLOCKS_ALWAYS:
+          // Retail BLOCKS_ALWAYS ROMTags store the launchme avatar
+          // directly (a 0-indexed block offset; see docs/romtags.md)
+          // and carry block_count -- not byte_count -- in the size
+          // field. This matches romtag_size_is_byte_count() in
+          // tdo_fs_walker.cpp, which returns false for this type.
           romtag.offset = record_.avatar_list[0];
-          romtag.size = record_.block_count;
+          romtag.size   = record_.block_count;
           break;
         case RSA_OS:
           apply_os_romtag_version(stream_,romtag,record_);
@@ -564,6 +707,7 @@ namespace
           {
             u64 allocated_size;
             std::vector<char> buf;
+            std::vector<char> decrypted;
             std::optional<u64> boot_size;
 
             allocated_size = static_cast<u64>(record_.block_count) * record_.block_size;
@@ -571,25 +715,28 @@ namespace
                                                record_.avatar_list[0],
                                                allocated_size);
 
-            boot_size = boot_code_romtag_size(buf);
+            decrypted = buf;
+            decrypt_boot_code_data(decrypted);
+
+            boot_size = boot_code_romtag_size_from_decrypted(decrypted);
             if(!boot_size)
               boot_size = TDO::round_up(record_.byte_count,sizeof(u32));
-            apply_boot_romtag_version(romtag,
-                                      record_.byte_count);
+            apply_boot_romtag_version(romtag,decrypted);
             if(boot_size && (*boot_size != record_.byte_count))
               {
                 fmt::print("    - correcting boot_code size to {}\n",
                            *boot_size);
                 romtag.size = *boot_size;
                 update_record_sizes(stream_,
-                                     record_pos_,
-                                     romtag.size,
+                                    record_pos_,
+                                    romtag.size,
                                     record_.block_count);
               }
           }
           break;
         }
 
+      apply_romtag_version_revision_fallback(stream_,romtag,record_);
       romtags.emplace_back(romtag);
     }
   };
@@ -664,9 +811,9 @@ namespace
                        VERSION_MAJOR,
                        VERSION_MINOR,
                        VERSION_PATCH);
-     mark.resize(64,'\0');
+    mark.resize(64,'\0');
 
-     fmt::print("  - Setting location {} to '{}'\n",
+    fmt::print("  - Setting location {} to '{}'\n",
                mark_offset,
                mark.c_str());
     stream_.data_byte_seek(mark_offset);
@@ -677,8 +824,8 @@ namespace
   // tool as (first_data_block - 1) and so must satisfy the bounds
   // enforced by safe_romtag_first_data_block. Other tag types (e.g.
   // RSA_BILLSTUFF, which stores a unique-id XOR; RSA_BLOCKS_ALWAYS,
-  // which stores avatar_list[0] directly) carry domain-specific values
-  // in `offset` and must not be passed through that helper.
+  // which stores avatar_list[0] directly) carry domain-specific
+  // values in `offset` and must not be passed through that helper.
   static
   bool
   romtag_offset_is_block_index_minus_one(const TDO::ROMTag &tag_)
@@ -763,9 +910,9 @@ namespace
   static
   TDO::ROMTagVec
   generate_romtags_for_image(TDO::FileStream &stream_,
-                            const bool       include_banner_romtag_,
-                            const bool       include_billstuff_romtag_,
-                            const std::uint8_t digest_check_count_)
+                             const bool       include_banner_romtag_,
+                             const bool       include_billstuff_romtag_,
+                             const std::uint8_t digest_check_count_)
   {
     ROMTagsGenerator tags(include_banner_romtag_,digest_check_count_);
     TDO::FSWalker fswalker(stream_,tags,false);
@@ -872,7 +1019,7 @@ namespace
       preflight.generated_romtag_count++;
 
     const u64 padded_size = TDO::round_up(stream_.size_in_device_blocks() * TDO::BLOCK_SIZE,
-                                      TDO::LOG_BLOCK_SIZE);
+                                          TDO::LOG_BLOCK_SIZE);
     const u64 volume_block_count = padded_size / TDO::BLOCK_SIZE;
     const u64 num_digests = safe_digest_count_for_volume_blocks(volume_block_count);
     const u64 signature_size = TDO::signature_file_size_for_digest_count(num_digests);
@@ -889,9 +1036,9 @@ namespace
   static
   void
   generate_and_write_romtags(TDO::FileStream &stream_,
-                            const bool       include_banner_romtag_,
-                            const bool       include_billstuff_romtag_,
-                            const std::uint8_t digest_check_count_)
+                             const bool       include_banner_romtag_,
+                             const bool       include_billstuff_romtag_,
+                             const std::uint8_t digest_check_count_)
   {
     TDO::ROMTagVec romtags;
 
@@ -926,9 +1073,24 @@ namespace
                                                       *romtag,
                                                       romtag->size,
                                                       label_);
+
     stream_.read_data_bytes_from_block(data,
                                        first_block,
-                                       romtag->size - RSA512_SIG_SIZE);
+                                       romtag->size);
+
+    if(romtag_type_is_aif_payload(romtag_type_))
+      set_aif_signature_metadata(stream_,
+                                 data,
+                                 first_block,
+                                 static_cast<u32>(romtag->size - RSA512_SIG_SIZE),
+                                 RSA512_SIG_SIZE,
+                                 label_);
+
+    data.resize(romtag->size - RSA512_SIG_SIZE);
+    // CD-ROM ROMTag asset checks (cdromdipir.c:ReadOsComponent)
+    // hash the raw payload up to the trailing signature. RSACheck's
+    // _3DO_SignatureLen zeroing applies to AIF task/driver checks, not
+    // these ROMTag signatures.
     md5_calc(data.data(),data.size(),digest);
     tdo_rsa_sign(key_,digest,sig);
 
@@ -1356,16 +1518,16 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
 
   if(preflight_)
     preflight_signing_image(stream,
-                           include_banner_romtag_,
-                           include_billstuff_romtag_);
+                            include_banner_romtag_,
+                            include_billstuff_romtag_);
 
   pad_image_and_update_disclabel(stream);
   if(mark_)
     add_3dt_mark(stream,"signed");
   generate_and_write_romtags(stream,
-                            include_banner_romtag_,
-                            include_billstuff_romtag_,
-                            digest_check_count_);
+                             include_banner_romtag_,
+                             include_billstuff_romtag_,
+                             digest_check_count_);
   sign_system_payloads(stream);
   sign_appsplash(stream);
   resize_signatures_file_record(stream);
