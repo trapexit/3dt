@@ -1130,7 +1130,7 @@ _verify(const Options::Verify &opts_)
                   (exit_code == 0))
             exit_code = VERIFY_EXIT_UNSIGNED;
         }
-      results.push_back({filepath.string(),status});
+      results.push_back({filepath.generic_string(),status});
     }
 
   _print_summary(format,opts_.quiet,results);
