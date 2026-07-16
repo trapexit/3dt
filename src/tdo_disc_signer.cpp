@@ -302,7 +302,7 @@ namespace
     {
       (void)record_;
 
-      if(nonstd::string::as_lowercase(filepath_.string()) != "rom_tags")
+      if(nonstd::string::as_lowercase(filepath_.generic_string()) != "rom_tags")
         return;
 
       update_record_sizes(stream_,
@@ -327,7 +327,7 @@ namespace
     {
       (void)record_;
 
-      if(nonstd::string::as_lowercase(filepath_.string()) != "signatures")
+      if(nonstd::string::as_lowercase(filepath_.generic_string()) != "signatures")
         return;
 
       update_record_sizes(stream_,
@@ -381,7 +381,7 @@ namespace
       (void)record_pos_;
       (void)stream_;
 
-      if(nonstd::string::as_lowercase(filepath_.string()) != "signatures")
+      if(nonstd::string::as_lowercase(filepath_.generic_string()) != "signatures")
         return;
 
       found = true;
@@ -424,7 +424,7 @@ namespace
       (void)record_pos_;
       (void)stream_;
 
-      lc_filepath = nonstd::string::as_lowercase(filepath_.string());
+      lc_filepath = nonstd::string::as_lowercase(filepath_.generic_string());
       if(lc_filepath == "rom_tags")
         {
           found_rom_tags = true;
@@ -481,7 +481,7 @@ namespace
       (void)record_pos_;
       (void)stream_;
 
-      lc_filepath = nonstd::string::as_lowercase(filepath_.string());
+      lc_filepath = nonstd::string::as_lowercase(filepath_.generic_string());
       if(lc_filepath == "rom_tags")
         {
           found_rom_tags = true;
@@ -530,17 +530,17 @@ namespace
     {
       u32 type;
 
-      type = romtag_type_for_path(nonstd::string::as_lowercase(filepath_.string()),
+      type = romtag_type_for_path(nonstd::string::as_lowercase(filepath_.generic_string()),
                                   include_banner_romtag);
       if(type == 0)
         return;
 
       if(record_.avatar_list.empty())
         throw Error(fmt::format("ROM tag candidate has no avatars: {}",
-                                filepath_.string()));
+                                filepath_.generic_string()));
       if(record_.avatar_list[0] == 0)
         throw Error(fmt::format("ROM tag candidate has invalid avatar 0: {}",
-                                filepath_.string()));
+                                filepath_.generic_string()));
 
       TDO::ROMTag romtag{};
 
