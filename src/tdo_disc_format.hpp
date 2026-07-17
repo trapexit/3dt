@@ -31,6 +31,35 @@ namespace TDO
   constexpr u64 BLOCK_SIZE = 2048;
   constexpr u64 LOG_BLOCK_SIZE = 32768;
   constexpr u64 LOG_BLOCKS_PER_DIGEST = (LOG_BLOCK_SIZE / BLOCK_SIZE);
+  constexpr u64 PORTFOLIO_MIN_SIGNATURE_DIGEST_SPAN = 12;
+
+  struct DigestRange
+  {
+    u64 first;
+    u64 last;
+
+    bool
+    contains(const u64 digest_) const
+    {
+      return ((digest_ >= first) && (digest_ <= last));
+    }
+  };
+
+  static inline
+  DigestRange
+  portfolio_signature_digest_range(const u64 first_data_block_,
+                                   const u64 advertised_size_)
+  {
+    const u64 first = (first_data_block_ / LOG_BLOCKS_PER_DIGEST);
+    const u64 size_span = (advertised_size_ / LOG_BLOCK_SIZE);
+    const u64 span = ((size_span < PORTFOLIO_MIN_SIGNATURE_DIGEST_SPAN)
+                      ? PORTFOLIO_MIN_SIGNATURE_DIGEST_SPAN
+                      : size_span);
+
+    // appdigest.c computes this inclusive range from the ROMTag-advertised
+    // size before applying the optional 8192-byte signature-file trailer.
+    return {first,first + span};
+  }
 
   static inline
   u64

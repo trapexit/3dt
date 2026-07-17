@@ -1270,19 +1270,10 @@ namespace
 
   static
   void
-  zero_signature_digests(std::vector<char> &signatures_,
-                         const u64          start_block_,
-                         const u64          byte_count_)
+  zero_signature_digests(std::vector<char>      &signatures_,
+                         const TDO::DigestRange &range_)
   {
-    if(byte_count_ == 0)
-      return;
-
-    const u64 start_byte = start_block_ * TDO::BLOCK_SIZE;
-    const u64 end_byte = start_byte + byte_count_;
-    const u64 first_digest = start_byte / TDO::LOG_BLOCK_SIZE;
-    const u64 last_digest = (end_byte - 1) / TDO::LOG_BLOCK_SIZE;
-
-    for(u64 digest = first_digest; digest <= last_digest; digest++)
+    for(u64 digest = range_.first; digest <= range_.last; digest++)
       {
         const u64 offset = digest * sizeof(md5_digest_t);
 
@@ -1296,8 +1287,8 @@ namespace
 
   static
   void
-  zero_mutable_signature_digests(TDO::FileStream &stream_,
-                                 std::vector<char> &signatures_)
+  zero_portfolio_signature_digests(TDO::FileStream &stream_,
+                                   std::vector<char> &signatures_)
   {
     std::optional<TDO::ROMTag> sig_romtag;
 
@@ -1306,7 +1297,9 @@ namespace
       {
         const u64 first_block =
           safe_romtag_first_data_block(stream_,*sig_romtag,"signatures");
-        zero_signature_digests(signatures_,first_block,sig_romtag->size);
+        const TDO::DigestRange range =
+          TDO::portfolio_signature_digest_range(first_block,sig_romtag->size);
+        zero_signature_digests(signatures_,range);
       }
   }
 
@@ -1326,7 +1319,7 @@ namespace
       return;
 
     signatures = generate_signatures_file_data(stream_);
-    zero_mutable_signature_digests(stream_,signatures);
+    zero_portfolio_signature_digests(stream_,signatures);
 
     num_digests = safe_signature_digest_count(stream_);
     file_size = std::max<u64>(TDO::signature_file_size_for_digest_count(num_digests),

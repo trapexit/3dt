@@ -25,7 +25,9 @@ last entry), and NEWKNEWNEWGNUBOOT.
 * the checker in appdigest.c ignores
   * 0x080F : third label digest
   * 0x0306 : Fatty Bear
-  * everything covering signature 
+  * the inclusive range from the signature file's first 32K digest through
+    first + max(12, ROMTag-advertised size / 32K); the optional 8192-byte
+    trailer is added after this exclusion range is calculated
 * TypeSpecific from sig romtag indicates "MaxPain", how many blocks to
   check
 * Add an additional 2048 block to signature file
