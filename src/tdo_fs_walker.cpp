@@ -39,6 +39,10 @@ romtag_size_is_byte_count(const TDO::ROMTag &tag_)
   switch(tag_.type)
     {
     case RSA_BLOCKS_ALWAYS:
+      // This field is a byte count under Portfolio's generic ROMTag
+      // definition, but authentic retail discs use a block count here.
+      // The filesystem record already supplies byte_count, so do not let
+      // either ambiguous encoding rewrite it while walking the image.
       return false;
     }
 

@@ -67,6 +67,21 @@ The `type` field when `sub_systype == RSANODE`:
 | `0x17` | `RSA_DEV_PERMS` | List of usable devices |
 | `0x18` | `RSA_BOOT_OVERLAY` | Overlay module for RSA_NEW*BOOT |
 
+`RSA_BLOCKS_ALWAYS` appears on bootable discs in two encodings:
+
+- Portfolio's documented form stores a table-relative block offset and a byte
+  size. `cdromdipir.c` calculates `rt_Offset + RomTagBlock` and copies
+  `rt_Size` under `SIGN_LAUNCHME`.
+- Authentic retail discs also contain an absolute block offset and a block
+  count. The published Portfolio tree tolerates this because `SIGN_LAUNCHME`
+  is not enabled by that tree, `RSACheckLaunchme()` returns success before
+  reading the block even if enabled, and its saved size is never consumed.
+
+Verification accepts either complete encoding, but not a mixture of their
+offset and size conventions. Signing emits the retail mastering form for
+compatibility with authentic discs. Filesystem walking does not use the
+ambiguous `RSA_BLOCKS_ALWAYS` size to rewrite a file's byte count.
+
 ### M2 Component Types
 
 | Value | Name | Description |
