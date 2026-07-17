@@ -270,18 +270,19 @@ _verify_romtag_version_revision_fallback(TDO::DevStream                   &s_,
 
 static
 bool
-_verify_blocks_always_romtag(const std::optional<TDO::ROMTag> &romtag_,
+_verify_blocks_always_romtag(TDO::DevStream                   &s_,
+                             const std::optional<TDO::ROMTag> &romtag_,
                              const ROMTagMetadataRecord       &metadata_)
 {
-  bool matched;
-  u32 expected_offset;
-  u32 expected_size;
+  bool portfolio_encoding;
+  bool portfolio_offset_valid;
+  bool retail_encoding;
+  u64 portfolio_offset;
   const TDO::DirectoryRecord &record = metadata_.record;
 
   if(!romtag_ || !metadata_.found)
     return true;
 
-  matched = true;
   if(record.avatar_list.empty())
     {
       _vprint("   - error: {} has no avatars\n",
@@ -295,30 +296,56 @@ _verify_blocks_always_romtag(const std::optional<TDO::ROMTag> &romtag_,
       return false;
     }
 
-  // Retail BLOCKS_ALWAYS stores avatar_list[0] (a 0-indexed block
-  // offset) in `offset` and the launchme block_count in `size` --
-  // not byte_count; see romtag_size_is_byte_count() in
-  // tdo_fs_walker.cpp and docs/romtags.md.
-  expected_offset = record.avatar_list[0];
-  expected_size = record.block_count;
-  if(romtag_->offset != expected_offset)
+  // Portfolio's src/includes/rom.h defines rt_Offset as a block offset from
+  // the ROMTag table and rt_Size as bytes. src/dipir/cdromdipir.c applies
+  // those generic rules to RSA_BLOCKS_ALWAYS, but only under SIGN_LAUNCHME.
+  // Its published RSACheckLaunchme() returns success before reading the
+  // saved size is never consumed. Authentic retail discs therefore also
+  // boot with the mastering convention seen in the corpus: absolute avatar
+  // plus block_count. Accept both complete pairs, but not a hybrid of them.
+  portfolio_offset_valid = (record.avatar_list[0] >= s_.romtags_block());
+  portfolio_offset = portfolio_offset_valid
+    ? (record.avatar_list[0] - s_.romtags_block())
+    : 0;
+  portfolio_encoding =
+    (portfolio_offset_valid &&
+     (romtag_->offset == portfolio_offset) &&
+     (romtag_->size == record.byte_count));
+  retail_encoding =
+    ((romtag_->offset == record.avatar_list[0]) &&
+     (romtag_->size == record.block_count));
+
+  if(portfolio_encoding)
     {
-      _vprint("   - error: BLOCKS_ALWAYS ROMTag offset is {}; expected {} for {}\n",
-              romtag_->offset,
-              expected_offset,
-              metadata_.path.generic_string());
-      matched = false;
+      _vprint("   - BLOCKS_ALWAYS encoding: Portfolio (table-relative offset, byte size)\n");
+      return true;
     }
-  if(romtag_->size != expected_size)
+  if(retail_encoding)
     {
-      _vprint("   - error: BLOCKS_ALWAYS ROMTag size is {}; expected {} for {}\n",
-              romtag_->size,
-              expected_size,
-              metadata_.path.generic_string());
-      matched = false;
+      _vprint("   - BLOCKS_ALWAYS encoding: retail compatibility (absolute offset, block count)\n");
+      return true;
     }
 
-  return matched;
+  if(portfolio_offset_valid)
+    _vprint("   - error: BLOCKS_ALWAYS ROMTag is offset {}, size {}; expected Portfolio offset {}, size {} bytes or retail offset {}, size {} blocks for {}\n",
+            romtag_->offset,
+            romtag_->size,
+            portfolio_offset,
+            record.byte_count,
+            record.avatar_list[0],
+            record.block_count,
+            metadata_.path.generic_string());
+  else
+    _vprint("   - error: BLOCKS_ALWAYS ROMTag is offset {}, size {}; LaunchMe block {} precedes ROMTag table block {} and does not match retail offset {}, size {} blocks for {}\n",
+            romtag_->offset,
+            romtag_->size,
+            record.avatar_list[0],
+            s_.romtags_block(),
+            record.avatar_list[0],
+            record.block_count,
+            metadata_.path.generic_string());
+
+  return false;
 }
 
 static
@@ -343,7 +370,8 @@ _verify_romtag_metadata(TDO::DevStream &s_)
   matched &= _verify_romtag_version_revision_fallback(s_,
                                                       s_.romtag(RSA_OS),
                                                       records.os_code);
-  matched &= _verify_blocks_always_romtag(s_.romtag(RSA_BLOCKS_ALWAYS),
+  matched &= _verify_blocks_always_romtag(s_,
+                                          s_.romtag(RSA_BLOCKS_ALWAYS),
                                           records.launchme);
 
   return matched;

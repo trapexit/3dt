@@ -308,8 +308,9 @@ namespace
     // on-disc record but not this const reference -- so prefer
     // romtag_.size, which carries the corrected byte count for boot_code
     // and equals record_.byte_count for the other byte-count types.
-    // RSA_BLOCKS_ALWAYS stores block_count (not bytes) in romtag_.size,
-    // so fall back to record_.byte_count for it.
+    // 3dt emits the retail-compatible RSA_BLOCKS_ALWAYS form, whose size is
+    // a block count rather than bytes, so use the filesystem byte_count for
+    // payload hashing and metadata fallback.
     const u64 data_size = (romtag_.type == RSA_BLOCKS_ALWAYS)
       ? record_.byte_count
       : romtag_.size;
@@ -692,11 +693,11 @@ namespace
           romtag.type_specific = digest_check_count;
           break;
         case RSA_BLOCKS_ALWAYS:
-          // Retail BLOCKS_ALWAYS ROMTags store the launchme avatar
-          // directly (a 0-indexed block offset; see docs/romtags.md)
-          // and carry block_count -- not byte_count -- in the size
-          // field. This matches romtag_size_is_byte_count() in
-          // tdo_fs_walker.cpp, which returns false for this type.
+          // Portfolio documents table-relative offset plus byte size, but
+          // its published LaunchMe check is inactive. Authentic retail
+          // discs instead store the absolute avatar and block_count here.
+          // Keep generating that mastering convention; verify accepts both
+          // it and the Portfolio-documented form (see docs/romtags.md).
           romtag.offset = record_.avatar_list[0];
           romtag.size   = record_.block_count;
           break;
@@ -824,8 +825,9 @@ namespace
   // tool as (first_data_block - 1) and so must satisfy the bounds
   // enforced by safe_romtag_first_data_block. Other tag types (e.g.
   // RSA_BILLSTUFF, which stores a unique-id XOR; RSA_BLOCKS_ALWAYS,
-  // which stores avatar_list[0] directly) carry domain-specific
-  // values in `offset` and must not be passed through that helper.
+  // for which 3dt emits the retail absolute-avatar form) carry
+  // domain-specific values in `offset` and must not be passed through
+  // that helper.
   static
   bool
   romtag_offset_is_block_index_minus_one(const TDO::ROMTag &tag_)
@@ -856,6 +858,11 @@ namespace
                      TDO::ROMTag::type_str(tag.type),
                      TDO::safe_romtag_first_data_block(stream_,tag,
                                                        TDO::ROMTag::type_str(tag.type).c_str()),
+                     tag.size);
+        else if(tag.type == RSA_BLOCKS_ALWAYS)
+          fmt::print("    - type: {}; offset: {:#010x}; size: {} blocks\n",
+                     TDO::ROMTag::type_str(tag.type),
+                     tag.offset,
                      tag.size);
         else
           fmt::print("    - type: {}; offset: {:#010x}; size: {}b\n",
