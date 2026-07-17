@@ -703,21 +703,6 @@ _collect_digest_files(TDO::DevStream                       &s_,
 }
 
 static
-bool
-_signature_digest_is_mutable(const u64 digest_,
-                             const u64 signature_block_,
-                             const u64 signature_size_)
-{
-  const u64 signature_start_byte = (signature_block_ * TDO::BLOCK_SIZE);
-  const u64 signature_end_byte = (signature_start_byte + signature_size_);
-  const u64 digest_start_byte = (digest_ * TDO::LOG_BLOCK_SIZE);
-  const u64 digest_end_byte = (digest_start_byte + TDO::LOG_BLOCK_SIZE);
-
-  return ((digest_start_byte < signature_end_byte) &&
-          (digest_end_byte > signature_start_byte));
-}
-
-static
 void
 _print_affected_files(const u64                                        digest_,
                       const u64                                        block_pos_,
@@ -760,10 +745,11 @@ _verify_signature_digests(TDO::DevStream          &s_,
   u64 checked_count;
   u64 digest_start32;
   u64 skipped_ignored_count;
-  u64 skipped_mutable_count;
   u64 skipped_prefix_count;
+  u64 skipped_signature_count;
   u64 skipped_unallocated_count;
   md5_digest_t digest;
+  TDO::DigestRange signature_range;
   std::vector<char> data;
   std::vector<bool> valid_digests;
 
@@ -777,10 +763,12 @@ _verify_signature_digests(TDO::DevStream          &s_,
   _collect_valid_digests(s_,num_digests_,valid_digests);
 
   digest_start32 = _portfolio_digest_start32(s_,num_digests_);
+  signature_range = TDO::portfolio_signature_digest_range(signature_block_,
+                                                           signature_size_);
   checked_count = 0;
   skipped_ignored_count = 0;
   skipped_prefix_count = 0;
-  skipped_mutable_count = 0;
+  skipped_signature_count = 0;
   skipped_unallocated_count = 0;
   for(u64 i = 0; i < num_digests_; i++)
     {
@@ -793,21 +781,21 @@ _verify_signature_digests(TDO::DevStream          &s_,
           continue;
         }
 
-      if(!valid_digests[i])
-        {
-          skipped_unallocated_count++;
-          continue;
-        }
-
       if(_portfolio_digest_is_ignored(i))
         {
           skipped_ignored_count++;
           continue;
         }
 
-      if(_signature_digest_is_mutable(i,signature_block_,signature_size_))
+      if(signature_range.contains(i))
         {
-          skipped_mutable_count++;
+          skipped_signature_count++;
+          continue;
+        }
+
+      if(!valid_digests[i])
+        {
+          skipped_unallocated_count++;
           continue;
         }
 
@@ -830,19 +818,22 @@ _verify_signature_digests(TDO::DevStream          &s_,
     }
 
   _vprint("   - digest table comparison: true\n"
-          "   - digest table policy: Portfolio max-check exhaustive\n"
+          "   - digest table policy: 3dt exhaustive with Portfolio exclusions\n"
           "   - digest table start index: {}\n"
+          "   - digest table signature exclusion: {}-{}\n"
           "   - digest table checked: {}\n"
           "   - digest table skipped prefix: {}\n"
           "   - digest table skipped ignored: {}\n"
           "   - digest table skipped unallocated: {}\n"
-          "   - digest table skipped mutable: {}\n",
+          "   - digest table skipped signature area: {}\n",
           digest_start32,
+          signature_range.first,
+          signature_range.last,
           checked_count,
           skipped_prefix_count,
           skipped_ignored_count,
           skipped_unallocated_count,
-          skipped_mutable_count);
+          skipped_signature_count);
 
   return true;
 }
