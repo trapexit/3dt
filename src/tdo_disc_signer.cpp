@@ -315,8 +315,6 @@ namespace
       ? record_.byte_count
       : romtag_.size;
 
-    if(TDO::romtag_has_version_revision(romtag_))
-      return;
     if(data_size > static_cast<u64>(std::numeric_limits<s64>::max()))
       throw Error("ROMTag version/revision fallback file is too large");
 
@@ -326,6 +324,13 @@ namespace
     fallback = TDO::find_romtag_version_revision_fallback(romtag_.type,data);
     if(fallback == nullptr)
       {
+        // A known payload hash is authoritative and may correct nonzero junk
+        // in the generic AIF version offsets. If the oracle has no entry,
+        // retain a plausible version already derived from the payload before
+        // falling back to an existing on-disc ROMTag.
+        if(TDO::romtag_has_version_revision(romtag_))
+          return;
+
         // The hash oracle missed. This happens, among other cases, when
         // re-signing an image this tool already mutated: for RSA_OS and
         // RSA_MISCCODE, set_aif_signature_metadata rewrites the AIF
@@ -915,11 +920,37 @@ namespace
   }
 
   static
+  void
+  apply_source_romtag_versions(TDO::ROMTagVec       &romtags_,
+                               const TDO::ROMTagVec &source_romtags_)
+  {
+    for(auto &romtag : romtags_)
+      {
+        const auto source = std::find_if(source_romtags_.begin(),
+                                         source_romtags_.end(),
+                                         [&romtag](const TDO::ROMTag &candidate_)
+                                         {
+                                           return ((candidate_.sub_systype == romtag.sub_systype) &&
+                                                   (candidate_.type == romtag.type));
+                                         });
+        if(source == source_romtags_.end())
+          continue;
+
+        // Repack has a known-good source table. Its version/revision fields
+        // are authoritative and intentionally override payload heuristics and
+        // the MD5 oracle. All structural fields are freshly regenerated.
+        romtag.version = source->version;
+        romtag.revision = source->revision;
+      }
+  }
+
+  static
   TDO::ROMTagVec
   generate_romtags_for_image(TDO::FileStream &stream_,
                              const bool       include_banner_romtag_,
                              const bool       include_billstuff_romtag_,
-                             const std::uint8_t digest_check_count_)
+                             const std::uint8_t digest_check_count_,
+                             const TDO::ROMTagVec &source_romtags_)
   {
     ROMTagsGenerator tags(include_banner_romtag_,digest_check_count_);
     TDO::FSWalker fswalker(stream_,tags,false);
@@ -928,6 +959,7 @@ namespace
 
     if(include_billstuff_romtag_)
       add_billstuff_romtag(stream_,tags.romtags);
+    apply_source_romtag_versions(tags.romtags,source_romtags_);
     sort_romtags(tags.romtags);
 
     return tags.romtags;
@@ -1045,7 +1077,8 @@ namespace
   generate_and_write_romtags(TDO::FileStream &stream_,
                              const bool       include_banner_romtag_,
                              const bool       include_billstuff_romtag_,
-                             const std::uint8_t digest_check_count_)
+                             const std::uint8_t digest_check_count_,
+                             const TDO::ROMTagVec &source_romtags_)
   {
     TDO::ROMTagVec romtags;
 
@@ -1053,7 +1086,8 @@ namespace
     romtags = generate_romtags_for_image(stream_,
                                          include_banner_romtag_,
                                          include_billstuff_romtag_,
-                                         digest_check_count_);
+                                         digest_check_count_,
+                                         source_romtags_);
     write_romtags(stream_,romtags);
     update_romtags_file(stream_,romtags.size() * sizeof(TDO::ROMTag));
   }
@@ -1442,7 +1476,8 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
                                    const bool                   mark_,
                                    const bool                   include_banner_romtag_,
                                    const bool                   include_billstuff_romtag_,
-                                   const std::uint8_t           digest_check_count_)
+                                   const std::uint8_t           digest_check_count_,
+                                   const TDO::ROMTagVec        &source_romtags_)
 {
   SpecialFileCapacity capacity;
   TDO::ROMTagVec romtags;
@@ -1464,7 +1499,8 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
   romtags = generate_romtags_for_image(stream,
                                        include_banner_romtag_,
                                        include_billstuff_romtag_,
-                                       digest_check_count_);
+                                       digest_check_count_,
+                                       source_romtags_);
   preflight_layout_special_files(stream,romtags,capacity);
   if(mark_)
     add_3dt_mark(stream,"packed and signed");
@@ -1507,7 +1543,8 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
                      const bool                   preflight_,
                      const bool                   include_banner_romtag_,
                      const bool                   include_billstuff_romtag_,
-                     const std::uint8_t           digest_check_count_)
+                     const std::uint8_t           digest_check_count_,
+                     const TDO::ROMTagVec        &source_romtags_)
 {
   TDO::FileStream stream;
 
@@ -1527,7 +1564,8 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
   generate_and_write_romtags(stream,
                              include_banner_romtag_,
                              include_billstuff_romtag_,
-                             digest_check_count_);
+                             digest_check_count_,
+                             source_romtags_);
   sign_system_payloads(stream);
   sign_appsplash(stream);
   resize_signatures_file_record(stream);

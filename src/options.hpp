@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "tdo_romtag.hpp"
+
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -67,6 +69,7 @@ public:
     bool        banner_romtag = true;
     bool        billstuff_romtag = false;
     bool        dry_run = false;
+    bool        discover_layout = true;
     bool        mark = true;
     bool        sign = false;
     bool        root_unique_identifier_set = false;
@@ -74,6 +77,9 @@ public:
     uint32_t    root_unique_identifier = 0;
     uint32_t    signature_digest_check_count = 0;
     uint32_t    volume_unique_identifier = 0;
+    // Repack supplies the source table so regenerated entries retain its
+    // authoritative version/revision fields. Ordinary pack leaves this empty.
+    TDO::ROMTagVec source_romtags;
   };
 
   struct Repack
