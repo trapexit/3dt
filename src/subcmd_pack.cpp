@@ -787,6 +787,38 @@ namespace
   }
 
   static
+  unsigned char
+  hex_nibble(const char c_)
+  {
+    if((c_ >= '0') && (c_ <= '9'))
+      return static_cast<unsigned char>(c_ - '0');
+    if((c_ >= 'a') && (c_ <= 'f'))
+      return static_cast<unsigned char>(10 + (c_ - 'a'));
+    if((c_ >= 'A') && (c_ <= 'F'))
+      return static_cast<unsigned char>(10 + (c_ - 'A'));
+    throw Error("layout path_raw_hex contains a non-hex character");
+  }
+
+  static
+  std::string
+  decode_path_bytes(const json &entry_json_)
+  {
+    if(!entry_json_.contains("path_raw_hex"))
+      return entry_json_.at("path").get<std::string>();
+
+    const std::string hex = entry_json_.at("path_raw_hex").get<std::string>();
+    std::string path;
+
+    if((hex.size() % 2) != 0)
+      throw Error("layout path_raw_hex has an odd length");
+    path.reserve(hex.size() / 2);
+    for(std::size_t i = 0; i < hex.size(); i += 2)
+      path.push_back(static_cast<char>((hex_nibble(hex[i]) << 4) |
+                                      hex_nibble(hex[i + 1])));
+    return path;
+  }
+
+  static
   LayoutMap
   read_layout(const fs::path    &layout_,
               TDO::DiscManifest &manifest_)
@@ -815,7 +847,7 @@ namespace
       {
         LayoutRecord record;
 
-        record.path               = fs::path(entry_json.at("path").get<std::string>()).lexically_normal().generic_string();
+        record.path               = fs::path(decode_path_bytes(entry_json)).lexically_normal().generic_string();
         record.flags              = json_u32(entry_json.at("flags"),"flags");
         record.unique_identifier  = json_u32(entry_json.at("unique_identifier"),"unique_identifier");
         record.type               = json_u32(entry_json.at("type"),"type");
@@ -1472,6 +1504,8 @@ namespace
 
     if(!options_.layout.empty())
       return options_.layout;
+    if(!options_.discover_layout)
+      return {};
 
     layout = options_.input / DEFAULT_LAYOUT_FILENAME;
     if(!fs::exists(layout))
@@ -1773,7 +1807,8 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               digest_check_count);
+                                               digest_check_count,
+                                               options_.source_romtags);
           }
 
         if(recreate_layout_specials)
@@ -1783,7 +1818,8 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               digest_check_count);
+                                               digest_check_count,
+                                               options_.source_romtags);
           }
 
         if(options_.sign && !recreate_layout_specials)
@@ -1793,7 +1829,8 @@ namespace Subcmd
                                  true,
                                  options_.banner_romtag,
                                  options_.billstuff_romtag,
-                                 digest_check_count);
+                                 digest_check_count,
+                                 options_.source_romtags);
           }
 
         if(options_.sign)

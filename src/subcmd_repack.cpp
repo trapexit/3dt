@@ -17,7 +17,6 @@
 */
 
 #include "subcmd.hpp"
-#include "temp_path.hpp"
 #include "tdo_disc_unpacker.hpp"
 #include "tdo_file_stream.hpp"
 
@@ -83,16 +82,6 @@ namespace
     throw Error("failed to find a unique temporary directory name");
   }
 
-  // FileExtractor used to override before()/after() to write each
-  // file body to _dstpath. That duplicated TDO::DiscUnpacker::Impl's
-  // own extraction (Impl reopens the same path with std::ios::trunc
-  // and rewrites the same bytes the callback just wrote), giving
-  // every repack a 2x I/O cost and silently undoing any
-  // transformation a callback might apply. The unpacker now
-  // provides no-op defaults for before()/after(), so repack just
-  // needs a default Callback to drive the walk; Impl handles the
-  // actual extraction.
-
   static
   void
   repack_one(const fs::path        &input_,
@@ -100,17 +89,19 @@ namespace
              const Options::Repack &opts_)
   {
     TDO::DiscLabel disc_label;
-
+    TDO::ROMTagVec source_romtags;
     {
       TDO::FileStream stream;
       stream.open(input_);
       disc_label = stream.disc_label();
+      // The rom_tags directory record may have a zero byte_count even though
+      // the authoritative table is present at block 1. Read it from the source
+      // image before extraction; only version/revision are applied later.
+      source_romtags = stream.romtags();
       stream.close();
     }
 
     fs::path temp_dir;
-    fs::path temp_output;
-
     try
       {
         temp_dir = create_temp_dir(input_);
@@ -118,8 +109,6 @@ namespace
         {
           std::fstream ifs;
           ifs.open(input_,std::ios::binary|std::ios::in);
-          // Default Callback (all hooks are no-op virtuals); Impl
-          // handles the directory-tree creation and file extraction.
           TDO::DiscUnpacker::Callback cb;
           TDO::DiscUnpacker unpacker(ifs,cb);
           unpacker.unpack(temp_dir);
@@ -128,11 +117,15 @@ namespace
         Options::Pack pack_opts{};
         pack_opts.input = temp_dir;
         pack_opts.output = target_;
+        // Repack deliberately rebuilds a compact, single-avatar filesystem.
+        // Never interpret an extracted layout.json payload as replay metadata.
+        pack_opts.discover_layout = false;
         pack_opts.banner_romtag = opts_.banner_romtag;
         pack_opts.billstuff_romtag = opts_.billstuff_romtag;
         pack_opts.mark = opts_.mark;
         pack_opts.sign = opts_.sign;
         pack_opts.signature_digest_check_count = opts_.signature_digest_check_count;
+        pack_opts.source_romtags = source_romtags;
 
         pack_opts.volume_commentary = label_string(disc_label.volume_commentary);
         pack_opts.volume_label = label_string(disc_label.volume_identifier);

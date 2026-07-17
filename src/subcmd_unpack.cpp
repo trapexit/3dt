@@ -107,6 +107,23 @@ namespace
   }
 
   static
+  std::string
+  json_display_string(const std::string &str_)
+  {
+    std::string rv;
+
+    for(const unsigned char c : str_)
+      {
+        if((c >= 0x20) && (c < 0x7f))
+          rv.push_back(static_cast<char>(c));
+        else
+          rv += fmt::format("\\x{:02X}",c);
+      }
+
+    return rv;
+  }
+
+  static
   json
   avatar_list_json(const std::vector<u32> &avatar_list_)
   {
@@ -339,12 +356,23 @@ namespace
            const uint32_t              record_pos_,
            TDO::DevStream             &stream_)
     {
+      const std::string path = path_.generic_string();
+      const std::string filename = fixed_string(record_.filename,
+                                                sizeof(record_.filename));
+
       init(stream_);
       _printer->before(path_,record_,record_pos_,stream_);
       if(!record_.is_directory() && is_default_layout_filename(path_))
         _default_layout_payload_paths.emplace_back(path_);
       _manifest["entries"].push_back({
-        {"path",path_.generic_string()},
+        // OperaFS filenames are byte strings, not guaranteed UTF-8 (for
+        // example the retail SailorMoon disc contains Shift-JIS bytes).
+        // Keep a readable ASCII rendering for humans and a lossless byte
+        // representation for layout replay. nlohmann::json rejects raw
+        // invalid UTF-8 while dumping, so writing the native path directly
+        // makes an otherwise valid image impossible to repack.
+        {"path",json_display_string(path)},
+        {"path_raw_hex",bytes_hex(path.data(),path.size())},
         {"kind",record_.is_directory() ? "directory" : "file"},
         {"record_file_offset",record_pos_},
         {"record_data_offset",stream_.data_byte_tell(record_pos_)},
@@ -357,7 +385,7 @@ namespace
         {"block_count",record_.block_count},
         {"burst",record_.burst},
         {"gap",record_.gap},
-        {"filename",fixed_string(record_.filename,sizeof(record_.filename))},
+        {"filename",json_display_string(filename)},
         {"filename_raw_hex",bytes_hex(record_.filename,sizeof(record_.filename))},
         {"last_avatar_index",record_.last_avatar_index},
         {"avatar_list",avatar_list_json(record_.avatar_list)},
