@@ -379,7 +379,7 @@ _generate_sign_argparser(CLI::App      &app_,
 
   subcmd = app_.add_subcommand("sign","sign 3DO ISO for retail system use");
   subcmd->add_option("filepaths",opts_.filepaths)
-    ->description("path to disc images")
+    ->description("path to ISO images")
     ->type_name("PATH")
     ->check(CLI::ExistingFile)
     ->required();

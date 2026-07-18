@@ -20,6 +20,7 @@
 
 #include "error.hpp"
 #include "tdo_disc_format.hpp"
+#include "tdo_romtag.hpp"
 #include "tdo_disc_label.hpp"
 #include "types_ints.h"
 
@@ -66,6 +67,7 @@ namespace TDO
   {
     std::filesystem::path output;
     TDO::DiscLabel        disc_label;
+    TDO::ROMTagVec        source_romtags;
     u32                   total_blocks;
     bool                  replay_layout;
     DiscManifestEntry     root;

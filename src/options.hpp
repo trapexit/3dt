@@ -77,7 +77,8 @@ public:
     uint32_t    root_unique_identifier = 0;
     uint32_t    volume_unique_identifier = 0;
     // Repack supplies the source table so regenerated entries retain its
-    // authoritative version/revision fields. Ordinary pack leaves this empty.
+    // authoritative signed extents and version/revision fields. Layout replay
+    // obtains the same metadata from layout.json when this is empty.
     TDO::ROMTagVec source_romtags;
   };
 

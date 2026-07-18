@@ -792,6 +792,45 @@ namespace
   }
 
   static
+  void
+  apply_layout_romtag_metadata(TDO::DiscManifest &manifest_,
+                               const json        &layout_)
+  {
+    if(!manifest_.source_romtags.empty() || !layout_.contains("rom_tags"))
+      return;
+
+    const json &tags = layout_.at("rom_tags");
+    if(!tags.is_array())
+      throw Error("layout rom_tags is not an array");
+
+    for(const auto &tag_json : tags)
+      {
+        TDO::ROMTag tag{};
+
+        if(!tag_json.is_object())
+          throw Error("layout rom_tags entry is not an object");
+        tag.sub_systype =
+          TDO::checked_narrow_u32_to_u8(json_u32(tag_json.at("sub_systype"),
+                                                 "rom_tags sub_systype"),
+                                        "rom_tags sub_systype");
+        tag.type =
+          TDO::checked_narrow_u32_to_u8(json_u32(tag_json.at("type"),
+                                                 "rom_tags type"),
+                                        "rom_tags type");
+        tag.version =
+          TDO::checked_narrow_u32_to_u8(json_u32(tag_json.at("version"),
+                                                 "rom_tags version"),
+                                        "rom_tags version");
+        tag.revision =
+          TDO::checked_narrow_u32_to_u8(json_u32(tag_json.at("revision"),
+                                                 "rom_tags revision"),
+                                        "rom_tags revision");
+        tag.size = json_u32_value(tag_json,"size",0);
+        manifest_.source_romtags.emplace_back(tag);
+      }
+  }
+
+  static
   unsigned char
   hex_nibble(const char c_)
   {
@@ -844,6 +883,12 @@ namespace
        (layout["image"].value("device_block_data_size",TDO::BLOCK_SIZE) != TDO::BLOCK_SIZE))
       throw Error("packing NVRAM or other non-2048-byte images is not supported yet");
     apply_layout_disc_label(manifest_,layout);
+    // An unpack-generated layout records the source table's authoritative
+    // signed extent and known-good version/revision values. Preserve those
+    // during regeneration just as repack does; Orbatak's retail boot_code is
+    // 0.0 in its AIF metadata and cannot otherwise be recovered from the
+    // payload alone.
+    apply_layout_romtag_metadata(manifest_,layout);
     manifest_.total_blocks = manifest_.disc_label.volume_block_count;
     manifest_.replay_layout = true;
 
@@ -1120,6 +1165,26 @@ namespace
     entry->unique_identifier = next_id_++;
     entry->start_block = std::max(total_blocks_,max_allocated_block(root_));
     entry->avatar_list = {entry->start_block};
+  }
+
+  static
+  void
+  normalize_replay_romtags_entry(Entry &root_)
+  {
+    Entry *entry = find_root_child(root_,"rom_tags");
+
+    if(entry == nullptr)
+      throw Error("layout is missing the synthetic rom_tags entry");
+
+    // The boot ROM reads the authoritative ROMTag table from block 1, but
+    // some retail layouts (Eye of Typhoon is one) expose a separate, stale
+    // mastering-side /rom_tags file at an ordinary filesystem avatar. Unpack
+    // necessarily records that directory avatar. Pack regenerates the boot
+    // table, so replay must normalize this synthetic entry to block 1 instead
+    // of rejecting an otherwise valid retail layout or preserving stale data.
+    entry->block_count = 1;
+    entry->start_block = 1;
+    entry->avatar_list = {1};
   }
 
   static
@@ -1560,6 +1625,7 @@ namespace
 
     manifest.output = options_.output;
     manifest.disc_label = {};
+    manifest.source_romtags = options_.source_romtags;
     manifest.disc_label.record_type = RECORD_STD_VOLUME;
     manifest.disc_label.volume_sync_bytes.fill(VOLUME_SYNC_BYTE);
     manifest.disc_label.volume_structure_version = VOLUME_STRUCTURE_OPERA_READONLY;
@@ -1609,6 +1675,7 @@ namespace
       {
         apply_layout(manifest.root,fs::path(),layout);
         apply_pack_unique_identifiers(options_,manifest,true);
+        normalize_replay_romtags_entry(manifest.root);
         ensure_replay_signatures_entry(manifest.root,
                                        next_id,
                                        manifest.total_blocks);
@@ -1697,7 +1764,7 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               options_.source_romtags);
+                                               manifest.source_romtags);
           }
 
         if(recreate_layout_specials)
@@ -1707,7 +1774,7 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               options_.source_romtags);
+                                               manifest.source_romtags);
           }
 
         if(options_.sign && !recreate_layout_specials)
@@ -1717,7 +1784,7 @@ namespace Subcmd
                                  true,
                                  options_.banner_romtag,
                                  options_.billstuff_romtag,
-                                 options_.source_romtags);
+                                 manifest.source_romtags);
           }
 
         if(options_.sign)
