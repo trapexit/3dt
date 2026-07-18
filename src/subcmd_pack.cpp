@@ -464,6 +464,10 @@ namespace
     for(const auto &dirent : fs::directory_iterator(path_))
       {
         reject_symlink(dirent);
+        // Files emitted by unpack describe the source image and may be
+        // consumed above for layout replay, but they are never OperaFS
+        // payload.  In particular, root layout.json must not reappear in an
+        // unpack -> pack result.
         if(root_ && dirent.is_regular_file() && is_unpacked_metadata_file(dirent.path()))
           continue;
         if(!is_supported_source(dirent))
@@ -1077,6 +1081,124 @@ namespace
   }
 
   static
+  u32
+  signed_romtag_type_for_path(const fs::path &path_,
+                              const bool      include_banner_)
+  {
+    const std::string key = path_key(path_);
+
+    if(key == "system/kernel/boot_code")
+      return RSA_NEWKNEWNEWGNUBOOT;
+    if(key == "system/kernel/os_code")
+      return RSA_OS;
+    if(key == "system/kernel/misc_code")
+      return RSA_MISCCODE;
+    if(include_banner_ && (key == "bannerscreen"))
+      return RSA_APPSPLASH;
+
+    return 0;
+  }
+
+  static
+  u32
+  source_romtag_size(const TDO::ROMTagVec &romtags_,
+                     const u32             type_)
+  {
+    for(const auto &romtag : romtags_)
+      {
+        if(romtag.type == type_)
+          return romtag.size;
+        if((type_ == RSA_MISCCODE) && (romtag.type == RSA_OLD_MISCCODE))
+          return romtag.size;
+      }
+
+    return 0;
+  }
+
+  static
+  std::vector<char>
+  read_manifest_file(const Entry &entry_,
+                     const fs::path &entry_path_)
+  {
+    std::ifstream is;
+    std::vector<char> data(entry_.data_byte_count);
+
+    if(data.empty())
+      throw Error("signed payload is empty: " + display_path(entry_path_));
+    is.open(entry_.src_path,std::ios::binary);
+    if(!is)
+      throw Error("failed to open signed payload: " + entry_.src_path.string());
+    is.read(data.data(),static_cast<std::streamsize>(data.size()));
+    if((is.gcount() != static_cast<std::streamsize>(data.size())) || is.bad())
+      throw Error("failed to read signed payload: " + entry_.src_path.string());
+
+    return data;
+  }
+
+  static
+  void
+  reserve_signed_payload_storage(Entry                 &entry_,
+                                 const fs::path        &entry_path_,
+                                 const bool             replay_layout_,
+                                 const bool             include_banner_,
+                                 const TDO::ROMTagVec  &source_romtags_)
+  {
+    if(!entry_.directory && (entry_.kind == EntryKind::Normal))
+      {
+        const u32 type = signed_romtag_type_for_path(entry_path_,include_banner_);
+
+        if(type != 0)
+          {
+            const u32 source_size = entry_.data_byte_count;
+            const std::vector<char> data = read_manifest_file(entry_,entry_path_);
+            const TDO::SignedROMTagPayloadLayout layout =
+              TDO::inspect_signed_romtag_payload(type,
+                                                 data,
+                                                 entry_.data_byte_count,
+                                                 source_romtag_size(source_romtags_,type));
+
+            if((entry_.data_byte_count > layout.payload_size) &&
+               (entry_.data_byte_count < layout.signed_size))
+              throw Error("signed payload has a partial signature trailer: " +
+                          display_path(entry_path_));
+
+            // A complete existing trailer may be copied into the temporary
+            // image so the known-payload metadata oracle can still recognize
+            // legacy boot_code; signing replaces every trailer before output.
+            // An unsigned source copies only its structural payload. The
+            // filesystem-visible size includes the newly reserved trailer,
+            // matching the normal retail component convention.
+            entry_.data_byte_count = ((source_size >= layout.signed_size) ?
+                                      layout.signed_size :
+                                      layout.payload_size);
+            entry_.byte_count = layout.signed_size;
+
+            const u64 required_size = std::max<u64>(entry_.byte_count,
+                                                    layout.signed_size);
+            const u64 capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
+            if(replay_layout_)
+              {
+                if(required_size > capacity)
+                  throw Error("layout allocation has no room for signature storage: " +
+                              display_path(entry_path_));
+              }
+            else
+              {
+                entry_.block_count = block_count_for_size(required_size,
+                                                          entry_.block_size);
+              }
+          }
+      }
+
+    for(auto &child : entry_.children)
+      reserve_signed_payload_storage(*child,
+                                     entry_path_ / child->name,
+                                     replay_layout_,
+                                     include_banner_,
+                                     source_romtags_);
+  }
+
+  static
   void
   compute_directory_sizes(Entry &entry_)
   {
@@ -1687,10 +1809,22 @@ namespace
         manifest.total_blocks = std::max(manifest.total_blocks,
                                          max_allocated_block(manifest.root));
         validate_replay_file_sizes(manifest.root,fs::path());
+        if(options_.sign)
+          reserve_signed_payload_storage(manifest.root,
+                                         fs::path(),
+                                         true,
+                                         options_.banner_romtag,
+                                         manifest.source_romtags);
         validate_layout_allocations(manifest.root);
       }
     else
       {
+        if(options_.sign)
+          reserve_signed_payload_storage(manifest.root,
+                                         fs::path(),
+                                         false,
+                                         options_.banner_romtag,
+                                         manifest.source_romtags);
         compute_directory_sizes(manifest.root);
         reserve_signatures_placeholder(manifest.root);
         manifest.total_blocks = allocate_blocks(manifest.root);

@@ -19,7 +19,10 @@ tdo_rsa_sign(const char         *key,
              const md5_digest_t  digest,
              rsa512_sig_t        sig);
 
+bool
+tdo_rsa_verify_demo(const md5_digest_t digest,
+                    const rsa512_sig_t sig);
+
 #ifdef __cplusplus
 }
 #endif
-
