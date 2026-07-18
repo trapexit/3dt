@@ -5,9 +5,22 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace TDO
 {
+  struct SignedROMTagPayloadLayout
+  {
+    u32 payload_size;
+    u32 signed_size;
+  };
+
+  SignedROMTagPayloadLayout inspect_signed_romtag_payload(u32                      romtag_type,
+                                                          const std::vector<char> &data,
+                                                          u32                      logical_size_hint = 0,
+                                                          u32                      authoritative_size_hint = 0,
+                                                          u32                      existing_size_hint = 0);
+
   void recreate_layout_special_files(const std::filesystem::path &filepath,
                                       bool                         sign_payloads = false,
                                       bool                         mark = false,

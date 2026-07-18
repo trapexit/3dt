@@ -55,6 +55,16 @@ namespace
   static constexpr u64 AIF_3DO_HEADER_SIZE = 0xb8;
   static constexpr u32 AIF_3DO_HEADER_WORKSPACE_FLAG = 0x40000000;
   static constexpr u32 AIF_3DO_USERAPP = 0x04;
+  static constexpr u64 COMPONENT_SIZE_OFFSET = 0x04;
+  static constexpr u64 VIDEO_IMAGE_HEADER_SIZE = 24;
+  static constexpr u64 VIDEO_IMAGE_SIZE_OFFSET = 0x08;
+  static constexpr u64 VIDEO_IMAGE_HEIGHT_OFFSET = 0x0c;
+  static constexpr u64 VIDEO_IMAGE_WIDTH_OFFSET = 0x0e;
+  static constexpr u64 VIDEO_IMAGE_DEPTH_OFFSET = 0x10;
+  static constexpr char APP_SPLASH_PATTERN[] = "APPSCRN";
+  static constexpr u64 NTSC_APP_SPLASH_PAYLOAD_SIZE = 153624;
+  static constexpr u64 NTSC_APP_SPLASH_SIGNED_SIZE =
+    NTSC_APP_SPLASH_PAYLOAD_SIZE + RSA512_SIG_SIZE;
 
   static
   u32
@@ -65,6 +75,15 @@ namespace
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 1])) << 16) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 2])) << 8) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 3])) << 0));
+  }
+
+  static
+  u16
+  read_u16_be(const std::vector<char> &data_,
+              const u64                offset_)
+  {
+    return ((static_cast<u16>(static_cast<u8>(data_[offset_ + 0])) << 8) |
+            (static_cast<u16>(static_cast<u8>(data_[offset_ + 1])) << 0));
   }
 
   static
@@ -180,20 +199,30 @@ namespace
 
   static
   std::optional<u64>
-  boot_code_romtag_size_from_decrypted(const std::vector<char> &data_)
+  boot_code_signed_size_from_decrypted(const std::vector<char> &data_)
   {
-    u64 signed_size;
     std::optional<u64> executable_size;
 
     executable_size = aif_executable_size(data_);
     if(!executable_size)
       return {};
 
-    signed_size = TDO::round_up(*executable_size,sizeof(u32)) + (RSA512_SIG_SIZE * 2);
-    if(signed_size > data_.size())
+    return TDO::round_up(*executable_size,sizeof(u32)) + (RSA512_SIG_SIZE * 2);
+  }
+
+  static
+  std::optional<u64>
+  boot_code_romtag_size_from_decrypted(const std::vector<char> &data_)
+  {
+    std::optional<u64> signed_size;
+
+    signed_size = boot_code_signed_size_from_decrypted(data_);
+    if(!signed_size)
       return {};
-    if((signed_size < data_.size()) &&
-       !is_zero_range(data_,signed_size,data_.size()))
+    if(*signed_size > data_.size())
+      return {};
+    if((*signed_size < data_.size()) &&
+       !is_zero_range(data_,*signed_size,data_.size()))
       return {};
 
     return signed_size;
@@ -665,12 +694,37 @@ namespace
   public:
     TDO::ROMTagVec romtags;
     bool           include_banner_romtag;
+    bool           sign_payloads;
+    const TDO::ROMTagVec &authoritative_romtags;
+    const TDO::ROMTagVec &existing_romtags;
 
   public:
-    ROMTagsGenerator(const bool include_banner_romtag_)
+    ROMTagsGenerator(const bool            include_banner_romtag_,
+                     const bool            sign_payloads_,
+                     const TDO::ROMTagVec &authoritative_romtags_,
+                     const TDO::ROMTagVec &existing_romtags_)
       : romtags(),
-        include_banner_romtag(include_banner_romtag_)
+        include_banner_romtag(include_banner_romtag_),
+        sign_payloads(sign_payloads_),
+        authoritative_romtags(authoritative_romtags_),
+        existing_romtags(existing_romtags_)
     {
+    }
+
+  private:
+    u32
+    size_hint(const TDO::ROMTagVec &romtags_,
+              const u32             type_) const
+    {
+      for(const auto &tag : romtags_)
+        {
+          if(tag.type == type_)
+            return tag.size;
+          if((type_ == RSA_MISCCODE) && (tag.type == RSA_OLD_MISCCODE))
+            return tag.size;
+        }
+
+      return 0;
     }
 
   public:
@@ -700,6 +754,47 @@ namespace
       romtag.sub_systype = RSANODE;
       romtag.size        = record_.byte_count;
       romtag.offset      = record_.avatar_list[0] - 1;
+
+      if(sign_payloads &&
+         ((type == RSA_NEWKNEWNEWGNUBOOT) ||
+          (type == RSA_OS) ||
+          (type == RSA_MISCCODE) ||
+          (type == RSA_APPSPLASH)))
+        {
+          u64 capacity;
+          std::vector<char> data;
+          TDO::SignedROMTagPayloadLayout layout;
+
+          capacity = static_cast<u64>(record_.block_count) * record_.block_size;
+          if((record_.byte_count == 0) || (record_.byte_count > capacity))
+            throw Error(fmt::format("invalid signed payload allocation: {}",
+                                    filepath_.string()));
+          stream_.read_data_bytes_from_block(data,
+                                             record_.avatar_list[0],
+                                             record_.byte_count);
+          layout = TDO::inspect_signed_romtag_payload(type,
+                                                      data,
+                                                      record_.byte_count,
+                                                      size_hint(authoritative_romtags,type),
+                                                      size_hint(existing_romtags,type));
+          if(layout.signed_size > capacity)
+            throw Error(fmt::format("{} needs {} bytes of signature storage but its allocation holds {} bytes; unpack and pack the image to rebuild it",
+                                    filepath_.string(),
+                                    layout.signed_size,
+                                    capacity));
+          if((record_.byte_count > layout.payload_size) &&
+             (record_.byte_count < layout.signed_size))
+            throw Error(fmt::format("{} contains a partial signature trailer",
+                                    filepath_.string()));
+
+          // Portfolio's ROMTag loaders hash the structural payload and read
+          // the signature immediately after it.  The directory byte count is
+          // not authoritative here: retail APPSPLASH records commonly expose
+          // only the 153624-byte VideoImage while rt_Size includes the hidden
+          // 64-byte trailer in the same 76-block allocation.
+          romtag.size = layout.signed_size;
+        }
+
       switch(type)
         {
         case RSA_SIGNATURE_BLOCK:
@@ -721,35 +816,46 @@ namespace
           apply_os_romtag_version(stream_,romtag,record_);
           break;
         case RSA_NEWKNEWNEWGNUBOOT:
-          {
-            u64 allocated_size;
-            std::vector<char> buf;
-            std::vector<char> decrypted;
-            std::optional<u64> boot_size;
+          if(!sign_payloads)
+            {
+              u64 allocated_size;
+              std::vector<char> buf;
+              std::vector<char> decrypted;
+              std::optional<u64> boot_size;
 
-            allocated_size = static_cast<u64>(record_.block_count) * record_.block_size;
-            stream_.read_data_bytes_from_block(buf,
-                                               record_.avatar_list[0],
-                                               allocated_size);
+              allocated_size = static_cast<u64>(record_.block_count) * record_.block_size;
+              stream_.read_data_bytes_from_block(buf,
+                                                 record_.avatar_list[0],
+                                                 allocated_size);
 
-            decrypted = buf;
-            decrypt_boot_code_data(decrypted);
+              decrypted = buf;
+              decrypt_boot_code_data(decrypted);
 
-            boot_size = boot_code_romtag_size_from_decrypted(decrypted);
-            if(!boot_size)
-              boot_size = TDO::round_up(record_.byte_count,sizeof(u32));
-            apply_boot_romtag_version(romtag,decrypted);
-            if(boot_size && (*boot_size != record_.byte_count))
-              {
-                fmt::print("    - correcting boot_code size to {}\n",
-                           *boot_size);
-                romtag.size = *boot_size;
-                update_record_sizes(stream_,
-                                    record_pos_,
-                                    romtag.size,
-                                    record_.block_count);
-              }
-          }
+              boot_size = boot_code_romtag_size_from_decrypted(decrypted);
+              if(!boot_size)
+                boot_size = TDO::round_up(record_.byte_count,sizeof(u32));
+              apply_boot_romtag_version(romtag,decrypted);
+              if(boot_size && (*boot_size != record_.byte_count))
+                {
+                  fmt::print("    - correcting boot_code size to {}\n",
+                             *boot_size);
+                  romtag.size = *boot_size;
+                  update_record_sizes(stream_,
+                                      record_pos_,
+                                      romtag.size,
+                                      record_.block_count);
+                }
+            }
+          else
+            {
+              std::vector<char> encrypted;
+
+              stream_.read_data_bytes_from_block(encrypted,
+                                                 record_.avatar_list[0],
+                                                 record_.byte_count);
+              decrypt_boot_code_data(encrypted);
+              apply_boot_romtag_version(romtag,encrypted);
+            }
           break;
         }
 
@@ -942,9 +1048,11 @@ namespace
         if(source == source_romtags_.end())
           continue;
 
-        // Repack has a known-good source table. Its version/revision fields
-        // are authoritative and intentionally override payload heuristics and
-        // the MD5 oracle. All structural fields are freshly regenerated.
+        // Repack/unpack-pack carry a known-good source table, and direct sign
+        // starts from the table already in the image.  Those version/revision
+        // fields are authoritative and intentionally override payload
+        // heuristics and the MD5 oracle. All structural fields are freshly
+        // regenerated.
         romtag.version = source->version;
         romtag.revision = source->revision;
       }
@@ -955,16 +1063,36 @@ namespace
   generate_romtags_for_image(TDO::FileStream &stream_,
                              const bool       include_banner_romtag_,
                              const bool       include_billstuff_romtag_,
+                             const bool       sign_payloads_,
                              const TDO::ROMTagVec &source_romtags_)
   {
-    ROMTagsGenerator tags(include_banner_romtag_);
+    TDO::ROMTagVec trusted_romtags(source_romtags_);
+    const TDO::ROMTagVec existing_romtags = stream_.romtags();
+
+    for(const auto &existing : existing_romtags)
+      {
+        const auto duplicate =
+          std::find_if(trusted_romtags.begin(),
+                       trusted_romtags.end(),
+                       [&existing](const TDO::ROMTag &candidate_)
+                       {
+                         return (candidate_.type == existing.type);
+                       });
+        if(duplicate == trusted_romtags.end())
+          trusted_romtags.emplace_back(existing);
+      }
+
+    ROMTagsGenerator tags(include_banner_romtag_,
+                          sign_payloads_,
+                          source_romtags_,
+                          existing_romtags);
     TDO::FSWalker fswalker(stream_,tags,false);
 
     fswalker.walk();
 
     if(include_billstuff_romtag_)
       add_billstuff_romtag(stream_,tags.romtags);
-    apply_source_romtag_versions(tags.romtags,source_romtags_);
+    apply_source_romtag_versions(tags.romtags,trusted_romtags);
     sort_romtags(tags.romtags);
 
     return tags.romtags;
@@ -1062,6 +1190,7 @@ namespace
     romtags = generate_romtags_for_image(stream_,
                                          include_banner_romtag_,
                                          include_billstuff_romtag_,
+                                         true,
                                          source_romtags_);
     write_romtags(stream_,romtags);
     update_romtags_file(stream_,romtags.size() * sizeof(TDO::ROMTag));
@@ -1241,6 +1370,214 @@ namespace
   }
 }
 
+TDO::SignedROMTagPayloadLayout
+TDO::inspect_signed_romtag_payload(const u32                romtag_type_,
+                                   const std::vector<char> &data_,
+                                   const u32                logical_size_hint_,
+                                   const u32                authoritative_size_hint_,
+                                   const u32                existing_size_hint_)
+{
+  u64 payload_size;
+  u64 signed_size;
+  u64 signature_size;
+
+  payload_size = 0;
+  signed_size = 0;
+  signature_size = RSA512_SIG_SIZE;
+
+  switch(romtag_type_)
+    {
+    case RSA_APPSPLASH:
+      {
+        u64 expected_image_size;
+        u64 image_size;
+        u64 row_bits;
+        u16 height;
+        u16 width;
+        u8 depth;
+
+        if(data_.size() < VIDEO_IMAGE_HEADER_SIZE)
+          throw Error("BannerScreen is too small to contain a VideoImage header");
+        if((static_cast<u8>(data_[0]) != 1) ||
+           (std::memcmp(data_.data() + 1,
+                        APP_SPLASH_PATTERN,
+                        sizeof(APP_SPLASH_PATTERN) - 1) != 0))
+          throw Error("BannerScreen has an invalid VideoImage header");
+
+        image_size = read_u32_be(data_,VIDEO_IMAGE_SIZE_OFFSET);
+        height = read_u16_be(data_,VIDEO_IMAGE_HEIGHT_OFFSET);
+        width = read_u16_be(data_,VIDEO_IMAGE_WIDTH_OFFSET);
+        depth = static_cast<u8>(data_[VIDEO_IMAGE_DEPTH_OFFSET]);
+        if((height == 0) || (width == 0) || (depth == 0) || (depth > 16))
+          throw Error("BannerScreen has invalid VideoImage dimensions");
+
+        row_bits = static_cast<u64>(width) * depth;
+        if((row_bits % 8) != 0)
+          throw Error("BannerScreen VideoImage rows are not byte aligned");
+        expected_image_size = (row_bits / 8) * height;
+        const u64 declared_payload_size = VIDEO_IMAGE_HEADER_SIZE + image_size;
+
+        // The mastering ROMTag, not vi_Size, is the boot loader's authority.
+        // Shipping Retro Love Letter banners use the standard 320x240 extent
+        // and rt_Size=153688 even where a stale header says 241 rows (Tempest
+        // is internally inconsistent; Wreckman is consistently but wrongly
+        // 640 bytes too large).  Honor that known-good source extent first.
+        if((authoritative_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE) ||
+           (existing_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE))
+          payload_size = NTSC_APP_SPLASH_PAYLOAD_SIZE;
+        else if((image_size == expected_image_size) &&
+                (declared_payload_size <= data_.size()))
+          payload_size = declared_payload_size;
+        else if(((logical_size_hint_ == NTSC_APP_SPLASH_PAYLOAD_SIZE) ||
+                 (logical_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE)) &&
+                (data_.size() >= NTSC_APP_SPLASH_PAYLOAD_SIZE))
+          payload_size = NTSC_APP_SPLASH_PAYLOAD_SIZE;
+        else
+          throw Error("BannerScreen VideoImage extent cannot be derived safely");
+      }
+      break;
+
+    case RSA_OS:
+    case RSA_MISCCODE:
+    case RSA_OLD_MISCCODE:
+      // makeboot stores the unsigned component extent in the big-endian word
+      // at +4. Portfolio's ReadOsComponent hashes rt_Size - 64 bytes, then
+      // reads the signature immediately after that declared payload.
+      if(data_.size() < (COMPONENT_SIZE_OFFSET + sizeof(u32)))
+        throw Error("system component is too small to contain its size header");
+      payload_size = read_u32_be(data_,COMPONENT_SIZE_OFFSET);
+      if(payload_size < (COMPONENT_SIZE_OFFSET + sizeof(u32)))
+        throw Error("system component has an invalid payload size");
+      break;
+
+    case RSA_NEWKNEWNEWGNUBOOT:
+      {
+        std::vector<char> decrypted(data_);
+        std::optional<u64> derived_size;
+
+        signature_size = RSA512_SIG_SIZE * 2;
+        decrypt_boot_code_data(decrypted);
+        derived_size = boot_code_signed_size_from_decrypted(decrypted);
+        if(derived_size)
+          {
+            u64 minimum_payload_size;
+
+            minimum_payload_size = *derived_size - signature_size;
+            // Some makeboot inputs retain one zero word immediately after the
+            // relocation terminator.  It belongs to the payload, not to the
+            // variable amount of zero padding that may precede the slots.
+            if(((minimum_payload_size + sizeof(u32)) <= decrypted.size()) &&
+               (read_u32_be(decrypted,minimum_payload_size) == 0))
+              minimum_payload_size += sizeof(u32);
+
+            auto valid_declared_extent = [&](const u64 candidate_size_)
+            {
+              if(candidate_size_ < signature_size)
+                return false;
+              const u64 candidate_payload_size = candidate_size_ - signature_size;
+              return ((candidate_payload_size >= minimum_payload_size) &&
+                      (candidate_payload_size <= decrypted.size()));
+            };
+
+            auto has_valid_trailing_signatures = [&](const u64 candidate_size_)
+            {
+              md5_digest_t digest;
+              rsa512_sig_t expected;
+
+              if((candidate_size_ < signature_size) ||
+                 (candidate_size_ > data_.size()))
+                return false;
+
+              const u64 inner_offset = candidate_size_ - signature_size;
+              const u64 outer_offset = candidate_size_ - RSA512_SIG_SIZE;
+              md5_calc(decrypted.data(),inner_offset,digest);
+              tdo_rsa_sign(TDO_KEY_3DO,digest,expected);
+              const auto *inner_signature =
+                reinterpret_cast<const rsa512_sig_t*>(decrypted.data() + inner_offset);
+              if((std::memcmp(expected,
+                              *inner_signature,
+                              sizeof(expected)) != 0) &&
+                 !tdo_rsa_verify_demo(digest,*inner_signature))
+                return false;
+
+              md5_calc(data_.data(),outer_offset,digest);
+              tdo_rsa_sign(TDO_KEY_3DO,digest,expected);
+              const auto *outer_signature =
+                reinterpret_cast<const rsa512_sig_t*>(data_.data() + outer_offset);
+              return ((std::memcmp(expected,
+                                   *outer_signature,
+                                   sizeof(expected)) == 0) ||
+                      tdo_rsa_verify_demo(digest,*outer_signature));
+            };
+
+            auto has_zero_trailing_slots = [&](const u64 candidate_size_)
+            {
+              return ((candidate_size_ >= signature_size) &&
+                      (candidate_size_ <= data_.size()) &&
+                      is_zero_range(data_,
+                                    candidate_size_ - signature_size,
+                                    candidate_size_));
+            };
+
+            const bool known_source_payload =
+              (TDO::find_romtag_version_revision_fallback(RSA_NEWKNEWNEWGNUBOOT,
+                                                          data_) != nullptr);
+
+            // Portfolio's padded 8 KiB beta boot components cannot be reduced
+            // to minimum_payload_size+128: their authoritative ROMTag places
+            // both signatures after a pad.  For standalone source files, a
+            // valid existing pair or an all-zero reserved tail proves the same
+            // layout.  Otherwise append slots after every source byte so an
+            // unsigned file cannot lose payload merely because it is padded.
+            auto extent_has_storage = [&](const u64 candidate_size_)
+            {
+              if(!valid_declared_extent(candidate_size_))
+                return false;
+              const u64 candidate_payload_size = candidate_size_ - signature_size;
+              return ((candidate_payload_size == minimum_payload_size) ||
+                      known_source_payload ||
+                      has_valid_trailing_signatures(candidate_size_) ||
+                      has_zero_trailing_slots(candidate_size_));
+            };
+
+            if((authoritative_size_hint_ != 0) &&
+               extent_has_storage(authoritative_size_hint_))
+              signed_size = authoritative_size_hint_;
+            else if((existing_size_hint_ != 0) &&
+                    extent_has_storage(existing_size_hint_))
+              signed_size = existing_size_hint_;
+            else if((logical_size_hint_ != 0) &&
+                    extent_has_storage(logical_size_hint_))
+              signed_size = logical_size_hint_;
+            else if((logical_size_hint_ >= minimum_payload_size) &&
+                    (logical_size_hint_ <= decrypted.size()))
+              signed_size = static_cast<u64>(logical_size_hint_) + signature_size;
+            else
+              signed_size = minimum_payload_size + signature_size;
+
+            payload_size = signed_size - signature_size;
+          }
+        else
+          {
+            throw Error("boot_code signed extent cannot be derived safely");
+          }
+      }
+      break;
+
+    default:
+      throw Error("unsupported signed ROMTag payload type");
+    }
+
+  if(signed_size == 0)
+    signed_size = payload_size + signature_size;
+  if((payload_size > data_.size()) ||
+     (payload_size > std::numeric_limits<u32>::max()) ||
+     (signed_size > std::numeric_limits<u32>::max()))
+    throw Error("signed ROMTag payload size is outside the available data");
+
+  return {static_cast<u32>(payload_size),static_cast<u32>(signed_size)};
+}
+
 void
 TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
                                    const bool                   sign_payloads_,
@@ -1269,6 +1606,7 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
   romtags = generate_romtags_for_image(stream,
                                        include_banner_romtag_,
                                        include_billstuff_romtag_,
+                                       sign_payloads_,
                                        source_romtags_);
   preflight_layout_special_files(romtags,capacity);
   if(mark_)
