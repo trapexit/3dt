@@ -243,6 +243,12 @@ _verify_romtag_version_revision_fallback(TDO::DevStream                   &s_,
   const TDO::ROMTagVersionRevisionFallback *fallback;
   std::vector<char> data;
 
+  if(metadata_.found && metadata_.record.byte_count == 0)
+    {
+      _vprint("   - error: {} has zero length\n",
+              metadata_.path.generic_string());
+      return false;
+    }
   if(!romtag_ || !metadata_.found)
     return true;
   if(TDO::romtag_has_version_revision(*romtag_))
