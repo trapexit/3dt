@@ -260,8 +260,8 @@ _generate_repack_argparser(CLI::App        &app_,
     ->type_name("BOOL")
     ->default_val("true")
     ->take_last();
-  subcmd->add_flag("--sign",options_.sign)
-    ->description("sign the image after repacking");
+  subcmd->add_flag("--no-sign{false}",options_.sign)
+    ->description("do not sign the image after repacking");
 
   subcmd->callback([&options_]()
   {
