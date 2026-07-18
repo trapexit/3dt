@@ -582,7 +582,12 @@ namespace
     entry_.type            = 0;
     entry_.flags           = DR_FLAG_IS_READONLY;
     entry_.block_size      = TDO::BLOCK_SIZE;
+    // Portfolio's count-zero app-digest path requires the ROMTag and file
+    // entry to exist, but returns before reading the payload. Keep one block
+    // allocated so the ROMTag has a real avatar while advertising no data.
+    entry_.byte_count      = 0;
     entry_.data_byte_count = 0;
+    entry_.block_count     = 1;
     entry_.burst           = 0;
     entry_.gap             = 0;
     entry_.children.clear();
@@ -1042,85 +1047,6 @@ namespace
   }
 
   static
-  u32
-  sum_directory_blocks(const Entry &entry_)
-  {
-    u64 blocks;
-
-    blocks = (entry_.directory ? entry_.block_count : 0);
-    for(const auto &child : entry_.children)
-      blocks += sum_directory_blocks(*child);
-
-    return TDO::checked_narrow_u64_to_u32(blocks,"sum of directory blocks");
-  }
-
-  static
-  u32
-  sum_file_blocks_without_signatures(const Entry &entry_)
-  {
-    u64 blocks;
-
-    blocks = 0;
-    if(!entry_.directory)
-      {
-        if((entry_.kind != EntryKind::DiscLabel) &&
-           (entry_.kind != EntryKind::ROMTags) &&
-           (entry_.kind != EntryKind::Signatures))
-          blocks += entry_.block_count;
-      }
-
-    for(const auto &child : entry_.children)
-      blocks += sum_file_blocks_without_signatures(*child);
-
-    return TDO::checked_narrow_u64_to_u32(blocks,"sum of file blocks");
-  }
-
-  static
-  u32
-  signature_digest_count_for_volume(u32 volume_blocks_)
-  {
-    u64 padded_blocks;
-
-    padded_blocks   = TDO::round_up(volume_blocks_,(TDO::LOG_BLOCK_SIZE / TDO::BLOCK_SIZE));
-
-    return TDO::checked_narrow_u64_to_u32((padded_blocks * TDO::BLOCK_SIZE) / TDO::LOG_BLOCK_SIZE,"signature digest count");
-  }
-
-  static
-  u32
-  required_signature_file_size_for_volume(u32 volume_blocks_)
-  {
-    return TDO::checked_narrow_u64_to_u32(TDO::signature_file_size_for_digest_count(signature_digest_count_for_volume(volume_blocks_)),
-                                          "signatures file size");
-  }
-
-  static
-  u32
-  required_signature_blocks_for_volume(u32 volume_blocks_)
-  {
-    return TDO::checked_narrow_u64_to_u32(required_signature_file_size_for_volume(volume_blocks_) / TDO::BLOCK_SIZE,
-                                          "signatures file block count");
-  }
-
-  static
-  u32
-  required_signature_blocks(u32 base_blocks_)
-  {
-    u32 sig_blocks;
-
-    sig_blocks = 1;
-    while(true)
-      {
-        u32 next_sig_blocks;
-
-        next_sig_blocks = required_signature_blocks_for_volume(base_blocks_ + sig_blocks);
-        if(next_sig_blocks == sig_blocks)
-          return sig_blocks;
-        sig_blocks = next_sig_blocks;
-      }
-  }
-
-  static
   Entry*
   find_signatures_entry(Entry &entry_)
   {
@@ -1141,41 +1067,17 @@ namespace
 
   static
   void
-  reserve_signatures_file(Entry &root_,
-                          u32    volume_blocks_ = 0)
+  reserve_signatures_placeholder(Entry &root_)
   {
     Entry *entry;
-    u32 base_blocks;
-    u32 num_digests;
-    u32 record_size;
-    u32 sig_blocks;
 
     entry = find_signatures_entry(root_);
     if(entry == nullptr)
       throw Error("layout removed required signatures file");
 
-    if(volume_blocks_ != 0)
-      {
-        num_digests = signature_digest_count_for_volume(volume_blocks_);
-        sig_blocks = TDO::checked_narrow_u64_to_u32(TDO::signature_file_size_for_digest_count(num_digests) / TDO::BLOCK_SIZE,
-                                                    "signatures file block count");
-        record_size = TDO::signature_record_size_for_digest_count(num_digests);
-      }
-    else
-      {
-        u64 acc = FIRST_FILE_BLOCK;
-        acc += sum_directory_blocks(root_);
-        acc += sum_file_blocks_without_signatures(root_);
-        base_blocks = TDO::checked_narrow_u64_to_u32(acc,"base block count");
-        sig_blocks  = required_signature_blocks(base_blocks);
-        num_digests = signature_digest_count_for_volume(
-                                                        TDO::checked_narrow_u64_to_u32(static_cast<u64>(base_blocks) + sig_blocks,
-                                                                                       "volume block count"));
-        record_size = TDO::signature_record_size_for_digest_count(num_digests);
-      }
-
-    entry->block_count = std::max(entry->block_count,sig_blocks);
-    entry->byte_count  = std::max(entry->byte_count,record_size);
+    entry->byte_count = 0;
+    entry->data_byte_count = 0;
+    entry->block_count = std::max<u32>(entry->block_count,1);
   }
 
   static
@@ -1714,25 +1616,16 @@ namespace
 
     if(manifest.replay_layout)
       {
-        {
-          u32 total_blocks;
-
-          do
-            {
-              total_blocks = manifest.total_blocks;
-              reserve_signatures_file(manifest.root,manifest.total_blocks);
-              manifest.total_blocks = std::max(manifest.total_blocks,
-                                               max_allocated_block(manifest.root));
-            }
-          while(manifest.total_blocks != total_blocks);
-        }
+        reserve_signatures_placeholder(manifest.root);
+        manifest.total_blocks = std::max(manifest.total_blocks,
+                                         max_allocated_block(manifest.root));
         validate_replay_file_sizes(manifest.root,fs::path());
         validate_layout_allocations(manifest.root);
       }
     else
       {
         compute_directory_sizes(manifest.root);
-        reserve_signatures_file(manifest.root);
+        reserve_signatures_placeholder(manifest.root);
         manifest.total_blocks = allocate_blocks(manifest.root);
       }
 
@@ -1789,9 +1682,6 @@ namespace Subcmd
 
         const bool recreate_layout_specials = (manifest.replay_layout &&
                                                options_.sign);
-        const auto digest_check_count =
-          static_cast<std::uint8_t>(options_.signature_digest_check_count);
-
         if(options_.mark)
           {
             TDO::mark_disc_image(temp_output_path,
@@ -1807,7 +1697,6 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               digest_check_count,
                                                options_.source_romtags);
           }
 
@@ -1818,7 +1707,6 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               digest_check_count,
                                                options_.source_romtags);
           }
 
@@ -1829,7 +1717,6 @@ namespace Subcmd
                                  true,
                                  options_.banner_romtag,
                                  options_.billstuff_romtag,
-                                 digest_check_count,
                                  options_.source_romtags);
           }
 

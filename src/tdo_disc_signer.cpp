@@ -29,10 +29,7 @@
 #include "tdo_fs_walker.hpp"
 #include "tdo_romtag_metadata.hpp"
 #include "tdo_rsa.h"
-#include "tdo_safe_narrow.hpp"
 #include "version.hpp"
-
-#include <limits>
 
 #include <algorithm>
 #include <array>
@@ -40,7 +37,7 @@
 #include <cstring>
 #include <limits>
 #include <optional>
-#include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace
@@ -51,45 +48,6 @@ namespace
   static constexpr u64 AIF_HEADER_RO_SIZE_OFFSET = 0x14;
   static constexpr u64 AIF_HEADER_RW_SIZE_OFFSET = 0x18;
   static constexpr u64 AIF_HEADER_DEBUG_SIZE_OFFSET = 0x1c;
-  static constexpr u64 AIF_3DO_SIGNATURE_OFFSET_OFFSET = 0xb0;
-  static constexpr u64 AIF_3DO_SIGNATURE_LEN_OFFSET = 0xb4;
-
-  // Compute the digest count for a given volume_block_count, rejecting
-  // values that would overflow the digest math. This is the shared core
-  // of all (volume_block_count * BLOCK_SIZE) / LOG_BLOCK_SIZE sites; it
-  // does not depend on the disc label so it is safe to use during pack
-  // preflight, where the disc label may not yet be authoritative.
-  static
-  u64
-  safe_digest_count_for_volume_blocks(const u64 volume_blocks_)
-  {
-    if(volume_blocks_ > (std::numeric_limits<u64>::max() / TDO::BLOCK_SIZE))
-      throw Error("volume_block_count overflows digest math");
-    return ((volume_blocks_ * TDO::BLOCK_SIZE) / TDO::LOG_BLOCK_SIZE);
-  }
-
-  // Validate volume_block_count against the actual file size and
-  // return the number of digests the signatures table will hold.
-  //
-  // OperaFS volume_block_size is 2 KiB by definition (see TDO::BLOCK_SIZE),
-  // so we use BLOCK_SIZE rather than disc_label().volume_block_size; the
-  // older code in generate_signatures_file_data multiplied by the on-disc
-  // value, which was redundant for any conforming image and would have
-  // produced an unbounded num_digests for a crafted one. Reject mismatches
-  // explicitly.
-  static
-  u64
-  safe_signature_digest_count(TDO::FileStream &stream_)
-  {
-    const u64 volume_blocks = stream_.disc_label().volume_block_count;
-    const u64 volume_block_size = stream_.disc_label().volume_block_size;
-    const u64 file_blocks = stream_.device_block_count();
-    if(volume_block_size != TDO::BLOCK_SIZE)
-      throw Error("disc label volume_block_size is not 2 KiB");
-    if((file_blocks > 0) && (volume_blocks > file_blocks))
-      throw Error("disc label volume_block_count exceeds image size");
-    return safe_digest_count_for_volume_blocks(volume_blocks);
-  }
 
   static
   u32
@@ -100,17 +58,6 @@ namespace
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 1])) << 16) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 2])) << 8) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 3])) << 0));
-  }
-
-  static
-  void
-  write_u32_be(std::array<char, sizeof(u32)> &out_,
-               const u32                      value_)
-  {
-    out_[0] = static_cast<char>((value_ >> 24) & 0xff);
-    out_[1] = static_cast<char>((value_ >> 16) & 0xff);
-    out_[2] = static_cast<char>((value_ >> 8) & 0xff);
-    out_[3] = static_cast<char>((value_ >> 0) & 0xff);
   }
 
   static
@@ -315,6 +262,12 @@ namespace
       ? record_.byte_count
       : romtag_.size;
 
+    // The disabled RSA_SIGNATURE_BLOCK placeholder deliberately has no
+    // payload. There is nothing to hash for version/revision inference, and
+    // DevStream's vector overload requires at least one destination byte.
+    if(data_size == 0)
+      return;
+
     if(data_size > static_cast<u64>(std::numeric_limits<s64>::max()))
       throw Error("ROMTag version/revision fallback file is too large");
 
@@ -332,15 +285,12 @@ namespace
           return;
 
         // The hash oracle missed. This happens, among other cases, when
-        // re-signing an image this tool already mutated: for RSA_OS and
-        // RSA_MISCCODE, set_aif_signature_metadata rewrites the AIF
-        // _3DO_Signature/_3DO_SignatureLen at payload offsets 0xb0/0xb4,
-        // so the on-disc bytes hashed here no longer match the
-        // retail-keyed fallback table. As a last resort, preserve the
-        // version/revision already recorded in the on-disc ROMTag table
-        // for this type, keeping the regenerated ROMTag stable across
-        // sign runs (sign -> verify -> sign idempotency). On retail
-        // discs this is the retail-authored value; on re-signed images
+        // re-signing an image this tool already signed: replacing a payload's
+        // trailing component signature changes the full-payload hash. As a
+        // last resort, preserve the version/revision already recorded in the
+        // on-disc ROMTag table for this type, keeping regenerated ROMTags
+        // stable across sign runs (sign -> verify -> sign idempotency). On
+        // retail discs this is the retail-authored value; on re-signed images
         // it is the value a prior sign established -- both authoritative.
         const std::optional<TDO::ROMTag> existing = stream_.romtag(romtag_.type);
         if(existing && TDO::romtag_has_version_revision(*existing))
@@ -407,11 +357,10 @@ namespace
     }
   };
 
-  class SignaturesFileUpdater final : public TDO::FSWalker::Callbacks
+  class SignaturesPlaceholderUpdater final : public TDO::FSWalker::Callbacks
   {
   public:
-    u32 signatures_block_count;
-    u32 signatures_record_size;
+    bool found = false;
 
   public:
     void
@@ -420,16 +369,17 @@ namespace
                const u32                    record_pos_,
                TDO::DevStream              &stream_)
     {
-      (void)record_;
-
       if(nonstd::string::as_lowercase(filepath_.generic_string()) != "signatures")
         return;
 
+      if(record_.avatar_list.empty() || (record_.block_count == 0))
+        throw Error("signatures placeholder has no allocated block");
+
+      found = true;
       update_record_sizes(stream_,
                           record_pos_,
-                          signatures_record_size,
-                          std::max<u32>(record_.block_count,
-                                        signatures_block_count));
+                          0,
+                          record_.block_count);
     }
   };
 
@@ -453,57 +403,18 @@ namespace
     return 0;
   }
 
-  class SignaturesFileCapacity final : public TDO::FSWalker::Callbacks
-  {
-  public:
-    bool found;
-    u64  byte_count;
-
-  public:
-    SignaturesFileCapacity()
-      : found(false),
-        byte_count(0)
-    {
-    }
-
-  public:
-    void
-    operator()(const std::filesystem::path &filepath_,
-               const TDO::DirectoryRecord  &record_,
-               const u32                    record_pos_,
-               TDO::DevStream              &stream_)
-    {
-      (void)record_pos_;
-      (void)stream_;
-
-      if(nonstd::string::as_lowercase(filepath_.generic_string()) != "signatures")
-        return;
-
-      found = true;
-      byte_count = static_cast<u64>(record_.block_count) * record_.block_size;
-    }
-  };
-
   class SpecialFileCapacity final : public TDO::FSWalker::Callbacks
   {
   public:
     bool found_rom_tags;
     bool found_signatures;
     u64  rom_tags_capacity;
-    u64  signatures_capacity;
-    u32  signatures_record_pos;
-    u32  signatures_record_size;
-    u32  signatures_block_count;
 
   public:
     SpecialFileCapacity()
       : found_rom_tags(false),
         found_signatures(false),
-        rom_tags_capacity(0),
-        signatures_capacity(0),
-        signatures_record_pos(0),
-        signatures_record_size(0),
-        signatures_block_count(0)
+        rom_tags_capacity(0)
     {
     }
 
@@ -526,13 +437,7 @@ namespace
           rom_tags_capacity = static_cast<u64>(record_.block_count) * record_.block_size;
         }
       else if(lc_filepath == "signatures")
-        {
-          found_signatures = true;
-          signatures_capacity = static_cast<u64>(record_.block_count) * record_.block_size;
-          signatures_record_pos = record_pos_;
-          signatures_record_size = record_.byte_count;
-          signatures_block_count = record_.block_count;
-        }
+        found_signatures = true;
     }
   };
 
@@ -546,7 +451,6 @@ namespace
     bool found_signatures;
     u32  generated_romtag_count;
     u64  rom_tags_capacity;
-    u64  signatures_capacity;
     bool include_banner_romtag;
 
   public:
@@ -558,7 +462,6 @@ namespace
         found_signatures(false),
         generated_romtag_count(0),
         rom_tags_capacity(0),
-        signatures_capacity(0),
         include_banner_romtag(include_banner_romtag_)
     {
     }
@@ -583,10 +486,7 @@ namespace
           rom_tags_capacity = static_cast<u64>(record_.block_count) * record_.block_size;
         }
       else if(lc_filepath == "signatures")
-        {
-          found_signatures = true;
-          signatures_capacity = static_cast<u64>(record_.block_count) * record_.block_size;
-        }
+        found_signatures = true;
       else if(lc_filepath == "system/kernel/boot_code")
         found_boot_code = true;
       else if(lc_filepath == "system/kernel/misc_code")
@@ -600,68 +500,16 @@ namespace
     }
   };
 
-  static
-  void
-  set_aif_signature_metadata(TDO::FileStream &stream_,
-                             std::vector<char> &data_,
-                             const u64       first_block_,
-                             const u32       signature_offset_,
-                             const u32       signature_len_,
-                             const char      *label_)
-  {
-    // Portfolio OS's 0x80-byte AIFHeader is followed by _3DOBinHeader;
-    // _3DO_Signature and _3DO_SignatureLen are at payload-relative
-    // offsets 0xb0/0xb4. rsadipir.c uses _3DO_Signature as the length
-    // to hash and as the offset from the AIF start to the signature.
-    std::array<char, sizeof(u32)> bytes{};
-
-    if(data_.size() < (AIF_3DO_SIGNATURE_LEN_OFFSET + sizeof(u32)))
-      return;
-
-    if((static_cast<u64>(signature_offset_) + signature_len_) > data_.size())
-      return;
-
-    stream_.data_byte_seek((first_block_ * TDO::BLOCK_SIZE) +
-                           AIF_3DO_SIGNATURE_OFFSET_OFFSET);
-    write_u32_be(bytes,signature_offset_);
-    std::memcpy(data_.data() + AIF_3DO_SIGNATURE_OFFSET_OFFSET,
-                bytes.data(),
-                bytes.size());
-    stream_.write(bytes.data(),bytes.size());
-
-    stream_.data_byte_seek((first_block_ * TDO::BLOCK_SIZE) +
-                           AIF_3DO_SIGNATURE_LEN_OFFSET);
-    write_u32_be(bytes,signature_len_);
-    std::memcpy(data_.data() + AIF_3DO_SIGNATURE_LEN_OFFSET,
-                bytes.data(),
-                bytes.size());
-    stream_.write(bytes.data(),bytes.size());
-
-    if(label_)
-      fmt::print("  - Setting AIF signature metadata for {}\n",label_);
-  }
-
-  static
-  bool
-  romtag_type_is_aif_payload(const u8 romtag_type_)
-  {
-    return ((romtag_type_ == RSA_OS) ||
-            (romtag_type_ == RSA_MISCCODE));
-  }
-
   class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
   {
   public:
     TDO::ROMTagVec romtags;
     bool           include_banner_romtag;
-    std::uint8_t   digest_check_count;
 
   public:
-    ROMTagsGenerator(const bool         include_banner_romtag_,
-                     const std::uint8_t digest_check_count_)
+    ROMTagsGenerator(const bool include_banner_romtag_)
       : romtags(),
-        include_banner_romtag(include_banner_romtag_),
-        digest_check_count(digest_check_count_)
+        include_banner_romtag(include_banner_romtag_)
     {
     }
 
@@ -695,7 +543,10 @@ namespace
       switch(type)
         {
         case RSA_SIGNATURE_BLOCK:
-          romtag.type_specific = digest_check_count;
+          // Portfolio requires this tag on APPDIGEST boot paths, but a zero
+          // count returns success before reading the payload.
+          romtag.type_specific = 0;
+          romtag.size = 0;
           break;
         case RSA_BLOCKS_ALWAYS:
           // Portfolio documents table-relative offset plus byte size, but
@@ -774,16 +625,11 @@ namespace
 
   static
   void
-  pad_image_and_update_disclabel(TDO::FileStream &stream_)
+  update_disclabel(TDO::FileStream &stream_)
   {
     TDO::DiscLabel dl;
 
-    fmt::print("  - Pad image and update disc label\n"
-               "    - original size: {}b\n",
-               stream_.size_in_bytes());
-    stream_.resize_multiple(TDO::LOG_BLOCK_SIZE);
-    fmt::print("    - padded size:  {}b\n",
-               stream_.size_in_bytes());
+    fmt::print("  - Update disc label\n");
 
     dl = stream_.disc_label();
     {
@@ -949,10 +795,9 @@ namespace
   generate_romtags_for_image(TDO::FileStream &stream_,
                              const bool       include_banner_romtag_,
                              const bool       include_billstuff_romtag_,
-                             const std::uint8_t digest_check_count_,
                              const TDO::ROMTagVec &source_romtags_)
   {
-    ROMTagsGenerator tags(include_banner_romtag_,digest_check_count_);
+    ROMTagsGenerator tags(include_banner_romtag_);
     TDO::FSWalker fswalker(stream_,tags,false);
 
     fswalker.walk();
@@ -967,8 +812,7 @@ namespace
 
   static
   void
-  preflight_layout_special_files(TDO::FileStream           &stream_,
-                                 const TDO::ROMTagVec      &romtags_,
+  preflight_layout_special_files(const TDO::ROMTagVec      &romtags_,
                                  const SpecialFileCapacity &capacity_)
   {
     if(!capacity_.found_rom_tags)
@@ -981,41 +825,10 @@ namespace
 
     const auto sig_romtag = find_romtag(romtags_,RSA_SIGNATURE_BLOCK);
     if(!sig_romtag)
-      return;
+      throw Error("generated ROMTags are missing RSA_SIGNATURE_BLOCK");
 
     if(!capacity_.found_signatures)
       throw Error("image is missing file: signatures");
-
-    const u64 num_digests = safe_signature_digest_count(stream_);
-    const u64 file_size = TDO::signature_file_size_for_digest_count(num_digests);
-    const u64 record_size = TDO::signature_record_size_for_digest_count(num_digests);
-    if(file_size > capacity_.signatures_capacity)
-      throw Error("signatures file too small, increase size and rebuild image");
-    if(sig_romtag->size < record_size)
-      throw Error("signatures file too small, increase size and rebuild image");
-  }
-
-  static
-  void
-  update_layout_signatures_record(TDO::FileStream           &stream_,
-                                  const SpecialFileCapacity &capacity_)
-  {
-    if(!capacity_.found_signatures)
-      return;
-
-    const u64 num_digests = safe_signature_digest_count(stream_);
-    const u64 file_size = TDO::signature_file_size_for_digest_count(num_digests);
-    const u64 record_size =
-      std::max<u64>(capacity_.signatures_record_size,
-                    TDO::signature_record_size_for_digest_count(num_digests));
-
-    if(file_size > capacity_.signatures_capacity)
-      throw Error("signatures file too small, increase size and rebuild image");
-
-    update_record_sizes(stream_,
-                        capacity_.signatures_record_pos,
-                        record_size,
-                        capacity_.signatures_block_count);
   }
 
   static
@@ -1028,6 +841,18 @@ namespace
 
     updater.romtags_file_size = size_;
     fsw.walk();
+  }
+
+  static
+  void
+  reset_signatures_placeholder(TDO::FileStream &stream_)
+  {
+    SignaturesPlaceholderUpdater updater;
+    TDO::FSWalker fsw(stream_,updater);
+
+    fsw.walk();
+    if(!updater.found)
+      throw Error("image is missing file: signatures");
   }
 
   static
@@ -1057,14 +882,6 @@ namespace
     if(include_billstuff_romtag_)
       preflight.generated_romtag_count++;
 
-    const u64 padded_size = TDO::round_up(stream_.size_in_device_blocks() * TDO::BLOCK_SIZE,
-                                          TDO::LOG_BLOCK_SIZE);
-    const u64 volume_block_count = padded_size / TDO::BLOCK_SIZE;
-    const u64 num_digests = safe_digest_count_for_volume_blocks(volume_block_count);
-    const u64 signature_size = TDO::signature_file_size_for_digest_count(num_digests);
-    if(signature_size > preflight.signatures_capacity)
-      throw Error("signatures file too small, increase size and rebuild image");
-
     // Account for generated ROMTags, the terminating ROMTag, and the cross-app
     // signature stored immediately after the terminator.
     const u64 romtags_size = ((preflight.generated_romtag_count + 2) * sizeof(TDO::ROMTag));
@@ -1077,7 +894,6 @@ namespace
   generate_and_write_romtags(TDO::FileStream &stream_,
                              const bool       include_banner_romtag_,
                              const bool       include_billstuff_romtag_,
-                             const std::uint8_t digest_check_count_,
                              const TDO::ROMTagVec &source_romtags_)
   {
     TDO::ROMTagVec romtags;
@@ -1086,7 +902,6 @@ namespace
     romtags = generate_romtags_for_image(stream_,
                                          include_banner_romtag_,
                                          include_billstuff_romtag_,
-                                         digest_check_count_,
                                          source_romtags_);
     write_romtags(stream_,romtags);
     update_romtags_file(stream_,romtags.size() * sizeof(TDO::ROMTag));
@@ -1118,14 +933,6 @@ namespace
     stream_.read_data_bytes_from_block(data,
                                        first_block,
                                        romtag->size);
-
-    if(romtag_type_is_aif_payload(romtag_type_))
-      set_aif_signature_metadata(stream_,
-                                 data,
-                                 first_block,
-                                 static_cast<u32>(romtag->size - RSA512_SIG_SIZE),
-                                 RSA512_SIG_SIZE,
-                                 label_);
 
     data.resize(romtag->size - RSA512_SIG_SIZE);
     // CD-ROM ROMTag asset checks (cdromdipir.c:ReadOsComponent)
@@ -1227,212 +1034,6 @@ namespace
   }
 
   static
-  std::vector<char>
-  generate_signatures_file_data(TDO::FileStream &stream_)
-  {
-    u64 num_digests;
-    u64 volume_block_count;
-    md5_digest_t digest;
-    std::vector<char> buf;
-    std::vector<char> signatures;
-
-    volume_block_count = stream_.disc_label().volume_block_count;
-    num_digests        = safe_signature_digest_count(stream_);
-
-    signatures.resize(num_digests * sizeof(digest));
-
-    fmt::print("  - Generate and sign signatures file with APP key\n"
-               "    - block count: {}\n"
-               "    - num digests: {}\n",
-               volume_block_count,
-               num_digests);
-    for(u64 i = 0; i < num_digests; i++)
-      {
-        s64 block_pos;
-
-        block_pos = ((i * TDO::LOG_BLOCK_SIZE) / TDO::BLOCK_SIZE);
-
-        buf.clear();
-        stream_.read_data_blocks(buf,block_pos,(TDO::LOG_BLOCK_SIZE / TDO::BLOCK_SIZE));
-
-        md5_calc(buf.data(),buf.size(),digest);
-
-        std::memcpy(&signatures[i * sizeof(digest)],digest,sizeof(digest));
-      }
-
-    return signatures;
-  }
-
-  static
-  void
-  update_signature_romtag_size(TDO::FileStream &stream_,
-                               const u32        signatures_record_size_)
-  {
-    bool found;
-
-    found = false;
-    stream_.data_block_seek(stream_.romtags_block());
-    while(true)
-      {
-        u64 offset;
-        TDO::ROMTag romtag;
-
-        offset = stream_.file_tell();
-        stream_.read(romtag);
-        if((romtag.sub_systype == 0) || (romtag.type == 0))
-          break;
-        if(romtag.type != RSA_SIGNATURE_BLOCK)
-          continue;
-
-        stream_.file_seek(offset);
-        stream_.data_byte_skip(offsetof(TDO::ROMTag,size));
-        stream_.write(signatures_record_size_);
-        found = true;
-        break;
-      }
-
-    if(!found)
-      throw Error("signatures ROM tag not found");
-  }
-
-  static
-  u64
-  signature_file_capacity(TDO::FileStream &stream_)
-  {
-    SignaturesFileCapacity capacity;
-    TDO::FSWalker fsw(stream_,capacity);
-
-    fsw.walk();
-    if(!capacity.found)
-      throw Error("signatures file not found");
-
-    return capacity.byte_count;
-  }
-
-  static
-  void
-  zero_signature_digests(std::vector<char>      &signatures_,
-                         const TDO::DigestRange &range_)
-  {
-    for(u64 digest = range_.first; digest <= range_.last; digest++)
-      {
-        const u64 offset = digest * sizeof(md5_digest_t);
-
-        if((offset + sizeof(md5_digest_t)) > signatures_.size())
-          break;
-        std::fill(signatures_.begin() + offset,
-                  signatures_.begin() + offset + sizeof(md5_digest_t),
-                  0);
-      }
-  }
-
-  static
-  void
-  zero_portfolio_signature_digests(TDO::FileStream &stream_,
-                                   std::vector<char> &signatures_)
-  {
-    std::optional<TDO::ROMTag> sig_romtag;
-
-    sig_romtag = stream_.romtag(RSA_SIGNATURE_BLOCK);
-    if(sig_romtag)
-      {
-        const u64 first_block =
-          safe_romtag_first_data_block(stream_,*sig_romtag,"signatures");
-        const TDO::DigestRange range =
-          TDO::portfolio_signature_digest_range(first_block,sig_romtag->size);
-        zero_signature_digests(signatures_,range);
-      }
-  }
-
-  static
-  void
-  recreate_layout_signatures_file(TDO::FileStream &stream_)
-  {
-    md5_digest_t digest;
-    rsa512_sig_t sig;
-    u64 file_size;
-    u64 num_digests;
-    std::optional<TDO::ROMTag> sig_romtag;
-    std::vector<char> signatures;
-
-    sig_romtag = stream_.romtag(RSA_SIGNATURE_BLOCK);
-    if(!sig_romtag)
-      return;
-
-    signatures = generate_signatures_file_data(stream_);
-    zero_portfolio_signature_digests(stream_,signatures);
-
-    num_digests = safe_signature_digest_count(stream_);
-    file_size = std::max<u64>(TDO::signature_file_size_for_digest_count(num_digests),
-                              sig_romtag->size);
-    if(file_size > signature_file_capacity(stream_))
-      throw Error("signatures file too small, increase size and rebuild image");
-    if((signatures.size() + sizeof(sig)) > file_size)
-      throw Error("signatures file too small, increase size and rebuild image");
-
-    signatures.resize(file_size);
-
-    md5_calc(signatures.data(),file_size - sizeof(sig),digest);
-    tdo_rsa_sign(TDO_KEY_APP,digest,sig);
-
-    fmt::print("    - signatures size: {}b\n"
-               "    - MD5 digest: {}\n"
-               "    - RSA signature: {}\n",
-               file_size,
-               digest,
-               sig);
-
-    std::memcpy(&signatures[file_size - sizeof(sig)],sig,sizeof(sig));
-
-    const u64 sig_offset =
-      safe_romtag_first_data_block(stream_,*sig_romtag,"signatures");
-    for(u64 i = 0; i < TDO::div_round_up(signatures.size(),TDO::BLOCK_SIZE); i++)
-      {
-        const u64 offset = i * TDO::BLOCK_SIZE;
-        const u64 bytes_left = signatures.size() - offset;
-        const u64 bytes_to_write = std::min<u64>(TDO::BLOCK_SIZE,bytes_left);
-
-        stream_.data_block_seek(sig_offset + i);
-        stream_.write(&signatures[offset],bytes_to_write);
-      }
-  }
-
-  static
-  void
-  resize_signatures_file_record(TDO::FileStream &stream_)
-  {
-    u64 file_size;
-    u64 num_digests;
-    u64 record_size;
-
-    std::optional<TDO::ROMTag> sig_romtag;
-    sig_romtag = stream_.romtag(RSA_SIGNATURE_BLOCK);
-    if(!sig_romtag)
-      throw Error("signatures ROM tag not found");
-
-    // Keep the logical record size separate from the physical file capacity;
-    // appdigest.c intentionally makes them differ at 512-digest boundaries.
-    num_digests = safe_signature_digest_count(stream_);
-    file_size = TDO::signature_file_size_for_digest_count(num_digests);
-    record_size = std::max<u64>(sig_romtag->size,
-                                TDO::signature_record_size_for_digest_count(num_digests));
-    file_size = std::max(file_size,record_size);
-    if(file_size > signature_file_capacity(stream_))
-      throw Error("signatures file too small, increase size and rebuild image");
-
-    update_signature_romtag_size(stream_,TDO::checked_narrow_u64_to_u32(record_size,
-                                                                        "signatures record size"));
-
-    SignaturesFileUpdater sfu;
-    TDO::FSWalker fsw(stream_,sfu);
-
-    sfu.signatures_block_count = TDO::div_round_up(file_size,TDO::BLOCK_SIZE);
-    sfu.signatures_record_size = TDO::checked_narrow_u64_to_u32(record_size,
-                                                                "signatures record size");
-    fsw.walk();
-  }
-
-  static
   void
   sign_disclabel_romtags_bootcode(TDO::FileStream &stream_)
   {
@@ -1476,7 +1077,6 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
                                    const bool                   mark_,
                                    const bool                   include_banner_romtag_,
                                    const bool                   include_billstuff_romtag_,
-                                   const std::uint8_t           digest_check_count_,
                                    const TDO::ROMTagVec        &source_romtags_)
 {
   SpecialFileCapacity capacity;
@@ -1494,14 +1094,13 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
 
     fsw.walk();
   }
-  pad_image_and_update_disclabel(stream);
-  update_layout_signatures_record(stream,capacity);
+  update_disclabel(stream);
+  reset_signatures_placeholder(stream);
   romtags = generate_romtags_for_image(stream,
                                        include_banner_romtag_,
                                        include_billstuff_romtag_,
-                                       digest_check_count_,
                                        source_romtags_);
-  preflight_layout_special_files(stream,romtags,capacity);
+  preflight_layout_special_files(romtags,capacity);
   if(mark_)
     add_3dt_mark(stream,"packed and signed");
 
@@ -1517,7 +1116,6 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
 
   if(stream.romtag(RSA_NEWKNEWNEWGNUBOOT))
     sign_disclabel_romtags_bootcode(stream);
-  recreate_layout_signatures_file(stream);
 
   stream.close();
 }
@@ -1543,7 +1141,6 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
                      const bool                   preflight_,
                      const bool                   include_banner_romtag_,
                      const bool                   include_billstuff_romtag_,
-                     const std::uint8_t           digest_check_count_,
                      const TDO::ROMTagVec        &source_romtags_)
 {
   TDO::FileStream stream;
@@ -1558,19 +1155,17 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
                             include_banner_romtag_,
                             include_billstuff_romtag_);
 
-  pad_image_and_update_disclabel(stream);
+  update_disclabel(stream);
   if(mark_)
     add_3dt_mark(stream,"signed");
+  reset_signatures_placeholder(stream);
   generate_and_write_romtags(stream,
                              include_banner_romtag_,
                              include_billstuff_romtag_,
-                             digest_check_count_,
                              source_romtags_);
   sign_system_payloads(stream);
   sign_appsplash(stream);
-  resize_signatures_file_record(stream);
   sign_disclabel_romtags_bootcode(stream);
-  recreate_layout_signatures_file(stream);
 
   stream.close();
 }

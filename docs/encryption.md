@@ -192,7 +192,7 @@ The following files are commonly signed or digest-covered, but are not normally 
 | `System/Kernel/os_code` | `RSA_OS` | RSA-signed OS component. |
 | `System/Kernel/misc_code` | `RSA_MISCCODE`, `RSA_OLD_MISCCODE` | RSA-signed misc-code component. |
 | `BannerScreen` | `RSA_APPSPLASH` | APP-key-signed splash image when present. |
-| `signatures` | `RSA_SIGNATURE_BLOCK` | APP-key-signed MD5 digest table for image blocks. |
+| `signatures` | `RSA_SIGNATURE_BLOCK` | Required application-digest record. Historical retail images may store an APP-key-signed block-digest table; 3dt emits a zero-length placeholder with `type_specific = 0`, so Portfolio does not read or authenticate a payload. |
 | `LaunchMe`, `AppStartup` | `RSA_BLOCKS_ALWAYS` or no ROM tag | Application startup files may be covered by signatures or digest checks, but are not typical `DecryptBlock()` targets. |
 
 ### When Decryption is Used

@@ -45,7 +45,7 @@ Standard 3DO disc file paths:
 
 ```
 /
-├── signatures                      # Block MD5 digests
+├── signatures                      # Required zero-length placeholder
 ├── bannerscreen                    # Splash screen image
 ├── rom_tags                        # Synthetic ROM tag table file
 ├── launchme                        # Application startup file
@@ -58,12 +58,16 @@ Standard 3DO disc file paths:
 
 ## Signing Overview
 
-1. Pad image to 32KB boundary
-2. Generate ROM tags for special files
-3. Sign bannerscreen with APP key
-4. Generate and sign signatures file
-5. Sign DiscLabel + ROMTags + boot_code with APP key
-6. OS code and misc_code signed with 3DO key
+1. Update the DiscLabel for the final filesystem allocation
+2. Create the zero-length `signatures` placeholder and generate ROMTags
+3. Sign BannerScreen with the APP key when present
+4. Sign DiscLabel + ROMTags + boot_code with the APP key
+5. Sign boot, OS, and misc-code components with the required keys
+
+The `signatures` record is deliberately logical length zero, with one allocated
+filesystem block. Its `RSA_SIGNATURE_BLOCK` ROMTag uses `size = 0` and
+`type_specific = 0`; this satisfies Portfolio's required tag lookup while
+disabling its historical application block-digest checks.
 
 ## Tools
 

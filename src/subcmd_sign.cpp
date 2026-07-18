@@ -24,7 +24,6 @@
 #include "temp_path.hpp"
 #include "types_ints.h"
 
-#include <cstdint>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -59,17 +58,13 @@ namespace
     temp_path = temp_path_for(target_);
     try
       {
-        const auto digest_check_count =
-          static_cast<std::uint8_t>(opts_.signature_digest_check_count);
-
         fs::copy_file(input_,temp_path,fs::copy_options::none);
 
         TDO::sign_disc_image(temp_path,
                              opts_.mark,
                              !opts_.force,
                              opts_.banner_romtag,
-                             opts_.billstuff_romtag,
-                             digest_check_count);
+                             opts_.billstuff_romtag);
 
         verify_signed_image(temp_path);
 

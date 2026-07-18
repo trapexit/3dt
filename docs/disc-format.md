@@ -224,5 +224,10 @@ ROMFS discs do not contain standard ROM tags.
 
 The 3DO system uses multiple integrity mechanisms:
 1. **Avatar redundancy**: Multiple copies of critical structures
-2. **MD5 signatures**: RSA-signed MD5 digests (see signing.md)
+2. **RSA component signatures**: RSA-signed MD5 digests for boot and system
+   components (see signing.md)
 3. **Mode 1 ECC**: Error correction in 2352-byte sectors
+
+Historical retail discs can also contain an image-block digest table. Current
+3dt output disables that policy with a required zero-count
+`RSA_SIGNATURE_BLOCK` placeholder rather than generating the table.

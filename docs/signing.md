@@ -152,8 +152,10 @@ void tdo_rsa_sign(const char *key_name,
 | Component | Data Signed | Signature Location |
 |-----------|-------------|-------------------|
 | DiscLabel + ROMTags + BootCode | Concatenated data | After ROM tags |
-| Signatures File | All MD5 digests | End of file |
 | BannerScreen | Image data | End of file |
+
+`RSA_SIGNATURE_BLOCK` is not an additional signed component in current 3dt
+output. 3dt emits a disabled application-digest placeholder, described below.
 
 ### Components Signed with 3DO Key
 
@@ -216,17 +218,20 @@ bool verify_signature(const char *key_name,
 
 ### Process Overview
 
-1. **Pad image to 32KB boundary**
-   - Image size must be multiple of 32768 bytes
-
-2. **Update disc label**
+1. **Update disc label**
    - Set `volume_block_count` to new total blocks
 
-3. **Add 3dt mark** (optional)
+2. **Add 3dt mark** (optional)
    - Write signature marker at offset 0x100
+
+3. **Ensure the application-digest placeholder exists**
+   - Keep a root `signatures` directory record
+   - Use logical byte length zero and at least one valid allocated avatar block
 
 4. **Generate and write ROM tags**
    - Create ROMTag for each special file
+   - Emit `RSA_SIGNATURE_BLOCK` with `size = 0` and `type_specific = 0`
+   - Optionally emit `RSA_BILLSTUFF`
    - Write terminator
    - Validate all required files exist
 
@@ -236,28 +241,42 @@ bool verify_signature(const char *key_name,
    - Sign with APP key
    - Append signature
 
-6. **Generate `RSA_BILLSTUFF` ROM tag**
-   - Create ROM tag for Bill Duvall component
+6. **Sign system components with the 3DO key**
+   - Sign OS and misc-code component payloads
+   - Decrypt boot_code, sign its inner payload, and write the signature back to
+     the encrypted filesystem file
 
-7. **Generate signatures file**
-   - Compute MD5 for each 32KB block
-   - Build signatures file
-   - Sign digest list with APP key
-   - Append signature
-
-8. **Sign DiscLabel + ROMTags + BootCode**
+7. **Sign DiscLabel + ROMTags + BootCode**
    - Concatenate: DiscLabel + ROMTags + boot_code (encrypted outer payload)
    - Compute MD5
    - Sign with APP key
    - Write signature after ROM tags
 
-9. **Sign boot code inner payload with 3DO key**
-   - Decrypt boot_code (remove XOR obfuscation)
-   - Compute MD5 of decrypted inner payload
-   - Sign with 3DO key
-   - Append signature to encrypted boot_code file
+No 32KB image padding or image-wide block-digest generation is part of the
+current 3dt signing flow.
 
-### Signatures File Format
+### Current `signatures` Placeholder
+
+Portfolio's `CheckAppDigest()` requires an `RSA_SIGNATURE_BLOCK` ROMTag, even
+when application block-digest checking is disabled. 3dt therefore keeps the
+minimum structural contract:
+
+- root filesystem record named `signatures`
+- `byte_count = 0`
+- one allocated filesystem block for images built or compacted by 3dt
+- a valid avatar pointing to that block
+- `RSA_SIGNATURE_BLOCK.size = 0`
+- `RSA_SIGNATURE_BLOCK.type_specific = 0`
+
+The zero check count causes Portfolio to return success before reading or
+RSA-checking a digest-table payload. The allocated block is a filesystem/layout
+requirement, not signature data.
+
+### Historical Signatures File Format
+
+Some authentic retail images use a nonzero `RSA_SIGNATURE_BLOCK` and store the
+older image-wide digest table below. This format is retained here for analysis
+of those images; 3dt does not generate, update, or verify it.
 
 ```
 +------------------+
@@ -271,6 +290,8 @@ bool verify_signature(const char *key_name,
 ```
 
 ### Digest Count Calculation
+
+For the historical nonzero format only:
 
 ```c
 uint64_t num_digests = (volume_block_count * volume_block_size) / 32768;
@@ -346,21 +367,33 @@ The 3DO boot process:
 3. **Verify cross-app signature** - Validates DiscLabel + ROMTags + boot_code
 4. **Load boot_code** - Verify with 3DO key signature
 5. **Load OS** - Verify with 3DO key signature
-6. **Validate signatures file** - Spot-check block digests
+6. **Check application-digest policy** - Require `RSA_SIGNATURE_BLOCK`; a zero
+   `type_specific` count succeeds before reading a digest payload
 7. **Boot application**
 
 This sequence follows the Portfolio OS `cdipir` flow in
 `portfolio_os/src/dipir/cdipir.c`.
 
-### Signature File Checking
+### Application-Digest Checking
 
-The `type_specific` field in RSA_SIGNATURE_BLOCK controls how many block digests are checked:
+The `type_specific` field in `RSA_SIGNATURE_BLOCK` historically controls how
+many image-block digests Portfolio spot-checks. The ROMTag itself is mandatory:
+if it is absent, `CheckAppDigest()` rejects the disc. A value of zero, however,
+returns success before Portfolio reads, hashes, or RSA-checks the associated
+file.
 
-- `MAX_DIGEST_CHECKS` = 128 (maximum)
-- Default: 15 digests checked
-- Setting to 0: disables checking
-- Setting to 1: uses default (15)
-- Setting ≥ 128: uses 127
+3dt always emits `type_specific = 0`, `size = 0`, and the zero-length
+`signatures` placeholder described above. It neither generates nor validates a
+nonzero digest table. This is why there is no digest-count setting in `pack`,
+`repack`, or `sign`, and no digest-table toggle in `verify`.
+
+For interpreting historical retail tags only:
+
+- `MAX_DIGEST_CHECKS` is 128
+- 15 is the conventional default count
+- 0 disables checking
+- 1 selects the default count
+- values at or above 128 are capped to 127
 
 ## Security Notes
 
