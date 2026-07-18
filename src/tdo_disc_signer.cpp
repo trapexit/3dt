@@ -340,7 +340,27 @@ namespace
     stream_.write(block_count_);
   }
 
-  class ROMTagsFileUpdater final : public TDO::FSWalker::Callbacks
+  class SigningFSCallbacks : public TDO::FSWalker::Callbacks
+  {
+  public:
+    Error
+    invalid_filename(const std::filesystem::path &,
+                     const std::string           &,
+                     const TDO::DirectoryRecord  &,
+                     const uint32_t,
+                     const Error                 &,
+                     TDO::DevStream              &) override
+    {
+      // Retail mastering output can contain otherwise harmless records with
+      // path-separator names (the German Panasonic sampler is one example).
+      // They cannot name any exact signing target below, and FSWalker cannot
+      // safely recurse through them, so skip those records just as list and
+      // unpack do instead of making an unrelated filename block re-signing.
+      return Error();
+    }
+  };
+
+  class ROMTagsFileUpdater final : public SigningFSCallbacks
   {
   public:
     u32 romtags_file_size;
@@ -364,7 +384,7 @@ namespace
     }
   };
 
-  class SignedAIFUpdater final : public TDO::FSWalker::Callbacks
+  class SignedAIFUpdater final : public SigningFSCallbacks
   {
   private:
     static
@@ -497,7 +517,7 @@ namespace
     }
   };
 
-  class SignaturesPlaceholderUpdater final : public TDO::FSWalker::Callbacks
+  class SignaturesPlaceholderUpdater final : public SigningFSCallbacks
   {
   public:
     bool found = false;
@@ -543,7 +563,7 @@ namespace
     return 0;
   }
 
-  class SpecialFileCapacity final : public TDO::FSWalker::Callbacks
+  class SpecialFileCapacity final : public SigningFSCallbacks
   {
   public:
     bool found_rom_tags;
@@ -581,7 +601,7 @@ namespace
     }
   };
 
-  class SigningPreflight final : public TDO::FSWalker::Callbacks
+  class SigningPreflight final : public SigningFSCallbacks
   {
   public:
     bool found_boot_code;
@@ -640,7 +660,7 @@ namespace
     }
   };
 
-  class ROMTagsGenerator final : public TDO::FSWalker::Callbacks
+  class ROMTagsGenerator final : public SigningFSCallbacks
   {
   public:
     TDO::ROMTagVec romtags;

@@ -12,7 +12,7 @@
 * repack existing images and compact free space
 * convert raw disc images to .iso
 * supports reading CD-ROM Mode 1 images and 2048 byte/sector ISOs
-* sign and re-sign 3DO images
+* sign and re-sign 3DO ISO images
 * verify 3DO signatures
 * encrypt or decrypt 3DO obfuscation payloads (primarily the boot file)
 
@@ -313,7 +313,7 @@ the legacy unsigned repack behavior. It also supports `--mark`,
 
 ### sign
 
-Sign an existing image for retail playback.
+Sign an existing ISO image for retail playback.
 
 ```
 3dt sign game.iso --output game-signed.iso
