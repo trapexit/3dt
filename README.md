@@ -305,7 +305,9 @@ Rebuild an image while compacting avatars and reclaiming free space.
 When `--output` is omitted, repack writes to the input basename with a `.iso`
 extension. For example, `3dt repack game.bin` writes `game.iso`.
 Repack supports multiple input images. `--output` requires exactly one input.
-Repack also supports `--sign`, `--mark`, `--no-banner-romtag` /
+Repack signs and verifies the compacted image by default. Use `--no-sign` for
+the legacy unsigned repack behavior. It also supports `--mark`,
+`--no-banner-romtag` /
 `--no-rsa-appsplash`, and `--billstuff-romtag`.
 
 

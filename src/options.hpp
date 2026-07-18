@@ -88,7 +88,7 @@ public:
     bool        banner_romtag = true;
     bool        billstuff_romtag = false;
     bool        mark = true;
-    bool        sign = false;
+    bool        sign = true;
   };
 
   struct Rename

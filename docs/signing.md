@@ -165,6 +165,21 @@ output. 3dt emits a disabled application-digest placeholder, described below.
 | Misc Code | `system/kernel/misc_code` | End of file |
 | Boot Code (inner decrypted payload) | Post-decryption inner boot code | End of encrypted `boot_code` file |
 
+### Ordinary Signed AIF Loadables
+
+Portfolio authenticates signed AIF tasks and demand-loaded modules separately
+from the disc envelope. For every filesystem file whose AIF metadata describes
+a 64-byte trailer at end-of-file, 3dt now mirrors `RSACheck()`:
+
+- hash bytes `[0, _3DO_Signature)` with `_3DO_SignatureLen` cleared in the
+  digest copy
+- use the APP key when `_3DO_USERAPP` is set, otherwise use the 3DO key
+- replace the existing trailer without changing the file's size or metadata
+- update every filesystem avatar
+
+This also converts development-key loadables, such as the privileged folios on
+the PO'ed beta, into signatures accepted by retail systems.
+
 ## Signature Verification
 
 ### Verification Algorithm
@@ -235,18 +250,22 @@ bool verify_signature(const char *key_name,
    - Write terminator
    - Validate all required files exist
 
-5. **Sign BannerScreen**
+5. **Sign system components with the 3DO key**
+   - Sign OS and misc-code component payloads
+   - Decrypt boot_code, sign its inner payload, and write the signature back to
+     the encrypted filesystem file
+
+6. **Sign ordinary AIF loadables**
+   - Apply Portfolio's embedded AIF signature-offset and signature-length rules
+   - Select the APP or 3DO key from `_3DO_Flags`
+
+7. **Sign BannerScreen**
    - Read bannerscreen data
    - Compute MD5
    - Sign with APP key
    - Append signature
 
-6. **Sign system components with the 3DO key**
-   - Sign OS and misc-code component payloads
-   - Decrypt boot_code, sign its inner payload, and write the signature back to
-     the encrypted filesystem file
-
-7. **Sign DiscLabel + ROMTags + BootCode**
+8. **Sign DiscLabel + ROMTags + BootCode**
    - Concatenate: DiscLabel + ROMTags + boot_code (encrypted outer payload)
    - Compute MD5
    - Sign with APP key
