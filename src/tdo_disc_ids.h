@@ -23,7 +23,6 @@
 
 #include <stdint.h>
 
-// TODO: Add hash of signatures file?
 
 EXTERN_C_BEGIN
 

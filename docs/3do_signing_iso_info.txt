@@ -1,8 +1,22 @@
+# Historical Nonzero Application-Digest Notes
+
+This file records the older retail `signatures` table format for forensic and
+compatibility analysis. It does not describe current 3dt output.
+
+Current 3dt behavior is to create a zero-length `signatures` filesystem record
+with one allocated block, then emit an `RSA_SIGNATURE_BLOCK` ROMTag with size 0
+and TypeSpecific 0. Portfolio requires the tag but, with a zero check count,
+returns successfully before reading or authenticating the file payload. 3dt
+does not generate, sign, update, or verify the historical digest table, and it
+does not pad an image to a 32K boundary for that purpose.
+
+The remaining notes apply only to historical nonzero tables.
+
 * Take the MD5 diget of binary.
 * Convert MD5 diget into string representation; "%02X" per byte.
 * Calculate 64 byte RSA sig from MD5
 
-## Things to get digest and sign
+## Historical things to get digest and sign
 
 * BannerScreen. get location from ROM tags. Just attach sig to end of
 file. Since the size of banner is 153600 bytes for data + 24 bytes for
@@ -16,7 +30,7 @@ always room for the sig.
 zeros), the md5 digest consists of the disc label, romtags (including
 last entry), and NEWKNEWNEWGNUBOOT.
 
-## How to calculate signatures file
+## Historical signatures-file calculation
 
 * Create md5 binary digests of every 32K (16 2k blocks)
 * create a "signatures" file with all digests in order

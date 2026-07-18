@@ -47,7 +47,7 @@ The `type` field when `sub_systype == RSANODE`:
 | `0x02` | `RSA_BLOCKS_ALWAYS` | Blocks always present |
 | `0x03` | `RSA_BLOCKS_SOMETIMES` | Blocks sometimes present |
 | `0x04` | `RSA_BLOCKS_RANDOM` | Random blocks |
-| `0x05` | `RSA_SIGNATURE_BLOCK` | Block of MD5 digest signatures |
+| `0x05` | `RSA_SIGNATURE_BLOCK` | Application block-digest descriptor; required as a zero-count placeholder in 3dt images |
 | `0x06` | `RSA_BOOT` | Old CD dipir tag (legacy) |
 | `0x07` | `RSA_OS` | Operating system (sherry, operator, fs) |
 | `0x08` | `RSA_CDINFO` | Optional mastering information |
@@ -170,7 +170,20 @@ while (true) {
 ### RSA_SIGNATURE_BLOCK (0x05)
 | Field | Usage |
 |-------|-------|
-| `type_specific` | Number of block digests to check (default: 15) |
+| `offset` | One less than the filesystem block containing `signatures` |
+| `size` | Historical digest-table size; 3dt writes `0` |
+| `type_specific` | Historical block-digest check count; 3dt writes `0` |
+
+Portfolio's application-digest path requires this ROMTag to exist even when
+block checking is disabled. With `type_specific = 0`, `CheckAppDigest()`
+returns successfully before reading or RSA-checking the `signatures` payload.
+Accordingly, 3dt generates a canonical zero-length `signatures` record with one
+allocated block and emits this tag with `size = 0` and `type_specific = 0`.
+
+Authentic retail images can have nonzero `size` and `type_specific` values
+(commonly a check count of 15) describing the older MD5 block-digest table.
+Those values document the source image's historical policy; 3dt does not
+generate or validate that table when building, repacking, signing, or verifying.
 
 ### RSA_OS (0x07)
 | Field | Usage |
@@ -248,7 +261,7 @@ The 3DO signing process maps specific filesystem paths to ROM tag types:
 
 | File Path | ROM Tag Type |
 |-----------|--------------|
-| `signatures` | `RSA_SIGNATURE_BLOCK` |
+| `signatures` | `RSA_SIGNATURE_BLOCK` (required zero-count placeholder in 3dt output) |
 | `system/kernel/boot_code` | `RSA_NEWKNEWNEWGNUBOOT` |
 | `system/kernel/misc_code` | `RSA_MISCCODE` |
 | `system/kernel/os_code` | `RSA_OS` |
@@ -257,7 +270,7 @@ The 3DO signing process maps specific filesystem paths to ROM tag types:
 This table reflects the same file-to-ROMTag associations used during CD-DIPIR
 load-time discovery in `portfolio_os/src/dipir/cdipir.c`.
 
-## ROM Tags for Signatures
+## Cross-Application Signature
 
 After signing, an additional RSA signature is appended after the ROM tags:
 

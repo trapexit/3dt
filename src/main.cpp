@@ -218,13 +218,6 @@ _generate_pack_argparser(CLI::App      &app_,
   subcmd->add_flag("--billstuff-romtag",
                    options_.billstuff_romtag)
     ->description("generate an RSA_BILLSTUFF ROMTag");
-  subcmd->add_option("--digest-check-count",
-                     options_.signature_digest_check_count)
-    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
-    ->type_name("UINT")
-    ->check(CLI::Range(0,255))
-    ->default_val("0")
-    ->take_last();
   subcmd->add_option("--mark",options_.mark)
     ->description("write a 3dt marker into the output image")
     ->type_name("BOOL")
@@ -262,13 +255,6 @@ _generate_repack_argparser(CLI::App        &app_,
   subcmd->add_flag("--billstuff-romtag",
                    options_.billstuff_romtag)
     ->description("generate an RSA_BILLSTUFF ROMTag");
-  subcmd->add_option("--digest-check-count",
-                     options_.signature_digest_check_count)
-    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
-    ->type_name("UINT")
-    ->check(CLI::Range(0,255))
-    ->default_val("0")
-    ->take_last();
   subcmd->add_option("--mark",options_.mark)
     ->description("write a 3dt marker into the output image")
     ->type_name("BOOL")
@@ -375,8 +361,6 @@ _generate_verify_argparser(CLI::App        &app_,
     ->default_val("human")
     ->take_last()
     ->check(CLI::IsMember({"human","csv","json"}));
-  subcmd->add_flag("--no-digest-table{false}",opts_.digest_table)
-    ->description("skip signature digest table comparison");
   subcmd->add_flag("--quiet",opts_.quiet)
     ->description("print only per-image verification status");
 
@@ -411,13 +395,6 @@ _generate_sign_argparser(CLI::App      &app_,
     ->description("generate an RSA_BILLSTUFF ROMTag");
   subcmd->add_flag("--force",opts_.force)
     ->description("skip signing preflight checks for unusual images");
-  subcmd->add_option("--digest-check-count",
-                     opts_.signature_digest_check_count)
-    ->description("RSA_SIGNATURE_BLOCK TypeSpecific digest check count")
-    ->type_name("UINT")
-    ->check(CLI::Range(0,255))
-    ->default_val("0")
-    ->take_last();
   subcmd->add_option("--mark",opts_.mark)
     ->description("write a 3dt marker into the signed image")
     ->type_name("BOOL")

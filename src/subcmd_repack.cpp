@@ -124,7 +124,6 @@ namespace
         pack_opts.billstuff_romtag = opts_.billstuff_romtag;
         pack_opts.mark = opts_.mark;
         pack_opts.sign = opts_.sign;
-        pack_opts.signature_digest_check_count = opts_.signature_digest_check_count;
         pack_opts.source_romtags = source_romtags;
 
         pack_opts.volume_commentary = label_string(disc_label.volume_commentary);

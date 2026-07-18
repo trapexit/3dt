@@ -75,7 +75,6 @@ public:
     bool        root_unique_identifier_set = false;
     bool        volume_unique_identifier_set = false;
     uint32_t    root_unique_identifier = 0;
-    uint32_t    signature_digest_check_count = 0;
     uint32_t    volume_unique_identifier = 0;
     // Repack supplies the source table so regenerated entries retain its
     // authoritative version/revision fields. Ordinary pack leaves this empty.
@@ -90,7 +89,6 @@ public:
     bool        billstuff_romtag = false;
     bool        mark = true;
     bool        sign = false;
-    uint32_t    signature_digest_check_count = 0;
   };
 
   struct Rename
@@ -116,7 +114,6 @@ public:
   {
     PathVec     filepaths;
     std::string format = "human";
-    bool        digest_table = true;
     bool        quiet = false;
   };
 
@@ -128,7 +125,6 @@ public:
     bool     billstuff_romtag = false;
     bool     force = false;
     bool     mark = true;
-    uint32_t signature_digest_check_count = 0;
   };
 
   struct SignFile

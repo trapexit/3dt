@@ -283,7 +283,6 @@ Common options:
 - `--dry-run`: validate layout and allocations without writing the image
 - `--mark`: write a 3dt marker into the output image
 - `--sign`: run signing as part of pack
-- `--digest-check-count`: tune signature digest check policy
 - `--no-banner-romtag` / `--no-rsa-appsplash`: disable RSA_APPSPLASH romtag generation
 - `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by
   default, really has no impact but was set in all original titles)
@@ -306,8 +305,8 @@ Rebuild an image while compacting avatars and reclaiming free space.
 When `--output` is omitted, repack writes to the input basename with a `.iso`
 extension. For example, `3dt repack game.bin` writes `game.iso`.
 Repack supports multiple input images. `--output` requires exactly one input.
-Repack also supports `--sign`, `--mark`, `--digest-check-count`,
-`--no-banner-romtag` / `--no-rsa-appsplash`, and `--billstuff-romtag`.
+Repack also supports `--sign`, `--mark`, `--no-banner-romtag` /
+`--no-rsa-appsplash`, and `--billstuff-romtag`.
 
 
 ### sign
@@ -319,8 +318,14 @@ Sign an existing image for retail playback.
 ```
 
 `--output` requires exactly one input. Useful flags include `--force` for
-unusual source layouts, `--mark`, `--digest-check-count`,
-`--no-banner-romtag` / `--no-rsa-appsplash`, and `--billstuff-romtag`.
+unusual source layouts, `--mark`, `--no-banner-romtag` /
+`--no-rsa-appsplash`, and `--billstuff-romtag`.
+
+For Portfolio OS compatibility, images built or repacked by 3dt contain a
+zero-length `signatures` placeholder with one allocated filesystem block. Its
+`RSA_SIGNATURE_BLOCK` ROMTag has `size = 0` and `type_specific = 0`. Portfolio
+requires the ROMTag to exist, but a zero check count makes `CheckAppDigest()`
+return before it reads or authenticates a digest-table payload.
 
 
 ### verify
@@ -331,8 +336,10 @@ Validate signed images and report status.
 3dt verify --format=csv game.iso
 ```
 
-Output formats are `human`, `csv`, and `json`; add `--no-digest-table` to skip
-digest-table checks or `--quiet` to print only per-image verification status.
+Output formats are `human`, `csv`, and `json`; add `--quiet` to print only
+per-image verification status. Verification checks the required component and
+cross-application RSA signatures. It does not interpret historical nonzero
+block-digest tables.
 
 
 ### sign-file

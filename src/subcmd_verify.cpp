@@ -40,10 +40,9 @@
 
 #include "types_ints.h"
 
-#include <algorithm>
+#include <array>
 #include <cstring>
 #include <filesystem>
-#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -53,7 +52,6 @@ static constexpr int VERIFY_EXIT_UNSIGNED = 2;
 static constexpr int VERIFY_EXIT_UNSUPPORTED = 3;
 static constexpr int VERIFY_EXIT_INVALID = 4;
 
-static bool g_check_digest_table = true;
 static bool g_quiet = false;
 
 enum class VerifyStatus
@@ -515,489 +513,6 @@ _verify_disclabel_romtags_bootcode(TDO::DevStream &s_,
 }
 
 static
-u64
-_portfolio_digest_start32(TDO::DevStream &s_,
-                          const u64       num_digests_)
-{
-  std::optional<TDO::ROMTag> app_romtag;
-
-  app_romtag = s_.romtag(RSA_APP);
-  if(app_romtag)
-    return ((app_romtag->offset + s_.romtags_block()) / TDO::LOG_BLOCKS_PER_DIGEST);
-  if(num_digests_ <= (256 / TDO::LOG_BLOCKS_PER_DIGEST))
-    return 0;
-
-  return (256 / TDO::LOG_BLOCKS_PER_DIGEST);
-}
-
-static
-bool
-_portfolio_digest_is_ignored(const u64 digest_)
-{
-  return ((digest_ == 0x080F) ||
-          (digest_ == 0x0306));
-}
-
-static
-bool
-_digest_overlaps_extent(const u64 digest_,
-                        const u64 start_byte_,
-                        const u64 byte_count_)
-{
-  const u64 extent_end_byte = (start_byte_ + byte_count_);
-  const u64 digest_start_byte = (digest_ * TDO::LOG_BLOCK_SIZE);
-  const u64 digest_end_byte = (digest_start_byte + TDO::LOG_BLOCK_SIZE);
-
-  if(byte_count_ == 0)
-    return false;
-
-  return ((digest_start_byte < extent_end_byte) &&
-          (digest_end_byte > start_byte_));
-}
-
-static
-void
-_mark_valid_digest_extent(std::vector<bool> &valid_digests_,
-                          const u64          avatar_,
-                          const u64          byte_count_)
-{
-  const u64 start_byte = (avatar_ * TDO::BLOCK_SIZE);
-  const u64 first_digest = (start_byte / TDO::LOG_BLOCK_SIZE);
-  const u64 last_digest = ((start_byte + byte_count_ - 1) / TDO::LOG_BLOCK_SIZE);
-
-  if(byte_count_ == 0)
-    return;
-
-  for(u64 digest = first_digest;
-      (digest <= last_digest) && (digest < valid_digests_.size());
-      digest++)
-    if(_digest_overlaps_extent(digest,start_byte,byte_count_))
-      valid_digests_[digest] = true;
-}
-
-static
-void
-_mark_valid_record_digests(std::vector<bool>              &valid_digests_,
-                           const TDO::DirectoryRecord     &record_)
-{
-  for(const auto avatar : record_.avatar_list)
-    _mark_valid_digest_extent(valid_digests_,avatar,record_.byte_count);
-}
-
-class ValidDigestCollector final : public TDO::FSWalker::Callbacks
-{
-public:
-  ValidDigestCollector(std::vector<bool> &valid_digests_)
-    : _valid_digests(valid_digests_)
-  {
-  }
-
-public:
-  void
-  operator()(const std::filesystem::path&,
-             const TDO::DirectoryRecord  &record_,
-             const uint32_t,
-             TDO::DevStream&)
-  {
-    _mark_valid_record_digests(_valid_digests,record_);
-  }
-
-  Error
-  invalid_filename(const std::filesystem::path&,
-                   const std::string&,
-                   const TDO::DirectoryRecord &record_,
-                   const uint32_t,
-                   const Error&,
-                   TDO::DevStream&)
-  {
-    _mark_valid_record_digests(_valid_digests,record_);
-
-    return {};
-  }
-
-private:
-  std::vector<bool> &_valid_digests;
-};
-
-static
-void
-_collect_valid_digests(TDO::DevStream    &s_,
-                       const u64          num_digests_,
-                       std::vector<bool> &valid_digests_)
-{
-  ValidDigestCollector callbacks(valid_digests_);
-  TDO::FSWalker fsw(s_,callbacks);
-
-  valid_digests_.assign(num_digests_,false);
-
-  fsw.walk();
-}
-
-
-// --- Digest-to-file mapping for mismatch reporting ---
-
-static
-void
-_mark_digest_file_overlap(std::vector<std::vector<std::string>> &digest_to_files_,
-                          const u64                             digest_,
-                          const std::string                   &filepath_)
-{
-  if(digest_ < digest_to_files_.size())
-    digest_to_files_[digest_].push_back(filepath_);
-}
-
-static
-void
-_mark_digest_extent_files(std::vector<std::vector<std::string>> &digest_to_files_,
-                          const u64                              avatar_,
-                          const u64                              byte_count_,
-                          const std::string                    &filepath_)
-{
-  if(byte_count_ == 0)
-    return;
-
-  const u64 start_byte = (avatar_ * TDO::BLOCK_SIZE);
-  const u64 first_digest = (start_byte / TDO::LOG_BLOCK_SIZE);
-  const u64 last_digest = ((start_byte + byte_count_ - 1) / TDO::LOG_BLOCK_SIZE);
-
-  for(u64 digest = first_digest;
-      (digest <= last_digest) && (digest < digest_to_files_.size());
-      digest++)
-    {
-      if(_digest_overlaps_extent(digest,start_byte,byte_count_))
-        _mark_digest_file_overlap(digest_to_files_,digest,filepath_);
-    }
-}
-
-static
-void
-_mark_record_digest_files(std::vector<std::vector<std::string>> &digest_to_files_,
-                          const TDO::DirectoryRecord          &record_,
-                          const std::filesystem::path           &path_)
-{
-  for(const auto avatar : record_.avatar_list)
-    _mark_digest_extent_files(digest_to_files_,avatar,record_.byte_count,
-                              path_.generic_string());
-}
-
-class FileDigestCollector final : public TDO::FSWalker::Callbacks
-{
-public:
-  FileDigestCollector(std::vector<std::vector<std::string>> &digest_to_files_)
-    : _digest_to_files(digest_to_files_)
-  {
-  }
-
-public:
-  void
-  operator()(const std::filesystem::path    &path_,
-             const TDO::DirectoryRecord     &record_,
-             const uint32_t,
-             TDO::DevStream&)
-  {
-    _mark_record_digest_files(_digest_to_files,record_,path_);
-  }
-
-  Error
-  invalid_filename(const std::filesystem::path    &parent_,
-                   const std::string             &filename_,
-                   const TDO::DirectoryRecord     &record_,
-                   const uint32_t,
-                   const Error&,
-                   TDO::DevStream&)
-  {
-    const std::filesystem::path path = TDO::display_path(parent_,filename_);
-    _mark_record_digest_files(_digest_to_files,record_,path);
-
-    return {};
-  }
-
-private:
-  std::vector<std::vector<std::string>> &_digest_to_files;
-};
-
-static
-void
-_collect_digest_files(TDO::DevStream                       &s_,
-                      const u64                             num_digests_,
-                      std::vector<std::vector<std::string>> &digest_to_files_)
-{
-  FileDigestCollector callbacks(digest_to_files_);
-  TDO::FSWalker fsw(s_,callbacks);
-
-  digest_to_files_.assign(num_digests_,{});
-
-  fsw.walk();
-}
-
-static
-void
-_print_affected_files(const u64                                        digest_,
-                      const u64                                        block_pos_,
-                      const std::vector<std::vector<std::string>>     &digest_to_files_)
-{
-  const u64 end_block = block_pos_ + TDO::LOG_BLOCKS_PER_DIGEST - 1;
-
-  _vprint("   - digest mismatch covers blocks: {}-{} ({:#010x}-{:#010x})\n",
-          block_pos_,end_block,
-          block_pos_,end_block);
-  _vprint("   - affected files/data:\n");
-
-  if(digest_ < digest_to_files_.size() && !digest_to_files_[digest_].empty())
-    {
-      std::vector<std::string> seen;
-      for(const auto &path : digest_to_files_[digest_])
-        {
-          if(std::find(seen.begin(),seen.end(),path) == seen.end())
-            {
-              seen.push_back(path);
-              _vprint("     - {}\n",path);
-            }
-        }
-    }
-  else
-    {
-      _vprint("     - (unallocated space)\n");
-    }
-}
-
-static
-bool
-_verify_signature_digests(TDO::DevStream          &s_,
-                          const std::vector<char> &signatures_,
-                          const u64                num_digests_,
-                          const u64                signature_block_,
-                          const u64                signature_size_,
-                          const std::vector<std::vector<std::string>> &digest_to_files_)
-{
-  u64 checked_count;
-  u64 digest_start32;
-  u64 skipped_ignored_count;
-  u64 skipped_prefix_count;
-  u64 skipped_signature_count;
-  u64 skipped_unallocated_count;
-  md5_digest_t digest;
-  TDO::DigestRange signature_range;
-  std::vector<char> data;
-  std::vector<bool> valid_digests;
-
-  if(signatures_.size() < (num_digests_ * sizeof(md5_digest_t)))
-    {
-      _vprint("   - digest table comparison: false\n"
-              "   - digest table error: too small\n");
-      return false;
-    }
-
-  _collect_valid_digests(s_,num_digests_,valid_digests);
-
-  digest_start32 = _portfolio_digest_start32(s_,num_digests_);
-  signature_range = TDO::portfolio_signature_digest_range(signature_block_,
-                                                           signature_size_);
-  checked_count = 0;
-  skipped_ignored_count = 0;
-  skipped_prefix_count = 0;
-  skipped_signature_count = 0;
-  skipped_unallocated_count = 0;
-  for(u64 i = 0; i < num_digests_; i++)
-    {
-      const u64 expected_offset = (i * sizeof(md5_digest_t));
-      const u64 block_pos = (i * TDO::LOG_BLOCKS_PER_DIGEST);
-
-      if(i < digest_start32)
-        {
-          skipped_prefix_count++;
-          continue;
-        }
-
-      if(_portfolio_digest_is_ignored(i))
-        {
-          skipped_ignored_count++;
-          continue;
-        }
-
-      if(signature_range.contains(i))
-        {
-          skipped_signature_count++;
-          continue;
-        }
-
-      if(!valid_digests[i])
-        {
-          skipped_unallocated_count++;
-          continue;
-        }
-
-      data.clear();
-      s_.read_data_blocks(data,block_pos,TDO::LOG_BLOCKS_PER_DIGEST);
-      md5_calc(data.data(),data.size(),digest);
-
-      if(memcmp(&signatures_[expected_offset],digest,sizeof(md5_digest_t)) != 0)
-        {
-          _vprint("   - digest table comparison: false\n"
-                  "   - digest mismatch index: {}\n"
-                  "   - digest mismatch block: {}\n",
-                  i,
-                  block_pos);
-          _print_affected_files(i,block_pos,digest_to_files_);
-          return false;
-        }
-
-      checked_count++;
-    }
-
-  _vprint("   - digest table comparison: true\n"
-          "   - digest table policy: 3dt exhaustive with Portfolio exclusions\n"
-          "   - digest table start index: {}\n"
-          "   - digest table signature exclusion: {}-{}\n"
-          "   - digest table checked: {}\n"
-          "   - digest table skipped prefix: {}\n"
-          "   - digest table skipped ignored: {}\n"
-          "   - digest table skipped unallocated: {}\n"
-          "   - digest table skipped signature area: {}\n",
-          digest_start32,
-          signature_range.first,
-          signature_range.last,
-          checked_count,
-          skipped_prefix_count,
-          skipped_ignored_count,
-          skipped_unallocated_count,
-          skipped_signature_count);
-
-  return true;
-}
-
-static
-bool
-_verify_signature_file(TDO::DevStream    &s_,
-                       const TDO::ROMTag &rom_tag_,
-                       bool              &saw_unsigned_,
-                       bool              &saw_invalid_)
-{
-  u64 sigfile_size = 0;
-  u64 num_digests = 0;
-  u64 sigfile_block_start = 0;
-  u64 sigfile_block_end = 0;
-  u64 sigfile_block_count = 0;
-  u64 volume_block_count = 0;
-  bool digests_matched;
-  md5_digest_t digest;
-  rsa512_sig_t original_sig;
-  rsa512_sig_t computed_sig;
-  std::vector<char> signatures;
-  std::vector<std::vector<std::string>> digest_to_files;
-  TDO::DiscLabel disc_label;
-
-  disc_label = s_.disc_label();
-  const s64 image_size = s_.size_in_bytes();
-
-  // This setup comes from Portfolio OS dipir/appdigest.c. When the digest
-  // count is divisible by 512, appdigest reads an extra 8192-byte trailer;
-  // the RSA_SIGNATURE_BLOCK ROMTag may still report only digest bytes.
-  volume_block_count = disc_label.volume_block_count;
-  sigfile_block_start = TDO::safe_romtag_first_data_block(s_,rom_tag_,"signatures");
-  sigfile_size = rom_tag_.size;
-  // volume_block_count is attacker-influenced disc-label data and
-  // feeds an unbounded multiplication and downstream allocation
-  // (valid_digests.assign(num_digests, ...)). Retail images sometimes
-  // had odd-but-valid layouts so we do not bail out, but we must keep
-  // the math finite. Detect overflow and out-of-image counts, warn,
-  // and clamp num_digests to what the image can physically describe.
-  {
-    const u64 max_vbc = (std::numeric_limits<u64>::max() / TDO::BLOCK_SIZE);
-    u64 effective_vbc = volume_block_count;
-    if(effective_vbc > max_vbc)
-      {
-        _vprint("   - warning: volume_block_count overflows digest math; clamping\n");
-        effective_vbc = max_vbc;
-      }
-    const u64 device_blocks = s_.device_block_count();
-    if((device_blocks > 0) && (effective_vbc > device_blocks))
-      {
-        _vprint("   - warning: volume_block_count exceeds image size; clamping to image\n");
-        effective_vbc = device_blocks;
-      }
-    num_digests = (effective_vbc * TDO::BLOCK_SIZE) / TDO::LOG_BLOCK_SIZE;
-  }
-  const u64 digest_table_size = num_digests * sizeof(md5_digest_t);
-  if(((num_digests & 511) == 0) && (sigfile_size == digest_table_size))
-    sigfile_size += 8192;
-  sigfile_block_count = TDO::div_round_up(sigfile_size,TDO::BLOCK_SIZE);
-  sigfile_block_end = sigfile_block_start + sigfile_block_count;
-
-  if(sigfile_size < RSA512_SIG_SIZE)
-    {
-      _vprint("   - error: signature file is too small\n");
-      return false;
-    }
-  if(!_range_in_image(s_,image_size,sigfile_block_start,sigfile_size))
-    {
-      _vprint("   - error: signature file is outside image bounds\n");
-      return false;
-    }
-
-  s_.read_data_bytes_from_block(signatures,
-                                sigfile_block_start,
-                                sigfile_size);
-
-  if(signatures.size() < RSA512_SIG_SIZE)
-    {
-      _vprint("   - error: signature file is too small\n");
-      return false;
-    }
-
-  _vprint("   - start block: {}\n"
-          "   - start byte: {}\n"
-          "   - end block: {}\n"
-          "   - end byte: {}\n"
-          "   - block count: {}\n"
-          "   - file size: {}b\n"
-          "   - num digests: {}\n"
-          "   - volume block count: {}\n"
-          "   - digest table mode: {}\n",
-          sigfile_block_start,
-          sigfile_block_start * s_.device_block_data_size(),
-          sigfile_block_end,
-          sigfile_block_end * s_.device_block_data_size(),
-          sigfile_block_count,
-          sigfile_size,
-          num_digests,
-          volume_block_count,
-          (g_check_digest_table ? "Portfolio" : "skipped"));
-
-  _get_sig_from_end(signatures,original_sig);
-  _vprint("   - original sig: {}\n",original_sig);
-
-  md5_calc(signatures.data(),
-           signatures.size() - RSA512_SIG_SIZE,
-           digest);
-  tdo_rsa_sign(TDO_KEY_APP,
-               digest,
-               computed_sig);
-
-  _vprint("   - computed sig: {}\n",computed_sig);
-
-  const bool matched = (memcmp(original_sig,computed_sig,sizeof(rsa512_sig_t)) == 0);
-  _vprint("   - match: {}\n",matched);
-  _vprint("   - status: {}\n",_sig_status(original_sig,matched,saw_unsigned_,saw_invalid_));
-
-  if(!g_check_digest_table)
-    {
-      _vprint("   - digest table comparison: skipped\n");
-      return matched;
-    }
-
-  _collect_digest_files(s_,num_digests,digest_to_files);
-
-  digests_matched = _verify_signature_digests(s_,
-                                              signatures,
-                                              num_digests,
-                                              sigfile_block_start,
-                                              rom_tag_.size,
-                                              digest_to_files);
-  return (matched && digests_matched);
-}
-
-static
 bool
 _verify_file(TDO::DevStream &s_,
              const u64       start_offset_in_blocks_,
@@ -1119,7 +634,6 @@ _has_checkable_rsa_sig(TDO::DevStream &s_)
         case RSA_MISCCODE:
         case RSA_NEWKNEWNEWGNUBOOT:
         case RSA_APPSPLASH:
-        case RSA_SIGNATURE_BLOCK:
           return true;
         }
     }
@@ -1150,7 +664,6 @@ _verify_romtag_assets(TDO::DevStream &s_,
         case RSA_MISCCODE:
         case RSA_NEWKNEWNEWGNUBOOT:
         case RSA_APPSPLASH:
-        case RSA_SIGNATURE_BLOCK:
           break;
         default:
           continue;
@@ -1179,12 +692,6 @@ _verify_romtag_assets(TDO::DevStream &s_,
                       rom_tag.type_str());
               matched &= ::_verify_file(s_,offset_in_blocks,size_in_bytes,TDO_KEY_APP,
                                         saw_unsigned_,saw_invalid_);
-              break;
-            case RSA_SIGNATURE_BLOCK:
-              _vprint(" - Verifying {} with APP Key:\n",
-                      rom_tag.type_str());
-              matched &= ::_verify_signature_file(s_,rom_tag,
-                                                  saw_unsigned_,saw_invalid_);
               break;
             }
         }
@@ -1226,6 +733,7 @@ _verify_rsa_sigs(TDO::DevStream &s_)
   bool matched;
   bool saw_unsigned;
   bool saw_invalid;
+  std::optional<TDO::ROMTag> signatures_romtag;
 
   saw_unsigned = false;
   saw_invalid = false;
@@ -1235,6 +743,21 @@ _verify_rsa_sigs(TDO::DevStream &s_)
       _vprint(" - No RSA signatures found\n");
       return VerifyStatus::Unsigned;
     }
+
+  // Portfolio's no-banner APPDIGEST path requires this ROMTag even when its
+  // TypeSpecific digest count is zero. 3dt deliberately does not implement
+  // the optional block-digest table, so only the required tag is checked.
+  // Check it only after establishing that the image has signed components:
+  // an image with no checkable RSA ROMTags is unsigned, not malformed.
+  signatures_romtag = s_.romtag(RSA_SIGNATURE_BLOCK);
+  if(!signatures_romtag)
+    {
+      _vprint(" - Missing required RSA_SIGNATURE_BLOCK ROMTag\n");
+      return VerifyStatus::Invalid;
+    }
+  _vprint(" - RSA_SIGNATURE_BLOCK ROMTag present"
+          " (TypeSpecific: {}; digest payload not checked)\n",
+          signatures_romtag->type_specific);
 
   matched = true;
   try
@@ -1328,7 +851,6 @@ _verify(const Options::Verify &opts_)
 
   format = opts_.format.empty() ? "human" : opts_.format;
 
-  g_check_digest_table = opts_.digest_table;
   g_quiet = (opts_.quiet || (format != "human"));
   failed = false;
   exit_code = 0;

@@ -90,7 +90,7 @@ namespace TDO
 #define RSA_BLOCKS_ALWAYS	0x02
 #define RSA_BLOCKS_SOMETIMES	0x03
 #define RSA_BLOCKS_RANDOM	0x04
-#define RSA_SIGNATURE_BLOCK	0x05	/* Block of digest signatures		*/
+#define RSA_SIGNATURE_BLOCK	0x05	/* Application-digest descriptor	*/
 #define RSA_BOOT		0x06	/* Old CD dipir tag			*/
 #define RSA_OS			0x07	/* CD's version of sherry, operator, fs	*/
 #define RSA_CDINFO		0x08	/* Optional mastering information	*/

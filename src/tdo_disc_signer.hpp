@@ -13,7 +13,6 @@ namespace TDO
                                       bool                         mark = false,
                                       bool                         banner_romtag = true,
                                       bool                         billstuff_romtag = false,
-                                      std::uint8_t                 digest_check_count = 0,
                                       const TDO::ROMTagVec        &source_romtags = {});
   void mark_disc_image(const std::filesystem::path &filepath,
                        const std::string           &action);
@@ -22,6 +21,5 @@ namespace TDO
                         bool                         preflight = true,
                         bool                         banner_romtag = true,
                         bool                         billstuff_romtag = false,
-                        std::uint8_t                 digest_check_count = 0,
                         const TDO::ROMTagVec        &source_romtags = {});
 }

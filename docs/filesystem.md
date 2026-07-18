@@ -207,7 +207,15 @@ OperaFS expects certain system files for bootable discs:
 | `system/kernel/os_code` | Operating system | `RSA_OS` |
 | `system/kernel/misc_code` | Miscellaneous code | `RSA_MISCCODE` |
 | `bannerscreen` | Splash screen image | `RSA_APPSPLASH` |
-| `signatures` | Block signature database | `RSA_SIGNATURE_BLOCK` |
+| `signatures` | Required application-digest placeholder | `RSA_SIGNATURE_BLOCK` |
+
+For images built or repacked by 3dt, `signatures` has `byte_count = 0`, one
+allocated block, and a valid avatar pointing to that block. The matching
+`RSA_SIGNATURE_BLOCK` ROMTag has `size = 0` and `type_specific = 0`. Portfolio
+requires this file/tag association during application-digest setup, but the
+zero check count returns successfully before the placeholder block is read.
+Retail images may instead contain a historical nonzero block-digest table;
+3dt does not generate or validate that payload.
 
 ## Free Space Management
 
