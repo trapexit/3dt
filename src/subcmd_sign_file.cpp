@@ -17,7 +17,7 @@
 */
 
 #include "md5.h"
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 
 #include "error.hpp"
 #include "subcmd.hpp"

@@ -21,22 +21,13 @@
 #include "bigd.h"
 #include "md5.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-BIGD tdo_keys_m1_retail_3do_n(void);
-BIGD tdo_keys_m1_retail_3do_d(void);
-BIGD tdo_keys_m1_retail_app_n(void);
-BIGD tdo_keys_m1_retail_app_d(void);
+BIGD tdo_keys_m1_retail_3do_n();
+BIGD tdo_keys_m1_retail_3do_d();
+BIGD tdo_keys_m1_retail_app_n();
+BIGD tdo_keys_m1_retail_app_d();
 
 BIGD tdo_keys_m1_retail_message(md5_digest_t digest);
 
 BIGD tdo_keys_n(const char *key);
 BIGD tdo_keys_d(const char *key);
 BIGD tdo_keys_m(const char *key, md5_digest_t digest);
-
-#ifdef __cplusplus
-}
-#endif

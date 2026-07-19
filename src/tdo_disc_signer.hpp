@@ -9,6 +9,13 @@
 
 namespace TDO
 {
+  inline constexpr u32 APP_SPLASH_NTSC_PAYLOAD_SIZE = 153624;
+  inline constexpr u32 APP_SPLASH_NTSC_SIGNED_SIZE =
+    APP_SPLASH_NTSC_PAYLOAD_SIZE + 64;
+  inline constexpr u32 APP_SPLASH_PAL_PAYLOAD_SIZE = 202752;
+  inline constexpr u32 APP_SPLASH_PAL_SIGNED_SIZE =
+    APP_SPLASH_PAL_PAYLOAD_SIZE + 64;
+
   struct SignedROMTagPayloadLayout
   {
     u32 payload_size;

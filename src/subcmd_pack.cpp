@@ -29,7 +29,7 @@
 #include "tdo_disc_signer.hpp"
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 #include "tdo_safe_narrow.hpp"
 #include "crc32b_file.hpp"
 
@@ -1024,8 +1024,8 @@ namespace
 
   static
   void
-  validate_replay_file_sizes(Entry          &entry_,
-                             const fs::path &entry_path_)
+  refresh_replay_file_sizes(Entry          &entry_,
+                            const fs::path &entry_path_)
   {
     if((entry_.block_count > 0) && (entry_.block_size == 0))
       throw Error("layout entry has zero block size: " +
@@ -1047,9 +1047,7 @@ namespace
       }
     else if(entry_.kind == EntryKind::Normal)
       {
-        u64 capacity;
         u64 source_size;
-        u32 required_blocks;
         std::error_code ec;
 
         if(entry_.src_path.empty())
@@ -1060,24 +1058,41 @@ namespace
           throw Error("failed to stat layout source file: " +
                       entry_.src_path.string() + " (" +
                       display_path(entry_path_) + "): " + ec.message());
-        capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
-        if(source_size > capacity)
-          throw Error("layout byte count exceeds allocation: " +
-                      display_path(entry_path_));
-        required_blocks = block_count_for_size(source_size,entry_.block_size);
-        if(entry_.block_count < required_blocks)
-          throw Error("layout file allocation too small: " +
-                      display_path(entry_path_) + " needs " +
-                      std::to_string(required_blocks) +
-                      " blocks but has " +
-                      std::to_string(entry_.block_count));
 
         entry_.byte_count = TDO::checked_narrow_u64_to_u32(source_size,"file byte count");
         entry_.data_byte_count = entry_.byte_count;
       }
 
     for(auto &child : entry_.children)
-      validate_replay_file_sizes(*child,entry_path_ / child->name);
+      refresh_replay_file_sizes(*child,entry_path_ / child->name);
+  }
+
+  static
+  void
+  validate_replay_file_capacities(const Entry    &entry_,
+                                  const fs::path &entry_path_)
+  {
+    if(!entry_.directory && (entry_.kind == EntryKind::Normal))
+      {
+        const u64 capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
+        const u64 required_size = std::max<u64>(entry_.byte_count,
+                                                entry_.data_byte_count);
+        if(required_size > capacity)
+          throw Error("layout byte count exceeds allocation: " +
+                      display_path(entry_path_));
+
+        const u32 required_blocks = block_count_for_size(required_size,
+                                                         entry_.block_size);
+        if(entry_.block_count < required_blocks)
+          throw Error("layout file allocation too small: " +
+                      display_path(entry_path_) + " needs " +
+                      std::to_string(required_blocks) +
+                      " blocks but has " +
+                      std::to_string(entry_.block_count));
+      }
+
+    for(const auto &child : entry_.children)
+      validate_replay_file_capacities(*child,entry_path_ / child->name);
   }
 
   static
@@ -1117,11 +1132,12 @@ namespace
 
   static
   std::vector<char>
-  read_manifest_file(const Entry &entry_,
-                     const fs::path &entry_path_)
+  read_manifest_file(const Entry    &entry_,
+                     const fs::path &entry_path_,
+                     const u32       byte_count_)
   {
     std::ifstream is;
-    std::vector<char> data(entry_.data_byte_count);
+    std::vector<char> data(byte_count_);
 
     if(data.empty())
       throw Error("signed payload is empty: " + display_path(entry_path_));
@@ -1150,14 +1166,33 @@ namespace
         if(type != 0)
           {
             const u32 source_size = entry_.data_byte_count;
-            const std::vector<char> data = read_manifest_file(entry_,entry_path_);
+            const u64 capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
+
+            // Only BannerScreen has a standard-extent truncation policy.
+            // Preserve replay layout's original capacity check for every
+            // other signed component before its structural extent is
+            // normalized below.
+            if(replay_layout_ &&
+               (type != RSA_APPSPLASH) &&
+               (source_size > capacity))
+              throw Error("layout byte count exceeds allocation: " +
+                          display_path(entry_path_));
+
+            const u32 inspection_size =
+              ((type == RSA_APPSPLASH) ?
+               std::min(source_size,TDO::APP_SPLASH_PAL_PAYLOAD_SIZE) :
+               source_size);
+            const std::vector<char> data = read_manifest_file(entry_,
+                                                              entry_path_,
+                                                              inspection_size);
             const TDO::SignedROMTagPayloadLayout layout =
               TDO::inspect_signed_romtag_payload(type,
                                                  data,
-                                                 entry_.data_byte_count,
+                                                 source_size,
                                                  source_romtag_size(source_romtags_,type));
 
-            if((entry_.data_byte_count > layout.payload_size) &&
+            if((type != RSA_APPSPLASH) &&
+               (entry_.data_byte_count > layout.payload_size) &&
                (entry_.data_byte_count < layout.signed_size))
               throw Error("signed payload has a partial signature trailer: " +
                           display_path(entry_path_));
@@ -1168,14 +1203,16 @@ namespace
             // An unsigned source copies only its structural payload. The
             // filesystem-visible size includes the newly reserved trailer,
             // matching the normal retail component convention.
-            entry_.data_byte_count = ((source_size >= layout.signed_size) ?
-                                      layout.signed_size :
-                                      layout.payload_size);
+            entry_.data_byte_count =
+              ((type == RSA_APPSPLASH) ?
+               layout.payload_size :
+               ((source_size >= layout.signed_size) ?
+                layout.signed_size :
+                layout.payload_size));
             entry_.byte_count = layout.signed_size;
 
             const u64 required_size = std::max<u64>(entry_.byte_count,
                                                     layout.signed_size);
-            const u64 capacity = static_cast<u64>(entry_.block_count) * entry_.block_size;
             if(replay_layout_)
               {
                 if(required_size > capacity)
@@ -1808,13 +1845,18 @@ namespace
         reserve_signatures_placeholder(manifest.root);
         manifest.total_blocks = std::max(manifest.total_blocks,
                                          max_allocated_block(manifest.root));
-        validate_replay_file_sizes(manifest.root,fs::path());
+        // Refresh source sizes before signed-payload normalization. In
+        // particular, an oversized BannerScreen is intentionally truncated to
+        // its fixed payload extent and must not be rejected against the replayed
+        // allocation before that normalization happens.
+        refresh_replay_file_sizes(manifest.root,fs::path());
         if(options_.sign)
           reserve_signed_payload_storage(manifest.root,
                                          fs::path(),
                                          true,
                                          options_.banner_romtag,
                                          manifest.source_romtags);
+        validate_replay_file_capacities(manifest.root,fs::path());
         validate_layout_allocations(manifest.root);
       }
     else

@@ -28,7 +28,7 @@
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
 #include "tdo_romtag_metadata.hpp"
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 #include "version.hpp"
 
 #include <algorithm>
@@ -56,15 +56,7 @@ namespace
   static constexpr u32 AIF_3DO_HEADER_WORKSPACE_FLAG = 0x40000000;
   static constexpr u32 AIF_3DO_USERAPP = 0x04;
   static constexpr u64 COMPONENT_SIZE_OFFSET = 0x04;
-  static constexpr u64 VIDEO_IMAGE_HEADER_SIZE = 24;
-  static constexpr u64 VIDEO_IMAGE_SIZE_OFFSET = 0x08;
-  static constexpr u64 VIDEO_IMAGE_HEIGHT_OFFSET = 0x0c;
-  static constexpr u64 VIDEO_IMAGE_WIDTH_OFFSET = 0x0e;
-  static constexpr u64 VIDEO_IMAGE_DEPTH_OFFSET = 0x10;
   static constexpr char APP_SPLASH_PATTERN[] = "APPSCRN";
-  static constexpr u64 NTSC_APP_SPLASH_PAYLOAD_SIZE = 153624;
-  static constexpr u64 NTSC_APP_SPLASH_SIGNED_SIZE =
-    NTSC_APP_SPLASH_PAYLOAD_SIZE + RSA512_SIG_SIZE;
 
   static
   u32
@@ -75,15 +67,6 @@ namespace
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 1])) << 16) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 2])) << 8) |
             (static_cast<u32>(static_cast<u8>(data_[offset_ + 3])) << 0));
-  }
-
-  static
-  u16
-  read_u16_be(const std::vector<char> &data_,
-              const u64                offset_)
-  {
-    return ((static_cast<u16>(static_cast<u8>(data_[offset_ + 0])) << 8) |
-            (static_cast<u16>(static_cast<u8>(data_[offset_ + 1])) << 0));
   }
 
   static
@@ -753,6 +736,10 @@ namespace
       romtag.type        = type;
       romtag.sub_systype = RSANODE;
       romtag.size        = record_.byte_count;
+      // TODO: Ordinary pack creates one avatar. Layout replay can preserve
+      // additional avatar addresses, but ROMTag signing currently updates only
+      // avatar_list[0]. Sign every copy if packing gains full secondary-avatar
+      // support.
       romtag.offset      = record_.avatar_list[0] - 1;
 
       if(sign_payloads &&
@@ -762,6 +749,7 @@ namespace
           (type == RSA_APPSPLASH)))
         {
           u64 capacity;
+          u32 inspection_size;
           std::vector<char> data;
           TDO::SignedROMTagPayloadLayout layout;
 
@@ -769,9 +757,13 @@ namespace
           if((record_.byte_count == 0) || (record_.byte_count > capacity))
             throw Error(fmt::format("invalid signed payload allocation: {}",
                                     filepath_.string()));
+          inspection_size =
+            ((type == RSA_APPSPLASH) ?
+             std::min(record_.byte_count,TDO::APP_SPLASH_PAL_PAYLOAD_SIZE) :
+             record_.byte_count);
           stream_.read_data_bytes_from_block(data,
                                              record_.avatar_list[0],
-                                             record_.byte_count);
+                                             inspection_size);
           layout = TDO::inspect_signed_romtag_payload(type,
                                                       data,
                                                       record_.byte_count,
@@ -782,10 +774,22 @@ namespace
                                     filepath_.string(),
                                     layout.signed_size,
                                     capacity));
-          if((record_.byte_count > layout.payload_size) &&
+          if((type != RSA_APPSPLASH) &&
+             (record_.byte_count > layout.payload_size) &&
              (record_.byte_count < layout.signed_size))
             throw Error(fmt::format("{} contains a partial signature trailer",
                                     filepath_.string()));
+
+          if((type == RSA_APPSPLASH) &&
+             (record_.byte_count != layout.signed_size))
+            {
+              fmt::print("    - normalizing BannerScreen size to {}\n",
+                         layout.signed_size);
+              update_record_sizes(stream_,
+                                  record_pos_,
+                                  layout.signed_size,
+                                  record_.block_count);
+            }
 
           // Portfolio's ROMTag loaders hash the structural payload and read
           // the signature immediately after it.  The directory byte count is
@@ -1389,51 +1393,31 @@ TDO::inspect_signed_romtag_payload(const u32                romtag_type_,
     {
     case RSA_APPSPLASH:
       {
-        u64 expected_image_size;
-        u64 image_size;
-        u64 row_bits;
-        u16 height;
-        u16 width;
-        u8 depth;
-
-        if(data_.size() < VIDEO_IMAGE_HEADER_SIZE)
-          throw Error("BannerScreen is too small to contain a VideoImage header");
+        if(data_.size() < TDO::APP_SPLASH_NTSC_PAYLOAD_SIZE)
+          throw Error("BannerScreen is smaller than the standard 153624-byte payload");
         if((static_cast<u8>(data_[0]) != 1) ||
            (std::memcmp(data_.data() + 1,
                         APP_SPLASH_PATTERN,
                         sizeof(APP_SPLASH_PATTERN) - 1) != 0))
           throw Error("BannerScreen has an invalid VideoImage header");
 
-        image_size = read_u32_be(data_,VIDEO_IMAGE_SIZE_OFFSET);
-        height = read_u16_be(data_,VIDEO_IMAGE_HEIGHT_OFFSET);
-        width = read_u16_be(data_,VIDEO_IMAGE_WIDTH_OFFSET);
-        depth = static_cast<u8>(data_[VIDEO_IMAGE_DEPTH_OFFSET]);
-        if((height == 0) || (width == 0) || (depth == 0) || (depth > 16))
-          throw Error("BannerScreen has invalid VideoImage dimensions");
+        const auto is_pal_extent = [](const u32 size_)
+        {
+          return ((size_ == TDO::APP_SPLASH_PAL_PAYLOAD_SIZE) ||
+                  (size_ == TDO::APP_SPLASH_PAL_SIGNED_SIZE));
+        };
 
-        row_bits = static_cast<u64>(width) * depth;
-        if((row_bits % 8) != 0)
-          throw Error("BannerScreen VideoImage rows are not byte aligned");
-        expected_image_size = (row_bits / 8) * height;
-        const u64 declared_payload_size = VIDEO_IMAGE_HEADER_SIZE + image_size;
-
-        // The mastering ROMTag, not vi_Size, is the boot loader's authority.
-        // Shipping Retro Love Letter banners use the standard 320x240 extent
-        // and rt_Size=153688 even where a stale header says 241 rows (Tempest
-        // is internally inconsistent; Wreckman is consistently but wrongly
-        // 640 bytes too large).  Honor that known-good source extent first.
-        if((authoritative_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE) ||
-           (existing_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE))
-          payload_size = NTSC_APP_SPLASH_PAYLOAD_SIZE;
-        else if((image_size == expected_image_size) &&
-                (declared_payload_size <= data_.size()))
-          payload_size = declared_payload_size;
-        else if(((logical_size_hint_ == NTSC_APP_SPLASH_PAYLOAD_SIZE) ||
-                 (logical_size_hint_ == NTSC_APP_SPLASH_SIGNED_SIZE)) &&
-                (data_.size() >= NTSC_APP_SPLASH_PAYLOAD_SIZE))
-          payload_size = NTSC_APP_SPLASH_PAYLOAD_SIZE;
-        else
-          throw Error("BannerScreen VideoImage extent cannot be derived safely");
+        // NTSC and PAL mastering use distinct fixed extents. Do not derive the
+        // extent from VideoImage geometry: shipping Retro Love Letter banners
+        // contain stale header values. Exact source or ROMTag extents reliably
+        // identify PAL; other oversized inputs retain the established NTSC
+        // truncation policy.
+        payload_size =
+          (is_pal_extent(logical_size_hint_) ||
+           is_pal_extent(authoritative_size_hint_) ||
+           is_pal_extent(existing_size_hint_)) ?
+          TDO::APP_SPLASH_PAL_PAYLOAD_SIZE :
+          TDO::APP_SPLASH_NTSC_PAYLOAD_SIZE;
       }
       break;
 
@@ -1484,6 +1468,10 @@ TDO::inspect_signed_romtag_payload(const u32                romtag_type_,
               md5_digest_t digest;
               rsa512_sig_t expected;
 
+              // Portfolio development Dipir accepts its demo and engineering
+              // public keys. Those signatures are useful here only as proof
+              // that this extent already reserves both slots; 3dt replaces
+              // them with retail signatures before emitting the image.
               if((candidate_size_ < signature_size) ||
                  (candidate_size_ > data_.size()))
                 return false;
@@ -1497,7 +1485,7 @@ TDO::inspect_signed_romtag_payload(const u32                romtag_type_,
               if((std::memcmp(expected,
                               *inner_signature,
                               sizeof(expected)) != 0) &&
-                 !tdo_rsa_verify_demo(digest,*inner_signature))
+                 !tdo_rsa_verify_development(digest,*inner_signature))
                 return false;
 
               md5_calc(data_.data(),outer_offset,digest);
@@ -1507,7 +1495,7 @@ TDO::inspect_signed_romtag_payload(const u32                romtag_type_,
               return ((std::memcmp(expected,
                                    *outer_signature,
                                    sizeof(expected)) == 0) ||
-                      tdo_rsa_verify_demo(digest,*outer_signature));
+                      tdo_rsa_verify_development(digest,*outer_signature));
             };
 
             auto has_zero_trailing_slots = [&](const u64 candidate_size_)
