@@ -16,8 +16,7 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-#include "bigd.h"
-#include "md5.h"
+#include "tdo_keys.hpp"
 
 #include "error.hpp"
 
@@ -38,9 +37,6 @@ static const char M1_RETAIL_APP_Q_STR[] = "EC4A6C856F69EA7F910C4327E4586DCFAEC8C
 static const char M1_RETAIL_APP_E_STR[] = "10001";
 
 static const char M1_RETAIL_MSG_PREFIX_STR[] = "1ffffffffffffffffffffffffffffffffffffffffffffffffffffff003020300c06082a864886f70d020505000410";
-
-extern "C"
-{
 
 static
 BIGD
@@ -123,5 +119,3 @@ tdo_keys_m(const char   *key_,
     throw Error("unknown key: " + std::string(key_));
   return tdo_keys_m1_retail_message(digest_);
 }
-
-} // extern "C"

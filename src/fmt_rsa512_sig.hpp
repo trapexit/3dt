@@ -2,7 +2,7 @@
 
 #include "fmt.hpp"
 
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 #include "types_ints.h"
 
 template<>

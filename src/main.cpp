@@ -19,7 +19,7 @@
 #include "error.hpp"
 #include "log.hpp"
 #include "subcmd.hpp"
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 #include "version.hpp"
 
 #include "CLI11.hpp"

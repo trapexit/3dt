@@ -28,7 +28,7 @@
 #include "tdo_boot_code_crypto.hpp"
 #include "tdo_file_stream.hpp"
 #include "tdo_fs_walker.hpp"
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 
 #include "discdata.h"
 

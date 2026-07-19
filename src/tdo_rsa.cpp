@@ -1,14 +1,16 @@
-#include "tdo_rsa.h"
+#include "tdo_rsa.hpp"
 
 #include "bigd.h"
 #include "md5.h"
+#include "tdo_keys.hpp"
 
+#include <cstddef>
 #include <cstring>
 
 namespace
 {
   // Portfolio OS src/dipir/rsadipir.c:PUBLIC_DEMOKEY_MOD. Development
-  // systems accept this public-only key after a retail-key check fails.
+  // Dipir builds test this key before the configured primary key.
   static constexpr unsigned char DEMO_KEY_MODULUS[] =
     {
       0x00,0xc0,0x76,0x47,0x97,0xb8,0xbe,0xc8,0x97,0x2a,0x0e,0xd8,
@@ -18,7 +20,19 @@ namespace
       0x98,0xae,0xcc,0x85,0xd6,0xed,0xc5,0x2d,0x93,0xd5,0xb7,0x39,
       0x67,0x76,0x16,0x05,0x25,
     };
-  static constexpr unsigned long DEMO_KEY_EXPONENT = 65537;
+  // Portfolio OS src/dipir/rsadipir.c:PUBLIC_ENGKEY_MOD.  `WHO_KNOWS`
+  // is explicitly undefined there, so this is the engineering modulus used
+  // by unencrypted, demo, and null Dipir builds.
+  static constexpr unsigned char ENGINEERING_KEY_MODULUS[] =
+    {
+      0x00,0xcc,0xdd,0xb7,0xd6,0x09,0x84,0xa4,0xa7,0xff,0x68,0x41,
+      0xea,0xf1,0xb4,0xdf,0x8e,0xdd,0x26,0xbd,0x31,0x5c,0xa7,0x26,
+      0x81,0x05,0x8d,0xe1,0x2f,0x47,0x7a,0x5a,0x5b,0x84,0xd4,0xf2,
+      0xe3,0x2d,0xd4,0x8b,0xdb,0x8b,0x4a,0x04,0x17,0x6c,0x8f,0x96,
+      0xd5,0xb1,0x94,0xc2,0x70,0xa3,0x05,0x93,0xa9,0xea,0x40,0x32,
+      0xd0,0x03,0x8c,0xae,0x2d,
+    };
+  static constexpr unsigned long DEVELOPMENT_KEY_EXPONENT = 65537;
 }
 
 struct Bigd
@@ -64,8 +78,31 @@ struct Bigd
   }
 };
 
-extern "C"
+namespace
 {
+  static
+  bool
+  verify_with_public_key(const md5_digest_t  digest_,
+                         const rsa512_sig_t  sig_,
+                         const unsigned char *modulus_,
+                         const std::size_t    modulus_size_)
+  {
+    md5_digest_t digest;
+    Bigd exponent(bdNew());
+    Bigd modulus(bdNew());
+    Bigd recovered(bdNew());
+    Bigd signature(bdNew());
+
+    std::memcpy(digest,digest_,sizeof(digest));
+    Bigd expected(tdo_keys_m1_retail_message(digest));
+    bdSetShort(exponent,DEVELOPMENT_KEY_EXPONENT);
+    bdConvFromOctets(modulus,modulus_,modulus_size_);
+    bdConvFromOctets(signature,sig_,sizeof(rsa512_sig_t));
+    bdModExp(recovered,signature,exponent,modulus);
+
+    return (bdIsEqual(recovered,expected) != 0);
+  }
+}
 
 void
 tdo_rsa_sign(const char         *key_,
@@ -86,23 +123,15 @@ tdo_rsa_sign(const char         *key_,
 }
 
 bool
-tdo_rsa_verify_demo(const md5_digest_t digest_,
-                    const rsa512_sig_t sig_)
+tdo_rsa_verify_development(const md5_digest_t digest_,
+                           const rsa512_sig_t sig_)
 {
-  md5_digest_t digest;
-  Bigd exponent(bdNew());
-  Bigd modulus(bdNew());
-  Bigd recovered(bdNew());
-  Bigd signature(bdNew());
-
-  std::memcpy(digest,digest_,sizeof(digest));
-  Bigd expected(tdo_keys_m1_retail_message(digest));
-  bdSetShort(exponent,DEMO_KEY_EXPONENT);
-  bdConvFromOctets(modulus,DEMO_KEY_MODULUS,sizeof(DEMO_KEY_MODULUS));
-  bdConvFromOctets(signature,sig_,sizeof(rsa512_sig_t));
-  bdModExp(recovered,signature,exponent,modulus);
-
-  return (bdIsEqual(recovered,expected) != 0);
-}
-
+  return (verify_with_public_key(digest_,
+                                 sig_,
+                                 DEMO_KEY_MODULUS,
+                                 sizeof(DEMO_KEY_MODULUS)) ||
+          verify_with_public_key(digest_,
+                                 sig_,
+                                 ENGINEERING_KEY_MODULUS,
+                                 sizeof(ENGINEERING_KEY_MODULUS)));
 }
