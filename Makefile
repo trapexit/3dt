@@ -93,8 +93,10 @@ help:
 
 all: $(OUTPUT)
 
-$(OUTPUT): builddir $(OBJS)
+$(OUTPUT): $(OBJS) | $(BUILDDIR)
 	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJS) $(LDFLAGS)
+
+$(OBJS): | $(BUILDDIR)
 
 strip: $(OUTPUT)
 	$(STRIP) --strip-all $(OUTPUT)
@@ -115,8 +117,8 @@ clean:
 distclean: clean
 	git clean -fdx
 
-builddir:
-	mkdir -p $(BUILDDIR)
+$(BUILDDIR):
+	mkdir -p $@
 
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
@@ -158,6 +160,6 @@ release:
 		-e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache \
 		-v ${PWD}:/src:Z localhost/cxxbuilder "/src/buildtools/podman-make-release"
 
-.PHONY: all clean distclean builddir release release-base strip install
+.PHONY: all clean distclean release release-base strip install
 
 -include $(DEPS)
