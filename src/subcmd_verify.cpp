@@ -251,13 +251,14 @@ _verify_romtag_version_revision_fallback(TDO::DevStream                   &s_,
     }
   if(!romtag_ || !metadata_.found)
     return true;
-  if(TDO::romtag_has_version_revision(*romtag_))
-    return true;
   if(!_read_metadata_record_data(s_,metadata_,data))
     return false;
 
   fallback = TDO::find_romtag_version_revision_fallback(romtag_->type,data);
   if(fallback == nullptr)
+    return true;
+  if((romtag_->version == fallback->version) &&
+     (romtag_->revision == fallback->revision))
     return true;
 
   _vprint("   - error: {} ROMTag version/revision is {}.{} for {}; known file hash {} expects {}.{}\n",
