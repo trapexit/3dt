@@ -53,6 +53,23 @@ starts_with(const fs::path &base_,
 
 static
 std::string
+printable_string(const std::string &value_)
+{
+  std::string printable;
+
+  for(const unsigned char c : value_)
+    {
+      if((c < 0x20) || (c == 0x7f))
+        printable += fmt::format("\\x{:02X}",c);
+      else
+        printable.push_back(static_cast<char>(c));
+    }
+
+  return printable;
+}
+
+static
+std::string
 display_path(const fs::path    &parent_,
              const std::string &filename_)
 {
@@ -66,7 +83,7 @@ display_path(const fs::path    &parent_,
   else
     path += filename_;
 
-  return path;
+  return printable_string(path);
 }
 
 static
@@ -269,7 +286,10 @@ public:
     if(!starts_with(base_filter,filepath_))
       return;
 
-    _printer(filepath_.generic_string(),record_,record_pos_,stream_);
+    _printer(printable_string(filepath_.generic_string()),
+             record_,
+             record_pos_,
+             stream_);
   }
 
   Error
