@@ -34,12 +34,17 @@ namespace
 {
   static
   void
-  verify_signed_image(const fs::path &path_)
+  verify_signed_image(const fs::path     &path_,
+                      const Options::Sign &opts_)
   {
     Options::Verify verify_opts{};
 
     verify_opts.filepaths.emplace_back(path_);
-    Subcmd::verify(verify_opts);
+    verify_opts.verbose = opts_.verbose;
+    verify_opts.internal = true;
+    const int code = Subcmd::verify(verify_opts);
+    if(code != 0)
+      throw Error("verification failed",code);
   }
 
 
@@ -64,9 +69,11 @@ namespace
                              opts_.mark,
                              !opts_.force,
                              opts_.banner_romtag,
-                             opts_.billstuff_romtag);
+                             opts_.billstuff_romtag,
+                             {},
+                             opts_.verbose);
 
-        verify_signed_image(temp_path);
+        verify_signed_image(temp_path,opts_);
 
         fs::rename(temp_path,target_);
       }
@@ -99,10 +106,16 @@ namespace Subcmd
         try
           {
             sign_one(filepath,target,opts_);
+            if(!opts_.verbose)
+              fmt::print("{}: signed\n",target.generic_string());
           }
         catch(const std::exception &e)
           {
-            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+            const char *what = e.what();
+            if((what != nullptr) && (what[0] != '\0'))
+              fmt::print(stderr,"3dt: {} - {}\n",what,filepath);
+            else
+              fmt::print(stderr,"3dt: signing failed - {}\n",filepath);
             failed = true;
           }
       }

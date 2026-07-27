@@ -116,6 +116,7 @@ namespace
 
         Options::Pack pack_opts{};
         pack_opts.input = temp_dir;
+        pack_opts.summary_input = input_;
         pack_opts.output = target_;
         // Repack deliberately rebuilds a compact, single-avatar filesystem.
         // Never interpret an extracted layout.json payload as replay metadata.
@@ -125,6 +126,7 @@ namespace
         pack_opts.mark = opts_.mark;
         pack_opts.sign = opts_.sign;
         pack_opts.source_romtags = source_romtags;
+        pack_opts.verbose = opts_.verbose;
 
         pack_opts.volume_commentary = label_string(disc_label.volume_commentary);
         pack_opts.volume_label = label_string(disc_label.volume_identifier);
@@ -175,7 +177,11 @@ namespace Subcmd
           }
         catch(const std::exception &e)
           {
-            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+            const char *what = e.what();
+            if((what != nullptr) && (what[0] != '\0'))
+              fmt::print(stderr,"3dt: {} - {}\n",what,filepath);
+            else
+              fmt::print(stderr,"3dt: verify failed - {}\n",filepath);
             failed = true;
           }
       }

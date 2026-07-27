@@ -226,7 +226,7 @@ namespace
   void
   apply_pack_unique_identifiers(const Options::Pack &options_,
                                 TDO::DiscManifest   &manifest_,
-                                const bool          preserve_unspecified_ = false)
+                                const bool           preserve_unspecified_ = false)
   {
     if(!preserve_unspecified_ || options_.volume_unique_identifier_set)
       {
@@ -1874,6 +1874,41 @@ namespace
 
     return manifest;
   }
+
+  static
+  void
+  count_manifest_entries(const TDO::DiscManifestEntry &entry_,
+                         u64                          &file_count_,
+                         u64                          &dir_count_)
+  {
+    for(const auto &child : entry_.children)
+      {
+        if(child->kind != EntryKind::Normal)
+          continue;
+        if(child->directory)
+          dir_count_++;
+        else
+          file_count_++;
+        count_manifest_entries(*child,file_count_,dir_count_);
+      }
+  }
+
+  static
+  void
+  print_pack_summary(const Options::Pack &options_,
+                     const u64            file_count_,
+                     const u64            dir_count_)
+  {
+    const fs::path &input = (options_.summary_input.empty() ?
+                             options_.input :
+                             options_.summary_input);
+
+    fmt::print("{}: packing {} file(s), {} director(ies) -> {}\n",
+               input.generic_string(),
+               file_count_,
+               dir_count_,
+               options_.output.generic_string());
+  }
 }
 
 namespace Subcmd
@@ -1895,17 +1930,33 @@ namespace Subcmd
         throw Error(e.what());
       }
 
-    if(options_.dry_run)
-      {
-        fmt::print("{}:\n"
-                   "  - dry run: true\n"
-                   "  - total blocks: {}\n"
-                   "  - total bytes: {}\n",
-                   options_.output,
-                   manifest.total_blocks,
-                   static_cast<u64>(manifest.total_blocks) * TDO::BLOCK_SIZE);
-        return;
-      }
+    {
+      u64 file_count;
+      u64 dir_count;
+
+      file_count = 0;
+      dir_count  = 0;
+      count_manifest_entries(manifest.root,file_count,dir_count);
+
+      if(!options_.verbose)
+        print_pack_summary(options_,file_count,dir_count);
+
+      if(options_.dry_run)
+        {
+          fmt::print("{}:\n"
+                     "  - dry run: true\n"
+                     "  - files: {}\n"
+                     "  - directories: {}\n"
+                     "  - total blocks: {}\n"
+                     "  - total bytes: {}\n",
+                     options_.output,
+                     file_count,
+                     dir_count,
+                     manifest.total_blocks,
+                     static_cast<u64>(manifest.total_blocks) * TDO::BLOCK_SIZE);
+          return;
+        }
+    }
 
     output_path = manifest.output;
     try
@@ -1921,7 +1972,6 @@ namespace Subcmd
     try
       {
         TDO::pack_disc_image(manifest);
-        list_packed_image(temp_output_path);
 
         const bool recreate_layout_specials = (manifest.replay_layout &&
                                                options_.sign);
@@ -1930,7 +1980,8 @@ namespace Subcmd
             TDO::mark_disc_image(temp_output_path,
                                  (options_.sign ?
                                   "packed and signed" :
-                                  "packed"));
+                                  "packed"),
+                                 options_.verbose);
           }
 
         if(!options_.sign)
@@ -1940,17 +1991,8 @@ namespace Subcmd
                                                false,
                                                options_.banner_romtag,
                                                options_.billstuff_romtag,
-                                               manifest.source_romtags);
-          }
-
-        if(recreate_layout_specials)
-          {
-            TDO::recreate_layout_special_files(temp_output_path,
-                                               options_.sign,
-                                               false,
-                                               options_.banner_romtag,
-                                               options_.billstuff_romtag,
-                                               manifest.source_romtags);
+                                               manifest.source_romtags,
+                                               options_.verbose);
           }
 
         if(options_.sign && !recreate_layout_specials)
@@ -1960,24 +2002,47 @@ namespace Subcmd
                                  true,
                                  options_.banner_romtag,
                                  options_.billstuff_romtag,
-                                 manifest.source_romtags);
+                                               manifest.source_romtags,
+                                               options_.verbose);
           }
 
         if(options_.sign)
           {
             Options::Verify verify_opts{};
 
-            fmt::print("{}:\n  - Verifying signed image\n",temp_output_path);
             verify_opts.filepaths.emplace_back(temp_output_path);
-            Subcmd::verify(verify_opts);
+            verify_opts.verbose = options_.verbose;
+            verify_opts.internal = true;
+
+            if(options_.verbose)
+              fmt::print("{}:\n  - Verifying signed image\n",temp_output_path);
+
+            const int code = Subcmd::verify(verify_opts);
+            if(code != 0)
+              throw Error("verification failed",code);
           }
         else
           {
-            fmt::print("{}:\n  - Verifying OperaFS structure\n",temp_output_path);
+            if(options_.verbose)
+              fmt::print("{}:\n  - Verifying OperaFS structure\n",temp_output_path);
+
             verify_operafs_structure_file(temp_output_path);
           }
 
+        if(options_.verbose)
+          list_packed_image(temp_output_path);
+
         fs::rename(temp_output_path,output_path);
+
+        if(!options_.verbose)
+          {
+            fmt::print("{}: packed{} ({} blocks, {} bytes){}\n",
+                       output_path.generic_string(),
+                       (options_.sign ? " and signed" : ""),
+                       manifest.total_blocks,
+                       static_cast<u64>(manifest.total_blocks) * TDO::BLOCK_SIZE,
+                       manifest.replay_layout ? ", from layout" : "");
+          }
       }
     catch(const std::exception &e)
       {

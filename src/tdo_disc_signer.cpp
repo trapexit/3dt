@@ -42,6 +42,20 @@
 
 namespace
 {
+  // When false, the signing/packing helpers suppress their progress
+  // output. Set by the public entry points from the caller's --verbose.
+  static bool g_verbose = true;
+
+  template<typename... Args>
+  static
+  void
+  _vprint(const char *fmt_,
+          Args&&...   args_)
+  {
+    if(g_verbose)
+      fmt::print(fmt_,std::forward<Args>(args_)...);
+  }
+
   static constexpr u32 ARM_NOP = 0xe1a00000;
   static constexpr u32 AIF_EXIT_INSTRUCTION = 0xef000011;
   static constexpr u32 AIF_RELOCATION_LIST_END = 0xffffffff;
@@ -322,11 +336,11 @@ namespace
 
     romtag_.version = fallback->version;
     romtag_.revision = fallback->revision;
-    fmt::print("    - using known {} version/revision {}.{} for file hash {}\n",
-               TDO::ROMTag::type_str(romtag_.type),
-               romtag_.version,
-               romtag_.revision,
-               fallback->md5);
+    _vprint("    - using known {} version/revision {}.{} for file hash {}\n",
+            TDO::ROMTag::type_str(romtag_.type),
+            romtag_.version,
+            romtag_.revision,
+            fallback->md5);
   }
 
   static
@@ -510,13 +524,13 @@ namespace
       md5_calc(data.data(),data.size(),digest);
       tdo_rsa_sign(key,digest,signature);
 
-      fmt::print("  - Signing AIF {} with {} key\n"
-                 "    - MD5 digest: {}\n"
-                 "    - RSA signature: {}\n",
-                 filepath_.string(),
-                 key,
-                 digest,
-                 signature);
+      _vprint("  - Signing AIF {} with {} key\n"
+              "    - MD5 digest: {}\n"
+              "    - RSA signature: {}\n",
+              filepath_.string(),
+              key,
+              digest,
+              signature);
 
       for(const u64 avatar_byte_offset : avatar_byte_offsets)
         {
@@ -783,8 +797,8 @@ namespace
           if((type == RSA_APPSPLASH) &&
              (record_.byte_count != layout.signed_size))
             {
-              fmt::print("    - normalizing BannerScreen size to {}\n",
-                         layout.signed_size);
+              _vprint("    - normalizing BannerScreen size to {}\n",
+                      layout.signed_size);
               update_record_sizes(stream_,
                                   record_pos_,
                                   layout.signed_size,
@@ -841,8 +855,8 @@ namespace
               apply_boot_romtag_version(romtag,decrypted);
               if(boot_size && (*boot_size != record_.byte_count))
                 {
-                  fmt::print("    - correcting boot_code size to {}\n",
-                             *boot_size);
+                  _vprint("    - correcting boot_code size to {}\n",
+                          *boot_size);
                   romtag.size = *boot_size;
                   update_record_sizes(stream_,
                                       record_pos_,
@@ -899,7 +913,7 @@ namespace
   {
     TDO::DiscLabel dl;
 
-    fmt::print("  - Update disc label\n");
+    _vprint("  - Update disc label\n");
 
     dl = stream_.disc_label();
     {
@@ -935,9 +949,9 @@ namespace
                        VERSION_PATCH);
     mark.resize(64,'\0');
 
-    fmt::print("  - Setting location {} to '{}'\n",
-               mark_offset,
-               mark.c_str());
+     _vprint("  - Setting location {} to '{}'\n",
+             mark_offset,
+             mark.c_str());
     stream_.data_byte_seek(mark_offset);
     stream_.write(mark.c_str(),mark.size());
   }
@@ -975,21 +989,21 @@ namespace
     for(auto &tag : romtags_)
       {
         if(romtag_offset_is_block_index_minus_one(tag))
-          fmt::print("    - type: {}; offset: {}; size: {}b\n",
-                     TDO::ROMTag::type_str(tag.type),
-                     TDO::safe_romtag_first_data_block(stream_,tag,
-                                                       TDO::ROMTag::type_str(tag.type).c_str()),
-                     tag.size);
+          _vprint("    - type: {}; offset: {}; size: {}b\n",
+                  TDO::ROMTag::type_str(tag.type),
+                  TDO::safe_romtag_first_data_block(stream_,tag,
+                                                    TDO::ROMTag::type_str(tag.type).c_str()),
+                  tag.size);
         else if(tag.type == RSA_BLOCKS_ALWAYS)
-          fmt::print("    - type: {}; offset: {:#010x}; size: {} blocks\n",
-                     TDO::ROMTag::type_str(tag.type),
-                     tag.offset,
-                     tag.size);
+          _vprint("    - type: {}; offset: {:#010x}; size: {} blocks\n",
+                  TDO::ROMTag::type_str(tag.type),
+                  tag.offset,
+                  tag.size);
         else
-          fmt::print("    - type: {}; offset: {:#010x}; size: {}b\n",
-                     TDO::ROMTag::type_str(tag.type),
-                     tag.offset,
-                     tag.size);
+          _vprint("    - type: {}; offset: {:#010x}; size: {}b\n",
+                  TDO::ROMTag::type_str(tag.type),
+                  tag.offset,
+                  tag.size);
         stream_.write(tag);
       }
     stream_.write(TDO::ROMTag{});
@@ -1190,7 +1204,7 @@ namespace
   {
     TDO::ROMTagVec romtags;
 
-    fmt::print("  - Generate and write ROM Tags\n");
+    _vprint("  - Generate and write ROM Tags\n");
     romtags = generate_romtags_for_image(stream_,
                                          include_banner_romtag_,
                                          include_billstuff_romtag_,
@@ -1235,12 +1249,12 @@ namespace
     md5_calc(data.data(),data.size(),digest);
     tdo_rsa_sign(key_,digest,sig);
 
-    fmt::print("  - Signing {}\n"
-               "    - MD5 digest: {}\n"
-               "    - RSA signature: {}\n",
-               label_,
-               digest,
-               sig);
+    _vprint("  - Signing {}\n"
+            "    - MD5 digest: {}\n"
+            "    - RSA signature: {}\n",
+            label_,
+            digest,
+            sig);
 
     stream_.data_byte_seek((first_block * TDO::BLOCK_SIZE) +
                            (romtag->size - RSA512_SIG_SIZE));
@@ -1284,11 +1298,11 @@ namespace
     md5_calc(data.data(),post_cheeze_sig_offset,digest);
     tdo_rsa_sign(TDO_KEY_3DO,digest,sig);
 
-    fmt::print("  - Signing decrypted boot_code\n"
-               "    - MD5 digest: {}\n"
-               "    - RSA signature: {}\n",
-               digest,
-               sig);
+    _vprint("  - Signing decrypted boot_code\n"
+            "    - MD5 digest: {}\n"
+            "    - RSA signature: {}\n",
+            digest,
+            sig);
 
     std::memcpy(encrypted_sig.data(),sig,sizeof(sig));
     TDO::encrypt_boot_code_range(encrypted_sig.data(),
@@ -1306,11 +1320,11 @@ namespace
     md5_calc(data.data(),data.size(),digest);
     tdo_rsa_sign(TDO_KEY_3DO,digest,sig);
 
-    fmt::print("  - Signing encrypted boot_code\n"
-               "    - MD5 digest: {}\n"
-               "    - RSA signature: {}\n",
-               digest,
-               sig);
+    _vprint("  - Signing encrypted boot_code\n"
+            "    - MD5 digest: {}\n"
+            "    - RSA signature: {}\n",
+            digest,
+            sig);
 
     stream_.data_byte_seek((first_block * TDO::BLOCK_SIZE) +
                            outer_sig_offset);
@@ -1362,11 +1376,11 @@ namespace
     md5_calc(data.data(),data.size(),digest);
     tdo_rsa_sign(TDO_KEY_APP,digest,signature);
 
-    fmt::print("  - Signing DiscLabel + ROMTags + BootCode with APP key\n"
-               "    - MD5 digest: {}\n"
-               "    - RSA signature: {}\n",
-               digest,
-               signature);
+    _vprint("  - Signing DiscLabel + ROMTags + BootCode with APP key\n"
+            "    - MD5 digest: {}\n"
+            "    - RSA signature: {}\n",
+            digest,
+            signature);
 
     stream_.data_block_seek(stream_.romtags_block());
     stream_.data_byte_skip(stream_.romtags_size_in_bytes());
@@ -1572,17 +1586,19 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
                                    const bool                   mark_,
                                    const bool                   include_banner_romtag_,
                                    const bool                   include_billstuff_romtag_,
-                                   const TDO::ROMTagVec        &source_romtags_)
+                                   const TDO::ROMTagVec        &source_romtags_,
+                                   const bool                   verbose_)
 {
   SpecialFileCapacity capacity;
   TDO::ROMTagVec romtags;
   TDO::FileStream stream;
 
+  g_verbose = verbose_;
   stream.open(filepath_,std::ios::in|std::ios::out);
   require_iso2048_image(stream);
 
-  fmt::print("{}:\n",filepath_);
-  fmt::print("  - Recreate layout special files\n");
+  _vprint("{}:\n",filepath_);
+  _vprint("  - Recreate layout special files\n");
 
   {
     TDO::FSWalker fsw(stream,capacity,false);
@@ -1600,7 +1616,7 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
   if(mark_)
     add_3dt_mark(stream,"packed and signed");
 
-  fmt::print("  - Write layout ROM Tags\n");
+  _vprint("  - Write layout ROM Tags\n");
   write_romtags(stream,romtags);
   update_romtags_file(stream,romtags.size() * sizeof(TDO::ROMTag));
 
@@ -1619,14 +1635,16 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
 
 void
 TDO::mark_disc_image(const std::filesystem::path &filepath_,
-                     const std::string           &action_)
+                     const std::string           &action_,
+                     const bool                   verbose_)
 {
   TDO::FileStream stream;
 
+  g_verbose = verbose_;
   stream.open(filepath_,std::ios::in|std::ios::out);
   require_iso2048_image(stream);
 
-  fmt::print("{}:\n",filepath_);
+  _vprint("{}:\n",filepath_);
   add_3dt_mark(stream,action_);
 
   stream.close();
@@ -1638,14 +1656,16 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
                      const bool                   preflight_,
                      const bool                   include_banner_romtag_,
                      const bool                   include_billstuff_romtag_,
-                     const TDO::ROMTagVec        &source_romtags_)
+                     const TDO::ROMTagVec        &source_romtags_,
+                     const bool                   verbose_)
 {
   TDO::FileStream stream;
 
+  g_verbose = verbose_;
   stream.open(filepath_,std::ios::in|std::ios::out);
   require_iso2048_image(stream);
 
-  fmt::print("{}:\n",filepath_);
+  _vprint("{}:\n",filepath_);
 
   if(preflight_)
     preflight_signing_image(stream,

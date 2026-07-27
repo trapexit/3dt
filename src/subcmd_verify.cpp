@@ -66,6 +66,7 @@ struct VerifyResult
 {
   std::string  path;
   VerifyStatus status;
+  std::string  reason;
 };
 
 static
@@ -810,20 +811,20 @@ _verify_rsa_sigs(TDO::DevStream &s_)
 }
 
 static
-void
+int
 _verify(const Options::Verify &opts_);
 
 static
 void
 _print_summary(const std::string                              &format_,
-               const bool                                      quiet_,
+               const bool                                      include_human_summary_,
                const std::vector<VerifyResult>                &results_)
 {
   if(format_ == "csv")
     {
-      fmt::print("status,path\n");
+      fmt::print("status,path,reason\n");
       for(const auto &result : results_)
-        fmt::print("{},{}\n",verify_status_str(result.status),result.path);
+        fmt::print("\"{}\",\"{}\",\"{}\"\n",verify_status_str(result.status),result.path,result.reason);
       return;
     }
 
@@ -831,24 +832,32 @@ _print_summary(const std::string                              &format_,
     {
       nlohmann::json arr = nlohmann::json::array();
       for(const auto &result : results_)
-        arr.push_back({{"path", result.path}, {"status", verify_status_str(result.status)}});
+        arr.push_back({{"path", result.path}, {"status", verify_status_str(result.status)}, {"reason", result.reason}});
       fmt::print("{}\n", arr.dump());
       return;
     }
 
-  if(quiet_)
+  if(include_human_summary_)
     for(const auto &result : results_)
-      fmt::print("{}: {}\n",result.path,verify_status_str(result.status));
+      {
+        if(result.reason.empty())
+          fmt::print("{}: {}\n",result.path,verify_status_str(result.status));
+        else
+          fmt::print("{}: {} ({})\n",
+                     result.path,
+                     verify_status_str(result.status),
+                     result.reason);
+      }
 }
 
-void
+int
 Subcmd::verify(const Options::Verify &opts_)
 {
-  ::_verify(opts_);
+  return ::_verify(opts_);
 }
 
 static
-void
+int
 _verify(const Options::Verify &opts_)
 {
   bool failed;
@@ -858,13 +867,14 @@ _verify(const Options::Verify &opts_)
 
   format = opts_.format.empty() ? "human" : opts_.format;
 
-  g_quiet = (opts_.quiet || (format != "human"));
+  g_quiet = (opts_.quiet || !opts_.verbose || (format != "human"));
   failed = false;
   exit_code = 0;
   for(const auto &filepath : opts_.filepaths)
     {
       bool file_failed;
       VerifyStatus status;
+      std::string reason;
       TDO::FileStream stream;
 
       file_failed = false;
@@ -875,24 +885,48 @@ _verify(const Options::Verify &opts_)
 
           if(!stream.has_romtags())
             {
-              fmt::print(stderr,"3dt: {} does not contain ROMTags\n",filepath);
               status = VerifyStatus::Unsupported;
+              reason = "image does not contain ROMTags";
               file_failed = true;
-              throw Error("image does not contain ROMTags");
+              throw Error(reason);
             }
 
           _vprint("{}:\n",filepath);
           ::_verify_operafs_structure(stream);
           status = ::_verify_rsa_sigs(stream);
           if(status != VerifyStatus::Valid)
-            file_failed = true;
+            {
+              if(reason.empty())
+                {
+                  switch(status)
+                    {
+                    case VerifyStatus::Invalid:
+                      reason = "signature verification failed";
+                      break;
+                    case VerifyStatus::Unsigned:
+                      reason = "image is unsigned";
+                      break;
+                    case VerifyStatus::Unsupported:
+                      reason = "unsupported image";
+                      break;
+                    default:
+                      break;
+                    }
+                }
+              file_failed = true;
+            }
         }
       catch(const std::exception &e)
         {
-          if(!file_failed)
-            fmt::print(stderr,"3dt: {} - {}\n",e.what(),filepath);
+          if(reason.empty())
+            reason = e.what();
+
           if(status == VerifyStatus::Valid)
             status = VerifyStatus::Invalid;
+
+          if(opts_.verbose && (format == "human"))
+            fmt::print(stderr,"3dt: {} - {}\n",reason,filepath);
+
           file_failed = true;
         }
 
@@ -908,16 +942,10 @@ _verify(const Options::Verify &opts_)
                   (exit_code == 0))
             exit_code = VERIFY_EXIT_UNSIGNED;
         }
-      results.push_back({filepath.generic_string(),status});
+      results.push_back({filepath.generic_string(),status,reason});
     }
 
-  _print_summary(format,opts_.quiet,results);
-  if(failed)
-    {
-      if(exit_code == VERIFY_EXIT_UNSIGNED)
-        throw Error("image is unsigned",exit_code);
-      if(exit_code == VERIFY_EXIT_UNSUPPORTED)
-        throw Error("unsupported image",exit_code);
-      throw Error("verification failed",exit_code);
-    }
+  if(!opts_.internal)
+    _print_summary(format,true,results);
+  return failed ? exit_code : 0;
 }
