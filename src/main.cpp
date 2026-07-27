@@ -184,7 +184,7 @@ _generate_pack_argparser(CLI::App      &app_,
     ->required()
     ->take_last();
   subcmd->add_option("--layout",options_.layout)
-    ->description("layout metadata input file (default: layout.json in source root when present)")
+    ->description("replay layout metadata from this file")
     ->type_name("PATH")
     ->default_val("")
     ->take_last();

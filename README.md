@@ -275,7 +275,10 @@ Build a 3DO disc image from a source tree.
 3dt pack /path/to/source --output game.iso
 ```
 
-If present, `layout.json` is used automatically; otherwise pass a custom path with `--layout`.
+Packing ignores `layout.json` by default. Pass `--layout /path/to/layout.json`
+to reproduce its recorded filesystem layout. With `--sign`, 3dt first writes
+that layout, then regenerates the ROMTags and signatures needed for retail
+compatibility within the recorded allocations.
 
 Common options:
 - `--volume-label` / `--volume-commentary`: set label metadata

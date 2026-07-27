@@ -119,8 +119,7 @@ namespace
         pack_opts.summary_input = input_;
         pack_opts.output = target_;
         // Repack deliberately rebuilds a compact, single-avatar filesystem.
-        // Never interpret an extracted layout.json payload as replay metadata.
-        pack_opts.discover_layout = false;
+        // It does not opt into replaying the extracted layout metadata.
         pack_opts.banner_romtag = opts_.banner_romtag;
         pack_opts.billstuff_romtag = opts_.billstuff_romtag;
         pack_opts.mark = opts_.mark;

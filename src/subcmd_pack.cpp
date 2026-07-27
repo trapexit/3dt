@@ -1626,40 +1626,7 @@ namespace
   fs::path
   layout_path_for(const Options::Pack &options_)
   {
-    fs::path layout;
-
-    if(!options_.layout.empty())
-      return options_.layout;
-    if(!options_.discover_layout)
-      return {};
-
-    layout = options_.input / DEFAULT_LAYOUT_FILENAME;
-    if(!fs::exists(layout))
-      return {};
-    if(!fs::is_regular_file(layout))
-      throw Error("layout path is not a regular file: " + layout.string());
-
-    std::error_code ec;
-    const std::uintmax_t sz = fs::file_size(layout,ec);
-    if(ec)
-      throw Error("failed to stat layout file: " +
-                  layout.string() + ": " + ec.message());
-    if(sz == 0)
-      {
-        // Auto-discovered layout file (no --layout argument). A
-        // 0-byte file most often comes from a killed unpack/repack
-        // that wrote the path before the body. Restore the prior
-        // behavior of treating that as "no layout, fresh pack" so
-        // the user is not forced to manually rm the stale file
-        // before pack will run, but warn so the stale file does not
-        // go unnoticed.
-        fmt::print(stderr,
-                   "3dt: warning: ignoring empty auto-discovered layout file: {}\n",
-                   layout.string());
-        return {};
-      }
-
-    return layout;
+    return options_.layout;
   }
 
 
@@ -1995,6 +1962,19 @@ namespace Subcmd
                                                options_.verbose);
           }
 
+        if(recreate_layout_specials)
+          {
+            // First preserve the layout-defined filesystem and allocations,
+            // then regenerate the retail ROMTags and signatures in place.
+            TDO::recreate_layout_special_files(temp_output_path,
+                                               true,
+                                               false,
+                                               options_.banner_romtag,
+                                               options_.billstuff_romtag,
+                                               manifest.source_romtags,
+                                               options_.verbose);
+          }
+
         if(options_.sign && !recreate_layout_specials)
           {
             TDO::sign_disc_image(temp_output_path,
@@ -2002,8 +1982,8 @@ namespace Subcmd
                                  true,
                                  options_.banner_romtag,
                                  options_.billstuff_romtag,
-                                               manifest.source_romtags,
-                                               options_.verbose);
+                                 manifest.source_romtags,
+                                 options_.verbose);
           }
 
         if(options_.sign)
