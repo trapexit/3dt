@@ -1654,7 +1654,7 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
       sign_appsplash(stream);
     }
 
-  if(stream.romtag(RSA_NEWKNEWNEWGNUBOOT))
+  if(sign_payloads_ && stream.romtag(RSA_NEWKNEWNEWGNUBOOT))
     sign_disclabel_romtags_bootcode(stream);
 
   stream.close();

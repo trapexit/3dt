@@ -275,17 +275,19 @@ Build a 3DO disc image from a source tree.
 3dt pack /path/to/source --output game.iso
 ```
 
-Packing ignores `layout.json` by default. Pass `--layout /path/to/layout.json`
-to reproduce its recorded filesystem layout. With `--sign`, 3dt first writes
-that layout, then regenerates the ROMTags and signatures needed for retail
-compatibility within the recorded allocations.
+Packing ignores `layout.json` by default and signs the image for retail
+compatibility. Pass `--layout /path/to/layout.json` to reproduce its recorded
+filesystem layout; 3dt first writes that layout, then regenerates the ROMTags
+and signatures needed for retail compatibility within the recorded
+allocations. Pass `--unsigned` only when an unsigned image is explicitly
+required.
 
 Common options:
 - `--volume-label` / `--volume-commentary`: set label metadata
 - `--volume-unique-id` / `--root-unique-id`: set identifiers
 - `--dry-run`: validate layout and allocations without writing the image
 - `--mark`: write a 3dt marker into the output image
-- `--sign`: run signing as part of pack
+- `--unsigned`: pack without signing the image
 - `--no-banner-romtag` / `--no-rsa-appsplash`: disable RSA_APPSPLASH romtag generation
 - `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by
   default, really has no impact but was set in all original titles)
@@ -311,7 +313,7 @@ Rebuild an image while compacting avatars and reclaiming free space.
 When `--output` is omitted, repack writes to the input basename with a `.iso`
 extension. For example, `3dt repack game.bin` writes `game.iso`.
 Repack supports multiple input images. `--output` requires exactly one input.
-Repack signs and verifies the compacted image by default. Use `--no-sign` for
+Repack signs and verifies the compacted image by default. Use `--unsigned` for
 the legacy unsigned repack behavior. It also supports `--mark`,
 `--no-banner-romtag` /
 `--no-rsa-appsplash`, `--billstuff-romtag`, and

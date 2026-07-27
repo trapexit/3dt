@@ -223,13 +223,14 @@ _generate_pack_argparser(CLI::App      &app_,
     ->type_name("BOOL")
     ->default_val("true")
     ->take_last();
-  subcmd->add_flag("--sign",options_.sign)
-    ->description("sign the image after packing");
+  subcmd->add_flag("--unsigned",options_.unsigned_image)
+    ->description("pack without signing the image");
   subcmd->add_flag("--verbose",options_.verbose)
     ->description("print detailed packing/verification output");
 
   subcmd->callback([&options_]()
   {
+    options_.sign = !options_.unsigned_image;
     Subcmd::pack(options_);
   });
 }
@@ -262,13 +263,14 @@ _generate_repack_argparser(CLI::App        &app_,
     ->type_name("BOOL")
     ->default_val("true")
     ->take_last();
-  subcmd->add_flag("--no-sign{false}",options_.sign)
-    ->description("do not sign the image after repacking");
+  subcmd->add_flag("--unsigned",options_.unsigned_image)
+    ->description("repack without signing the image");
   subcmd->add_flag("--verbose",options_.verbose)
     ->description("print detailed repacking/verification output");
 
   subcmd->callback([&options_]()
   {
+    options_.sign = !options_.unsigned_image;
     Subcmd::repack(options_);
   });
 }
