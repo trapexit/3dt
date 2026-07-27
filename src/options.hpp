@@ -62,6 +62,7 @@ public:
   struct Pack
   {
     Path        input;
+    Path        summary_input;
     Path        output;
     Path        layout;
     std::string volume_commentary;
@@ -80,6 +81,7 @@ public:
     // authoritative signed extents and version/revision fields. Layout replay
     // obtains the same metadata from layout.json when this is empty.
     TDO::ROMTagVec source_romtags;
+    bool        verbose = false;
   };
 
   struct Repack
@@ -90,6 +92,7 @@ public:
     bool        billstuff_romtag = false;
     bool        mark = true;
     bool        sign = true;
+    bool        verbose = false;
   };
 
   struct Rename
@@ -116,6 +119,8 @@ public:
     PathVec     filepaths;
     std::string format = "human";
     bool        quiet = false;
+    bool        verbose = false;
+    bool        internal = false;
   };
 
   struct Sign
@@ -126,6 +131,7 @@ public:
     bool     billstuff_romtag = false;
     bool     force = false;
     bool     mark = true;
+    bool     verbose = false;
   };
 
   struct SignFile

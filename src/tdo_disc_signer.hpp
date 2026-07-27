@@ -33,13 +33,16 @@ namespace TDO
                                       bool                         mark = false,
                                       bool                         banner_romtag = true,
                                       bool                         billstuff_romtag = false,
-                                      const TDO::ROMTagVec        &source_romtags = {});
+                                      const TDO::ROMTagVec        &source_romtags = {},
+                                      bool                         verbose = true);
   void mark_disc_image(const std::filesystem::path &filepath,
-                       const std::string           &action);
+                       const std::string           &action,
+                       bool                         verbose = true);
   void sign_disc_image(const std::filesystem::path &filepath,
                         bool                         mark = false,
                         bool                         preflight = true,
                         bool                         banner_romtag = true,
                         bool                         billstuff_romtag = false,
-                        const TDO::ROMTagVec        &source_romtags = {});
+                        const TDO::ROMTagVec        &source_romtags = {},
+                        bool                         verbose = true);
 }

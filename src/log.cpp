@@ -40,6 +40,8 @@ namespace Log
   void
   error(const Error &err_)
   {
+    if(err_.str.empty())
+      return;
     fprintf(stderr,
             "3dt: %s\n",
             err_.c_str());

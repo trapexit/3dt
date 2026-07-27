@@ -286,6 +286,9 @@ Common options:
 - `--no-banner-romtag` / `--no-rsa-appsplash`: disable RSA_APPSPLASH romtag generation
 - `--billstuff-romtag`: enable RSA_BILLSTUFF romtag generation (off by
   default, really has no impact but was set in all original titles)
+- `--verbose`: print the full packing, signing, and verification output
+  (a one-line summary including the number of files and directories found is
+  printed before packing starts otherwise)
 
 By default, `pack` derives the volume unique identifier from the CRC32 of
 `BannerScreen` and the root unique identifier from the CRC32 of `LaunchMe`.
@@ -308,7 +311,8 @@ Repack supports multiple input images. `--output` requires exactly one input.
 Repack signs and verifies the compacted image by default. Use `--no-sign` for
 the legacy unsigned repack behavior. It also supports `--mark`,
 `--no-banner-romtag` /
-`--no-rsa-appsplash`, and `--billstuff-romtag`.
+`--no-rsa-appsplash`, `--billstuff-romtag`, and
+`--verbose` (print the full packing/signing/verification output).
 
 
 ### sign
@@ -321,13 +325,8 @@ Sign an existing ISO image for retail playback.
 
 `--output` requires exactly one input. Useful flags include `--force` for
 unusual source layouts, `--mark`, `--no-banner-romtag` /
-`--no-rsa-appsplash`, and `--billstuff-romtag`.
-
-For Portfolio OS compatibility, images built or repacked by 3dt contain a
-zero-length `signatures` placeholder with one allocated filesystem block. Its
-`RSA_SIGNATURE_BLOCK` ROMTag has `size = 0` and `type_specific = 0`. Portfolio
-requires the ROMTag to exist, but a zero check count makes `CheckAppDigest()`
-return before it reads or authenticates a digest-table payload.
+`--no-rsa-appsplash`, `--billstuff-romtag`, and
+`--verbose` (print the full signing/verification output).
 
 
 ### verify
@@ -339,9 +338,10 @@ Validate signed images and report status.
 ```
 
 Output formats are `human`, `csv`, and `json`; add `--quiet` to print only
-per-image verification status. Verification checks the required component and
-cross-application RSA signatures. It does not interpret historical nonzero
-block-digest tables.
+per-image verification status. By default `verify` prints only per-image
+status; pass `-v,--verbose` for the full verification trace. Verification
+checks the required component and cross-application RSA signatures. It does
+not interpret historical nonzero block-digest tables.
 
 
 ### sign-file

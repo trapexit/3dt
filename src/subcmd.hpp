@@ -32,7 +32,7 @@ namespace Subcmd
   void rename(const Options::Rename &options);
   void to_iso(const Options::ToISO &options);
   void romtags(const Options::ROMTags &options);
-  void verify(const Options::Verify &options);
+  int verify(const Options::Verify &options);
   void sign(const Options::Sign &options);
   void sign_file(const Options::SignFile &);
   void decrypt_file(const Options::DecFile &);

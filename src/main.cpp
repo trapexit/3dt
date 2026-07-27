@@ -225,6 +225,8 @@ _generate_pack_argparser(CLI::App      &app_,
     ->take_last();
   subcmd->add_flag("--sign",options_.sign)
     ->description("sign the image after packing");
+  subcmd->add_flag("--verbose",options_.verbose)
+    ->description("print detailed packing/verification output");
 
   subcmd->callback([&options_]()
   {
@@ -262,6 +264,8 @@ _generate_repack_argparser(CLI::App        &app_,
     ->take_last();
   subcmd->add_flag("--no-sign{false}",options_.sign)
     ->description("do not sign the image after repacking");
+  subcmd->add_flag("--verbose",options_.verbose)
+    ->description("print detailed repacking/verification output");
 
   subcmd->callback([&options_]()
   {
@@ -363,10 +367,20 @@ _generate_verify_argparser(CLI::App        &app_,
     ->check(CLI::IsMember({"human","csv","json"}));
   subcmd->add_flag("--quiet",opts_.quiet)
     ->description("print only per-image verification status");
+  subcmd->add_flag("-v,--verbose",opts_.verbose)
+    ->description("print detailed verification output");
 
   subcmd->callback([&opts_]()
   {
-    Subcmd::verify(opts_);
+    const int code = Subcmd::verify(opts_);
+    if(code != 0)
+      {
+        if(opts_.format == "human")
+          throw Error("verification failed",code);
+
+        // Machine-readable formats already include failure details in stdout/stderr.
+        throw Error("",code);
+      }
   });
 }
 
@@ -400,6 +414,8 @@ _generate_sign_argparser(CLI::App      &app_,
     ->type_name("BOOL")
     ->default_val("true")
     ->take_last();
+  subcmd->add_flag("--verbose",opts_.verbose)
+    ->description("print detailed signing/verification output");
 
   subcmd->callback([&opts_]()
   {
@@ -547,6 +563,11 @@ main(int    argc_,
   catch(const CLI::ParseError &e)
     {
       return app.exit(e);
+    }
+  catch(const Error &e)
+    {
+      Log::error(e);
+      return e.code;
     }
   catch(const std::exception &e)
     {
