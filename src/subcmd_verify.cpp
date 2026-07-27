@@ -88,6 +88,25 @@ verify_status_str(const VerifyStatus status_)
   return "invalid";
 }
 
+static
+std::string
+csv_quote_field(const std::string &field_)
+{
+  std::string quoted;
+
+  quoted.reserve(field_.size() + 2);
+  quoted.push_back('"');
+  for(const char c : field_)
+    {
+      if(c == '"')
+        quoted.push_back('"');
+      quoted.push_back(c);
+    }
+  quoted.push_back('"');
+
+  return quoted;
+}
+
 template<typename... Args>
 static
 void
@@ -824,7 +843,10 @@ _print_summary(const std::string                              &format_,
     {
       fmt::print("status,path,reason\n");
       for(const auto &result : results_)
-        fmt::print("\"{}\",\"{}\",\"{}\"\n",verify_status_str(result.status),result.path,result.reason);
+        fmt::print("{},{},{}\n",
+                   csv_quote_field(verify_status_str(result.status)),
+                   csv_quote_field(result.path),
+                   csv_quote_field(result.reason));
       return;
     }
 
