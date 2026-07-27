@@ -1093,11 +1093,14 @@ namespace
         if(source == source_romtags_.end())
           continue;
 
-        // Repack/unpack-pack carry a known-good source table, and direct sign
-        // starts from the table already in the image.  Those version/revision
-        // fields are authoritative and intentionally override payload
-        // heuristics and the MD5 oracle. All structural fields are freshly
-        // regenerated.
+        // A known payload hash or payload-derived version is stronger evidence
+        // than a source table: prototype and homebrew images can carry stale
+        // ROMTag metadata for otherwise known retail system payloads. Preserve
+        // source metadata only when payload inspection could not identify a
+        // version/revision.
+        if(TDO::romtag_has_version_revision(romtag))
+          continue;
+
         romtag.version = source->version;
         romtag.revision = source->revision;
       }
@@ -1652,6 +1655,15 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
       sign_system_payloads(stream);
       inspect_aif_files(stream);
       sign_appsplash(stream);
+
+      // System signing changes the full payload hashes used by the ROMTag
+      // metadata oracle. Regenerate after signing so old or development
+      // payloads that normalize to a known retail form receive the matching
+      // version/revision before the cross-app signature is calculated.
+      generate_and_write_romtags(stream,
+                                 include_banner_romtag_,
+                                 include_billstuff_romtag_,
+                                 source_romtags_);
     }
 
   if(sign_payloads_ && stream.romtag(RSA_NEWKNEWNEWGNUBOOT))
@@ -1710,6 +1722,10 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
   sign_system_payloads(stream);
   inspect_aif_files(stream);
   sign_appsplash(stream);
+  generate_and_write_romtags(stream,
+                             include_banner_romtag_,
+                             include_billstuff_romtag_,
+                             source_romtags_);
   sign_disclabel_romtags_bootcode(stream);
 
   stream.close();
