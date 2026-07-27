@@ -168,17 +168,19 @@ output. 3dt emits a disabled application-digest placeholder, described below.
 ### Ordinary Signed AIF Loadables
 
 Portfolio authenticates signed AIF tasks and demand-loaded modules separately
-from the disc envelope. For every filesystem file whose AIF metadata describes
-a 64-byte trailer at end-of-file, 3dt now mirrors `RSACheck()`:
+from the disc envelope. Their preparation belongs to `modbin`; packing or
+repacking a disc does not change the bytes covered by `RSACheck()`.
 
-- hash bytes `[0, _3DO_Signature)` with `_3DO_SignatureLen` cleared in the
-  digest copy
-- use the APP key when `_3DO_USERAPP` is set, otherwise use the 3DO key
-- replace the existing trailer without changing the file's size or metadata
-- update every filesystem avatar
+3dt therefore preserves ordinary filesystem AIFs byte-for-byte. During a
+signing operation it inspects recognized AIFs and warns when an AIF:
 
-This also converts development-key loadables, such as the privileged folios on
-the PO'ed beta, into signatures accepted by retail systems.
+- has no complete 3DO header
+- is unsigned
+- carries a development signature that retail systems reject
+- has unsupported signature metadata or an invalid signature
+
+These warnings do not modify the AIF or fail disc signing. Run the source AIF
+through `modbin` to correct it.
 
 ## Signature Verification
 
@@ -255,9 +257,10 @@ bool verify_signature(const char *key_name,
    - Decrypt boot_code, sign its inner payload, and write the signature back to
      the encrypted filesystem file
 
-6. **Sign ordinary AIF loadables**
-   - Apply Portfolio's embedded AIF signature-offset and signature-length rules
-   - Select the APP or 3DO key from `_3DO_Flags`
+6. **Inspect ordinary AIF loadables**
+   - Preserve every ordinary AIF byte-for-byte
+   - Warn about unsigned, development-signed, invalid, or unsupported AIFs
+   - Leave any correction to `modbin`
 
 7. **Sign BannerScreen**
    - Read bannerscreen data
