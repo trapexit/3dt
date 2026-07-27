@@ -82,25 +82,36 @@ namespace
 {
   static
   bool
-  verify_with_public_key(const md5_digest_t  digest_,
-                         const rsa512_sig_t  sig_,
-                         const unsigned char *modulus_,
-                         const std::size_t    modulus_size_)
+  verify_with_modulus(const md5_digest_t digest_,
+                      const rsa512_sig_t sig_,
+                      const BIGD         modulus_)
   {
     md5_digest_t digest;
     Bigd exponent(bdNew());
-    Bigd modulus(bdNew());
     Bigd recovered(bdNew());
     Bigd signature(bdNew());
 
     std::memcpy(digest,digest_,sizeof(digest));
     Bigd expected(tdo_keys_m1_retail_message(digest));
     bdSetShort(exponent,DEVELOPMENT_KEY_EXPONENT);
-    bdConvFromOctets(modulus,modulus_,modulus_size_);
     bdConvFromOctets(signature,sig_,sizeof(rsa512_sig_t));
-    bdModExp(recovered,signature,exponent,modulus);
+    bdModExp(recovered,signature,exponent,modulus_);
 
     return (bdIsEqual(recovered,expected) != 0);
+  }
+
+  static
+  bool
+  verify_with_public_key(const md5_digest_t  digest_,
+                         const rsa512_sig_t  sig_,
+                         const unsigned char *modulus_,
+                         const std::size_t    modulus_size_)
+  {
+    Bigd modulus(bdNew());
+
+    bdConvFromOctets(modulus,modulus_,modulus_size_);
+
+    return verify_with_modulus(digest_,sig_,modulus);
   }
 }
 
@@ -120,6 +131,16 @@ tdo_rsa_sign(const char         *key_,
   bdModExp(s,m,d,n);
 
   bdConvToOctets(s,sig_,sizeof(rsa512_sig_t));
+}
+
+bool
+tdo_rsa_verify_retail(const char         *key_,
+                      const md5_digest_t  digest_,
+                      const rsa512_sig_t  sig_)
+{
+  Bigd modulus(tdo_keys_n(key_));
+
+  return verify_with_modulus(digest_,sig_,modulus);
 }
 
 bool

@@ -410,7 +410,7 @@ namespace
     }
   };
 
-  class SignedAIFUpdater final : public SigningFSCallbacks
+  class SignedAIFInspector final : public SigningFSCallbacks
   {
   private:
     static
@@ -424,7 +424,7 @@ namespace
       const u64 byte_offset = static_cast<u64>(avatar_) * TDO::BLOCK_SIZE;
 
       if(image_size_s64 < 0)
-        throw Error("invalid negative image size while signing AIF files");
+        throw Error("invalid negative image size while inspecting AIF files");
 
       const u64 image_size = static_cast<u64>(image_size_s64);
       if((byte_offset > image_size) ||
@@ -433,6 +433,17 @@ namespace
                                 filepath_.string()));
 
       return byte_offset;
+    }
+
+    static
+    void
+    warn(const std::filesystem::path &filepath_,
+         const std::string           &reason_)
+    {
+      fmt::print(stderr,
+                 "3dt: warning: AIF {} {}; prepare it with modbin\n",
+                 filepath_.generic_string(),
+                 reason_);
     }
 
   public:
@@ -445,56 +456,36 @@ namespace
       md5_digest_t digest;
       rsa512_sig_t signature;
       std::vector<char> data;
-      std::vector<u64> avatar_byte_offsets;
       const char *key;
       u32 flags;
       u32 instruction;
       u32 signature_length;
       u32 signature_offset;
+      u64 header_size;
 
       (void)record_pos_;
 
       const std::string lc_filepath =
         nonstd::string::as_lowercase(filepath_.generic_string());
       if((lc_filepath == "system/kernel/os_code") ||
-         (lc_filepath == "system/kernel/misc_code"))
+         (lc_filepath == "system/kernel/misc_code") ||
+         (lc_filepath == "system/kernel/boot_code"))
         return;
 
       if(record_.is_directory() ||
          record_.avatar_list.empty() ||
-         (record_.byte_count < AIF_3DO_HEADER_SIZE))
+         (record_.byte_count < 0x40))
         return;
 
+      header_size = std::min<u64>(record_.byte_count,AIF_3DO_HEADER_SIZE);
       checked_avatar_byte_offset(filepath_,
                                  stream_,
                                  record_.avatar_list[0],
-                                 AIF_3DO_HEADER_SIZE);
+                                 header_size);
       stream_.read_data_bytes_from_block(data,
                                          record_.avatar_list[0],
-                                         AIF_3DO_HEADER_SIZE);
-      if((read_u32_be(data,AIF_HEADER_WORKSPACE_OFFSET) &
-          AIF_3DO_HEADER_WORKSPACE_FLAG) == 0)
-        return;
+                                         header_size);
 
-      signature_offset = read_u32_be(data,AIF_3DO_SIGNATURE_OFFSET_OFFSET);
-      signature_length = read_u32_be(data,AIF_3DO_SIGNATURE_LENGTH_OFFSET);
-      if((signature_length != RSA512_SIG_SIZE) ||
-         (signature_offset < AIF_3DO_HEADER_SIZE) ||
-         ((static_cast<u64>(signature_offset) + signature_length) !=
-          record_.byte_count))
-        return;
-
-      avatar_byte_offsets.reserve(record_.avatar_list.size());
-      for(const u32 avatar : record_.avatar_list)
-        avatar_byte_offsets.emplace_back(checked_avatar_byte_offset(filepath_,
-                                                                    stream_,
-                                                                    avatar,
-                                                                    record_.byte_count));
-
-      data.clear();
-      stream_.read_data_bytes_from_block(data,
-                                         record_.avatar_list[0],
-                                         signature_offset);
       if(read_u32_be(data,0x10) != AIF_EXIT_INSTRUCTION)
         return;
       instruction = read_u32_be(data,0x00);
@@ -509,37 +500,73 @@ namespace
       if(!arm_bl_target(read_u32_be(data,0x0c),0x0c))
         return;
 
+      if(data.size() < AIF_3DO_HEADER_SIZE)
+        {
+          warn(filepath_,"has no complete 3DO header");
+          return;
+        }
+      if((read_u32_be(data,AIF_HEADER_WORKSPACE_OFFSET) &
+          AIF_3DO_HEADER_WORKSPACE_FLAG) == 0)
+        {
+          warn(filepath_,"has no 3DO header");
+          return;
+        }
+
+      signature_offset = read_u32_be(data,AIF_3DO_SIGNATURE_OFFSET_OFFSET);
+      signature_length = read_u32_be(data,AIF_3DO_SIGNATURE_LENGTH_OFFSET);
+      if(signature_length == 0)
+        {
+          warn(filepath_,"is unsigned");
+          return;
+        }
+      if((signature_length != RSA512_SIG_SIZE) ||
+         (signature_offset < AIF_3DO_HEADER_SIZE) ||
+         (signature_offset > record_.byte_count) ||
+         (signature_length > (record_.byte_count - signature_offset)))
+        {
+          warn(filepath_,
+               fmt::format("has unsupported signature metadata "
+                           "(offset {}, length {})",
+                           signature_offset,
+                           signature_length));
+          return;
+        }
+
+      data.clear();
+      checked_avatar_byte_offset(filepath_,
+                                 stream_,
+                                 record_.avatar_list[0],
+                                 static_cast<u64>(signature_offset) +
+                                   signature_length);
+      stream_.read_data_bytes_from_block(data,
+                                         record_.avatar_list[0],
+                                         static_cast<u64>(signature_offset) +
+                                           signature_length);
+
       flags = read_u32_be(data,AIF_3DO_FLAGS_OFFSET);
       key = ((flags & AIF_3DO_USERAPP) != 0) ? TDO_KEY_APP : TDO_KEY_3DO;
 
-      // Portfolio's RSACheck authenticates an ordinary AIF independently of
-      // the disc envelope. It hashes exactly _3DO_Signature bytes after
-      // clearing _3DO_SignatureLen in the loaded copy, then chooses the APP
-      // key only for _3DO_USERAPP files. This matters for prototypes such as
-      // PO'ed, whose privileged folios carry DEMO signatures that a retail
-      // console rejects even after the surrounding disc has been re-signed.
+      std::memcpy(signature,
+                  data.data() + signature_offset,
+                  sizeof(signature));
+
+      // Portfolio authenticates ordinary AIFs independently of the disc
+      // envelope. Preserve their bytes exactly: modbin owns AIF preparation,
+      // while 3dt only reports signatures that retail systems will reject.
       std::fill(data.begin() + AIF_3DO_SIGNATURE_LENGTH_OFFSET,
                 data.begin() + AIF_3DO_SIGNATURE_LENGTH_OFFSET + sizeof(u32),
                 0);
-      md5_calc(data.data(),data.size(),digest);
-      tdo_rsa_sign(key,digest,signature);
+      md5_calc(data.data(),signature_offset,digest);
+      if(tdo_rsa_verify_retail(key,digest,signature))
+        return;
 
-      _vprint("  - Signing AIF {} with {} key\n"
-              "    - MD5 digest: {}\n"
-              "    - RSA signature: {}\n",
-              filepath_.string(),
-              key,
-              digest,
-              signature);
-
-      for(const u64 avatar_byte_offset : avatar_byte_offsets)
+      if(tdo_rsa_verify_development(digest,signature))
         {
-          const u64 byte_offset =
-            avatar_byte_offset + signature_offset;
-
-          stream_.data_byte_seek(static_cast<s64>(byte_offset));
-          stream_.write(reinterpret_cast<const char*>(signature),sizeof(signature));
+          warn(filepath_,"has a development signature rejected by retail systems");
+          return;
         }
+
+      warn(filepath_,fmt::format("has an invalid {}-key signature",key));
     }
   };
 
@@ -1342,10 +1369,10 @@ namespace
 
   static
   void
-  sign_aif_files(TDO::FileStream &stream_)
+  inspect_aif_files(TDO::FileStream &stream_)
   {
-    SignedAIFUpdater updater;
-    TDO::FSWalker fsw(stream_,updater,false);
+    SignedAIFInspector inspector;
+    TDO::FSWalker fsw(stream_,inspector,false);
 
     fsw.walk();
   }
@@ -1623,7 +1650,7 @@ TDO::recreate_layout_special_files(const std::filesystem::path &filepath_,
   if(sign_payloads_)
     {
       sign_system_payloads(stream);
-      sign_aif_files(stream);
+      inspect_aif_files(stream);
       sign_appsplash(stream);
     }
 
@@ -1681,7 +1708,7 @@ TDO::sign_disc_image(const std::filesystem::path &filepath_,
                              include_billstuff_romtag_,
                              source_romtags_);
   sign_system_payloads(stream);
-  sign_aif_files(stream);
+  inspect_aif_files(stream);
   sign_appsplash(stream);
   sign_disclabel_romtags_bootcode(stream);
 

@@ -16,5 +16,10 @@ tdo_rsa_sign(const char         *key,
              rsa512_sig_t        sig);
 
 bool
+tdo_rsa_verify_retail(const char         *key,
+                      const md5_digest_t  digest,
+                      const rsa512_sig_t  sig);
+
+bool
 tdo_rsa_verify_development(const md5_digest_t digest,
                            const rsa512_sig_t sig);
