@@ -120,8 +120,8 @@ distclean: clean
 $(BUILDDIR):
 	mkdir -p $@
 
-PREFIX ?= /usr/local
-BINDIR ?= $(PREFIX)/bin
+PREFIX ?= $(HOME)/dev/3do-devkit
+BINDIR ?= $(PREFIX)/bin/tools/linux
 
 install: $(OUTPUT)
 	install -Dm755 $(OUTPUT) $(DESTDIR)$(BINDIR)/$(EXE)
@@ -156,8 +156,8 @@ release:
 	podman build -t localhost/cxxbuilder buildtools/
 	podman run --rm --userns=keep-id \
 		-e HOME=/tmp \
-		-e ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache \
-		-e ZIG_LOCAL_CACHE_DIR=/tmp/zig-local-cache \
+		-e ZIG_GLOBAL_CACHE_DIR=/src/.cache/zig-global \
+		-e ZIG_LOCAL_CACHE_DIR=/src/.cache/zig-local \
 		-v ${PWD}:/src:Z localhost/cxxbuilder "/src/buildtools/podman-make-release"
 
 .PHONY: all clean distclean release release-base strip install
