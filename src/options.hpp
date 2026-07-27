@@ -71,7 +71,8 @@ public:
     bool        billstuff_romtag = false;
     bool        dry_run = false;
     bool        mark = true;
-    bool        sign = false;
+    bool        sign = true;
+    bool        unsigned_image = false;
     bool        root_unique_identifier_set = false;
     bool        volume_unique_identifier_set = false;
     uint32_t    root_unique_identifier = 0;
@@ -91,6 +92,7 @@ public:
     bool        billstuff_romtag = false;
     bool        mark = true;
     bool        sign = true;
+    bool        unsigned_image = false;
     bool        verbose = false;
   };
 
