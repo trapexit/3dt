@@ -70,7 +70,6 @@ public:
     bool        banner_romtag = true;
     bool        billstuff_romtag = false;
     bool        dry_run = false;
-    bool        discover_layout = true;
     bool        mark = true;
     bool        sign = false;
     bool        root_unique_identifier_set = false;
