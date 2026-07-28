@@ -171,16 +171,18 @@ Portfolio authenticates signed AIF tasks and demand-loaded modules separately
 from the disc envelope. Their preparation belongs to `modbin`; packing or
 repacking a disc does not change the bytes covered by `RSACheck()`.
 
-3dt therefore preserves ordinary filesystem AIFs byte-for-byte. During a
-signing operation it inspects recognized AIFs and warns when an AIF:
+3dt therefore preserves ordinary filesystem AIFs byte-for-byte. Portfolio
+permits ordinary AIFs without a 3DO header or embedded signature, so 3dt does
+not warn about either condition. During a signing operation it warns only when
+an AIF declares a signature that cannot be used:
 
-- has no complete 3DO header
-- is unsigned
-- carries a development signature that retail systems reject
-- has unsupported signature metadata or an invalid signature
+- the signature metadata is unsupported
+- the signature is invalid for the key selected by the AIF flags
+- the signature uses a development key that retail systems reject
 
-These warnings do not modify the AIF or fail disc signing. Run the source AIF
-through `modbin` to correct it.
+These warnings do not modify the AIF or fail disc signing. If the AIF will be
+loaded through a path that validates its declared signature, run the source
+AIF through `modbin` to correct it.
 
 ## Signature Verification
 

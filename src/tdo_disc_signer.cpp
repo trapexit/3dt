@@ -410,7 +410,7 @@ namespace
     }
   };
 
-  class SignedAIFInspector final : public SigningFSCallbacks
+  class PresentAIFSignatureInspector final : public SigningFSCallbacks
   {
   private:
     static
@@ -501,24 +501,15 @@ namespace
         return;
 
       if(data.size() < AIF_3DO_HEADER_SIZE)
-        {
-          warn(filepath_,"has no complete 3DO header");
-          return;
-        }
+        return;
       if((read_u32_be(data,AIF_HEADER_WORKSPACE_OFFSET) &
           AIF_3DO_HEADER_WORKSPACE_FLAG) == 0)
-        {
-          warn(filepath_,"has no 3DO header");
-          return;
-        }
+        return;
 
       signature_offset = read_u32_be(data,AIF_3DO_SIGNATURE_OFFSET_OFFSET);
       signature_length = read_u32_be(data,AIF_3DO_SIGNATURE_LENGTH_OFFSET);
       if(signature_length == 0)
-        {
-          warn(filepath_,"is unsigned");
-          return;
-        }
+        return;
       if((signature_length != RSA512_SIG_SIZE) ||
          (signature_offset < AIF_3DO_HEADER_SIZE) ||
          (signature_offset > record_.byte_count) ||
@@ -543,7 +534,7 @@ namespace
                                          static_cast<u64>(signature_offset) +
                                            signature_length);
 
-      flags = read_u32_be(data,AIF_3DO_FLAGS_OFFSET);
+      flags = static_cast<unsigned char>(data[AIF_3DO_FLAGS_OFFSET]);
       key = ((flags & AIF_3DO_USERAPP) != 0) ? TDO_KEY_APP : TDO_KEY_3DO;
 
       std::memcpy(signature,
@@ -1374,7 +1365,7 @@ namespace
   void
   inspect_aif_files(TDO::FileStream &stream_)
   {
-    SignedAIFInspector inspector;
+    PresentAIFSignatureInspector inspector;
     TDO::FSWalker fsw(stream_,inspector,false);
 
     fsw.walk();
