@@ -162,9 +162,20 @@ _generate_unpack_argparser(CLI::App        &app_,
     ->description("do not extract or list special metadata files or write layout metadata");
   subcmd->add_flag("--no-system{false}",options_.include_system)
     ->description("do not extract, list, or record the System directory");
+  subcmd->add_flag("--no-executables{false}",options_.include_executables)
+    ->description("do not extract, list, or record ARM AIF executable files");
+  subcmd->add_flag("--only-assets",options_.only_assets)
+    ->description("equivalent to --no-metadata --no-system --no-executables");
 
   subcmd->callback([&options_]()
   {
+    if(options_.only_assets)
+      {
+        options_.include_metadata = false;
+        options_.include_system = false;
+        options_.include_executables = false;
+      }
+
     Subcmd::unpack(options_);
   });
 }

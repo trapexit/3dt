@@ -26,6 +26,7 @@
 
 #include "fmt.hpp"
 
+#include <array>
 #include <fstream>
 #include <cctype>
 #include <vector>
@@ -42,7 +43,8 @@ public:
       _walker(ios_,*this),
       _dstpath(),
       _include_metadata(true),
-      _include_system(true)
+      _include_system(true),
+      _include_executables(true)
   {
   }
 
@@ -54,11 +56,13 @@ public:
   void
   unpack(const fs::path &dstpath_,
          const bool      include_system_,
-         const bool      include_metadata_)
+         const bool      include_metadata_,
+         const bool      include_executables_)
   {
-    _dstpath          = dstpath_;
-    _include_metadata = include_metadata_;
-    _include_system   = include_system_;
+    _dstpath             = dstpath_;
+    _include_metadata    = include_metadata_;
+    _include_system      = include_system_;
+    _include_executables = include_executables_;
     _walker.walk();
   }
 
@@ -107,7 +111,8 @@ public:
              TDO::DevStream              &stream_)
   {
     if(_should_skip_system(path_) ||
-       _should_skip_metadata(path_,record_))
+       _should_skip_metadata(path_,record_) ||
+       _should_skip_executable(record_,stream_))
       return;
 
     fs::path fullpath = _dstpath / path_;
@@ -201,7 +206,8 @@ public:
 
     const fs::path path = TDO::display_path(parent_,filename_);
 
-    if(_should_skip_metadata(path,record_))
+    if(_should_skip_metadata(path,record_) ||
+       _should_skip_executable(record_,stream_))
       return Error();
 
     _cb.before(path,record_,dr_file_pos_,stream_);
@@ -234,6 +240,129 @@ private:
       }
 
     return true;
+  }
+
+  static
+  std::uint32_t
+  _read_u32_be(const std::array<char,0x80> &data_,
+               const std::size_t            offset_)
+  {
+    return ((static_cast<std::uint32_t>(
+               static_cast<unsigned char>(data_[offset_ + 0])) << 24) |
+            (static_cast<std::uint32_t>(
+               static_cast<unsigned char>(data_[offset_ + 1])) << 16) |
+            (static_cast<std::uint32_t>(
+               static_cast<unsigned char>(data_[offset_ + 2])) << 8) |
+            (static_cast<std::uint32_t>(
+               static_cast<unsigned char>(data_[offset_ + 3])) << 0));
+  }
+
+  static
+  bool
+  _is_valid_bl(const std::uint32_t instruction_,
+               const std::uint64_t instruction_offset_)
+  {
+    std::int64_t immediate;
+    std::int64_t target;
+
+    if((instruction_ & 0x0f000000) != 0x0b000000)
+      return false;
+
+    immediate = instruction_ & 0x00ffffff;
+    if((immediate & 0x00800000) != 0)
+      immediate -= 0x01000000;
+
+    target = static_cast<std::int64_t>(instruction_offset_) + 8 +
+             (immediate * 4);
+    return (target >= 0);
+  }
+
+  static
+  bool
+  _is_aif_executable(const TDO::DirectoryRecord &record_,
+                     TDO::DevStream              &stream_)
+  {
+    static constexpr std::uint32_t ARM_NOP = 0xe1a00000;
+    static constexpr std::uint32_t AIF_EXIT_INSTRUCTION = 0xef000011;
+    static constexpr std::uint32_t AIF_3DO_HEADER_FLAG = 0x40000000;
+    static constexpr std::uint64_t AIF_HEADER_SIZE = 0x80;
+    static constexpr std::uint64_t AIF_3DO_HEADER_SIZE = 0xb8;
+
+    std::array<char,AIF_HEADER_SIZE> header;
+    std::uint64_t byte_pos;
+    std::uint64_t header_size;
+    std::uint64_t image_size;
+    std::uint32_t address_mode;
+    std::uint32_t debug_size;
+    std::uint32_t decompress_instruction;
+    std::uint32_t entry_instruction;
+    std::uint32_t ro_size;
+    std::uint32_t rw_size;
+    std::uint32_t self_reloc_instruction;
+    std::uint32_t workspace;
+    std::uint32_t zero_init_instruction;
+
+    if(record_.is_directory() ||
+       (record_.byte_count < header.size()) ||
+       record_.avatar_list.empty())
+      return false;
+
+    byte_pos = static_cast<std::uint64_t>(record_.avatar_list[0]) *
+               stream_.device_block_data_size();
+    stream_.read_data_bytes(header.data(),
+                            static_cast<s64>(byte_pos),
+                            static_cast<s64>(header.size()));
+
+    decompress_instruction = _read_u32_be(header,0x00);
+    self_reloc_instruction = _read_u32_be(header,0x04);
+    zero_init_instruction = _read_u32_be(header,0x08);
+    entry_instruction = _read_u32_be(header,0x0c);
+
+    if(_read_u32_be(header,0x10) != AIF_EXIT_INSTRUCTION)
+      return false;
+    if((decompress_instruction != ARM_NOP) &&
+       !_is_valid_bl(decompress_instruction,0x00))
+      return false;
+    if((self_reloc_instruction != ARM_NOP) &&
+       !_is_valid_bl(self_reloc_instruction,0x04))
+      return false;
+    if((zero_init_instruction != ARM_NOP) &&
+       !_is_valid_bl(zero_init_instruction,0x08))
+      return false;
+    if(((entry_instruction >> 24) != 0xeb) ||
+       !_is_valid_bl(entry_instruction,0x0c))
+      return false;
+
+    address_mode = _read_u32_be(header,0x30);
+    if((address_mode != 26) && (address_mode != 32))
+      return false;
+
+    ro_size = _read_u32_be(header,0x14);
+    rw_size = _read_u32_be(header,0x18);
+    debug_size = _read_u32_be(header,0x1c);
+    workspace = _read_u32_be(header,0x2c);
+    header_size = ((workspace & AIF_3DO_HEADER_FLAG) != 0)
+      ? AIF_3DO_HEADER_SIZE
+      : AIF_HEADER_SIZE;
+    if(ro_size < header_size)
+      return false;
+
+    image_size = (static_cast<std::uint64_t>(ro_size) +
+                  static_cast<std::uint64_t>(rw_size) +
+                  static_cast<std::uint64_t>(debug_size));
+
+    return (image_size <= record_.byte_count);
+  }
+
+  bool
+  _should_skip_executable(const TDO::DirectoryRecord &record_,
+                          TDO::DevStream              &stream_) const
+  {
+    if(_include_executables)
+      return false;
+
+    return ((record_.type == DR_TYPE_CATAPULT) ||
+            _is_aif_executable(record_,stream_));
   }
 
   bool
@@ -282,6 +411,7 @@ private:
   fs::path _dstpath;
   bool     _include_metadata;
   bool     _include_system;
+  bool     _include_executables;
 };
 
 namespace TDO
@@ -299,10 +429,14 @@ namespace TDO
   void
   DiscUnpacker::unpack(const fs::path &dstpath_,
                        const bool      include_system_,
-                       const bool      include_metadata_)
+                       const bool      include_metadata_,
+                       const bool      include_executables_)
   {
     fs::create_directories(dstpath_);
 
-    _impl->unpack(dstpath_,include_system_,include_metadata_);
+    _impl->unpack(dstpath_,
+                  include_system_,
+                  include_metadata_,
+                  include_executables_);
   }
 }
