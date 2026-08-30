@@ -61,7 +61,8 @@ namespace TDO
 
   public:
     void unpack(const std::filesystem::path &dstpath,
-                bool                         include_system = true);
+                bool                         include_system = true,
+                bool                         include_metadata = true);
 
   private:
     class Impl;

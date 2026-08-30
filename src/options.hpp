@@ -57,6 +57,7 @@ public:
     Path        output;
     Path        layout;
     std::string format;
+    bool        include_metadata = true;
     bool        include_system = true;
   };
 

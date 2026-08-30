@@ -158,6 +158,8 @@ _generate_unpack_argparser(CLI::App        &app_,
     ->type_name("PATH")
     ->default_val("")
     ->take_last();
+  subcmd->add_flag("--no-metadata{false}",options_.include_metadata)
+    ->description("do not extract or list special metadata files or write layout metadata");
   subcmd->add_flag("--no-system{false}",options_.include_system)
     ->description("do not extract, list, or record the System directory");
 
