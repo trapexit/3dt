@@ -60,7 +60,8 @@ namespace TDO
     ~DiscUnpacker();
 
   public:
-    void unpack(const std::filesystem::path &dstpath);
+    void unpack(const std::filesystem::path &dstpath,
+                bool                         include_system = true);
 
   private:
     class Impl;

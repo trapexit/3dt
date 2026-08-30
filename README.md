@@ -165,6 +165,8 @@ the directory it unpacks to.
 Use `--format=human` or `--format=csv` to change logging output. A
 `layout.json` file is written in the unpacked root by default; use `--layout`
 to choose another path.
+Use `--no-system` to omit a case-insensitive top-level `System` entry and all
+of its descendants from extracted files, command output, and layout metadata.
 
 
 ```
