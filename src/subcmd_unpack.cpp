@@ -480,6 +480,12 @@ namespace Subcmd
     bool failed;
     fs::path dstpath;
 
+    if(!options_.include_metadata && !options_.layout.empty())
+      {
+        Log::error({"--layout cannot be used with --no-metadata"});
+        throw Error("unpack failed");
+      }
+
     if(!options_.layout.empty() && (options_.filepaths.size() != 1))
       {
         Log::error({"--layout requires exactly one input image"});
@@ -492,7 +498,7 @@ namespace Subcmd
         fs::path layout_path;
         TDO::DiscUnpacker::Ptr unpacker;
         TDO::DiscUnpacker::Callback::Ptr printer;
-        LayoutWriter *layout_writer;
+        LayoutWriter *layout_writer = nullptr;
         std::fstream fs;
 
         fs.open(srcpath,fs.binary|fs.in);
@@ -510,27 +516,32 @@ namespace Subcmd
 
         fs::create_directories(dstpath);
 
-        layout_path = layout_path_for(options_,dstpath);
-
         printer = get_printer(options_.format);
-        {
-          auto lw = std::make_unique<LayoutWriter>(std::move(printer));
-          layout_writer = lw.get();
-          printer = std::move(lw);
-        }
+        if(options_.include_metadata)
+          {
+            layout_path = layout_path_for(options_,dstpath);
+            auto lw = std::make_unique<LayoutWriter>(std::move(printer));
+            layout_writer = lw.get();
+            printer = std::move(lw);
+          }
         unpacker = std::make_unique<TDO::DiscUnpacker>(fs,*printer);
 
         try
           {
-            unpacker->unpack(dstpath,options_.include_system);
-            if(options_.layout.empty() &&
-               layout_writer->default_layout_payload_conflicts(dstpath,layout_path))
+            unpacker->unpack(dstpath,
+                             options_.include_system,
+                             options_.include_metadata);
+            if(layout_writer != nullptr)
               {
-                throw Error("default layout output conflicts with extracted file: " +
-                            layout_path.string() +
-                            "; pass --layout outside the unpacked root");
+                if(options_.layout.empty() &&
+                   layout_writer->default_layout_payload_conflicts(dstpath,layout_path))
+                  {
+                    throw Error("default layout output conflicts with extracted file: " +
+                                layout_path.string() +
+                                "; pass --layout outside the unpacked root");
+                  }
+                layout_writer->write(layout_path);
               }
-            layout_writer->write(layout_path);
           }
         catch(const std::exception &e)
           {

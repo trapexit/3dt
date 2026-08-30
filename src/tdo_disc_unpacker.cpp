@@ -41,6 +41,7 @@ public:
     : _cb(cb_),
       _walker(ios_,*this),
       _dstpath(),
+      _include_metadata(true),
       _include_system(true)
   {
   }
@@ -52,10 +53,12 @@ public:
 public:
   void
   unpack(const fs::path &dstpath_,
-         const bool      include_system_)
+         const bool      include_system_,
+         const bool      include_metadata_)
   {
-    _dstpath       = dstpath_;
-    _include_system = include_system_;
+    _dstpath          = dstpath_;
+    _include_metadata = include_metadata_;
+    _include_system   = include_system_;
     _walker.walk();
   }
 
@@ -79,7 +82,7 @@ public:
              const TDO::DirectoryHeader  &header_,
              TDO::DevStream              &stream_)
   {
-    if(!_include_system && _is_system_path(path_))
+    if(_should_skip_system(path_))
       return;
 
     // file_tell() returns s64; sizeof(TDO::DirectoryHeader) is size_t.
@@ -103,7 +106,8 @@ public:
              const std::uint32_t          dr_file_pos_,
              TDO::DevStream              &stream_)
   {
-    if(!_include_system && _is_system_path(path_))
+    if(_should_skip_system(path_) ||
+       _should_skip_metadata(path_,record_))
       return;
 
     fs::path fullpath = _dstpath / path_;
@@ -192,10 +196,13 @@ public:
                    const Error                 &err_,
                    TDO::DevStream              &stream_)
   {
-    if(!_include_system && _is_system_path(parent_))
+    if(_should_skip_system(parent_))
       return Error();
 
     const fs::path path = TDO::display_path(parent_,filename_);
+
+    if(_should_skip_metadata(path,record_))
+      return Error();
 
     _cb.before(path,record_,dr_file_pos_,stream_);
     _cb.after(path,record_,1);
@@ -207,16 +214,13 @@ public:
 private:
   static
   bool
-  _is_system_path(const fs::path &path_)
+  _name_matches(const fs::path &component_,
+                const char     *expected_,
+                const std::size_t expected_size_)
   {
-    static constexpr char expected[] = "system";
-    const fs::path::iterator first = path_.begin();
+    const auto &name = component_.native();
 
-    if(first == path_.end())
-      return false;
-
-    const auto &name = first->native();
-    if(name.size() != (sizeof(expected) - 1))
+    if(name.size() != expected_size_)
       return false;
 
     for(std::size_t i = 0; i < name.size(); ++i)
@@ -225,11 +229,49 @@ private:
 
         if((c >= 'A') && (c <= 'Z'))
           c += 'a' - 'A';
-        if(c != expected[i])
+        if(c != expected_[i])
           return false;
       }
 
     return true;
+  }
+
+  bool
+  _should_skip_metadata(const fs::path             &path_,
+                        const TDO::DirectoryRecord &record_) const
+  {
+    fs::path::iterator first;
+    fs::path::iterator next;
+
+    if(_include_metadata || record_.is_directory())
+      return false;
+
+    first = path_.begin();
+    if(first == path_.end())
+      return false;
+
+    next = first;
+    ++next;
+    if(next != path_.end())
+      return false;
+
+    return (_name_matches(*first,"disc label",sizeof("disc label") - 1) ||
+            _name_matches(*first,"layout.json",sizeof("layout.json") - 1) ||
+            _name_matches(*first,"rom_tags",sizeof("rom_tags") - 1) ||
+            _name_matches(*first,"signatures",sizeof("signatures") - 1));
+  }
+
+  bool
+  _should_skip_system(const fs::path &path_) const
+  {
+    fs::path::iterator first;
+
+    if(_include_system)
+      return false;
+
+    first = path_.begin();
+    return ((first != path_.end()) &&
+            _name_matches(*first,"system",sizeof("system") - 1));
   }
 
 private:
@@ -238,6 +280,7 @@ private:
 
 private:
   fs::path _dstpath;
+  bool     _include_metadata;
   bool     _include_system;
 };
 
@@ -255,10 +298,11 @@ namespace TDO
 
   void
   DiscUnpacker::unpack(const fs::path &dstpath_,
-                       const bool      include_system_)
+                       const bool      include_system_,
+                       const bool      include_metadata_)
   {
     fs::create_directories(dstpath_);
 
-    _impl->unpack(dstpath_,include_system_);
+    _impl->unpack(dstpath_,include_system_,include_metadata_);
   }
 }

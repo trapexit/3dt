@@ -167,6 +167,10 @@ Use `--format=human` or `--format=csv` to change logging output. A
 to choose another path.
 Use `--no-system` to omit a case-insensitive top-level `System` entry and all
 of its descendants from extracted files, command output, and layout metadata.
+Use `--no-metadata` to omit the case-insensitive top-level special files
+`Disc label`, `rom_tags`, `signatures`, and `layout.json` from extracted files
+and command output, and to disable generated layout metadata. It cannot be
+combined with `--layout`; nested files with those names remain ordinary files.
 
 
 ```
