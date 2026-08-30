@@ -59,6 +59,8 @@ public:
     std::string format;
     bool        include_metadata = true;
     bool        include_system = true;
+    bool        include_executables = true;
+    bool        only_assets = false;
   };
 
   struct Pack

@@ -171,6 +171,11 @@ Use `--no-metadata` to omit the case-insensitive top-level special files
 `Disc label`, `rom_tags`, `signatures`, and `layout.json` from extracted files
 and command output, and to disable generated layout metadata. It cannot be
 combined with `--layout`; nested files with those names remain ordinary files.
+Use `--no-executables` to omit `LaunchMe` and other ARM AIF executables,
+identified from their directory-record type or validated file header, from
+extracted files, command output, and layout metadata. Use `--only-assets` for
+reconstruction exports; it is equivalent to combining `--no-metadata`,
+`--no-system`, and `--no-executables`.
 
 
 ```

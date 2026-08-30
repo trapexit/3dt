@@ -530,7 +530,8 @@ namespace Subcmd
           {
             unpacker->unpack(dstpath,
                              options_.include_system,
-                             options_.include_metadata);
+                             options_.include_metadata,
+                             options_.include_executables);
             if(layout_writer != nullptr)
               {
                 if(options_.layout.empty() &&
