@@ -35,7 +35,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -94,9 +93,12 @@ namespace
   {
     std::string rv;
 
-    rv.reserve(str_.size());
     for(unsigned char c : str_)
-      rv.push_back(std::tolower(c));
+      {
+        if((c >= 'A') && (c <= 'Z'))
+          c += 'a' - 'A';
+        rv.push_back(static_cast<char>(c));
+      }
 
     return rv;
   }
@@ -495,6 +497,33 @@ namespace
   }
 
   static
+  void
+  validate_operafs_namespace(const Entry    &entry_,
+                             const fs::path &path_)
+  {
+    std::unordered_map<std::string,const Entry*> names;
+
+    for(const auto &child : entry_.children)
+      {
+        const std::string key = lowercase(child->name);
+        const auto result = names.emplace(key,child.get());
+
+        if(!result.second)
+          {
+            throw Error(fmt::format(
+              "OperaFS filename collision in {}: \"{}\" and \"{}\" "
+              "compare equal under ASCII case-insensitive lookup",
+              display_path(path_),
+              printable_filename(result.first->second->name),
+              printable_filename(child->name)));
+          }
+
+        if(child->directory)
+          validate_operafs_namespace(*child,path_ / child->name);
+      }
+  }
+
+  static
   Entry*
   find_root_child(Entry       &root_,
                   const char  *name_)
@@ -534,6 +563,26 @@ namespace
     root_.children.emplace_back(std::move(entry));
 
     return *root_.children.back();
+  }
+
+  static
+  Entry&
+  get_or_add_synthetic_entry(Entry       &root_,
+                             const char  *lookup_name_,
+                             const char  *entry_name_)
+  {
+    Entry *entry = find_root_child(root_,lookup_name_);
+
+    if(entry == nullptr)
+      return add_root_child(root_,entry_name_);
+    if(entry->directory)
+      {
+        throw Error(fmt::format(
+          "reserved OperaFS file \"{}\" cannot be a directory",
+          printable_filename(entry->name)));
+      }
+
+    return *entry;
   }
 
   static
@@ -621,21 +670,15 @@ namespace
   {
     Entry *entry;
 
-    entry = find_root_child(root_,"disc label");
-    if(entry == nullptr)
-      entry = &add_root_child(root_,"Disc label");
+    entry = &get_or_add_synthetic_entry(root_,"disc label","Disc label");
     setup_disc_label_entry(*entry);
 
-    entry = find_root_child(root_,"rom_tags");
-    if(entry == nullptr)
-      entry = &add_root_child(root_,"rom_tags");
+    entry = &get_or_add_synthetic_entry(root_,"rom_tags","rom_tags");
     setup_romtags_entry(*entry);
 
     if(reserve_signing_space_)
       {
-        entry = find_root_child(root_,"signatures");
-        if(entry == nullptr)
-          entry = &add_root_child(root_,"signatures");
+        entry = &get_or_add_synthetic_entry(root_,"signatures","signatures");
         setup_signatures_entry(*entry);
       }
 
@@ -1792,6 +1835,7 @@ namespace
       layout = read_layout(layout_path,manifest);
 
     read_directory(options_.input,manifest.root);
+    validate_operafs_namespace(manifest.root,fs::path());
     add_or_replace_synthetic_entries(manifest.root,true);
 
     next_id = 2;
@@ -1806,6 +1850,8 @@ namespace
                                        next_id,
                                        manifest.total_blocks);
       }
+
+    validate_operafs_namespace(manifest.root,fs::path());
 
     if(manifest.replay_layout)
       {

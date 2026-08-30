@@ -287,6 +287,9 @@ filesystem layout; 3dt first writes that layout, then regenerates the ROMTags
 and signatures needed for retail compatibility within the recorded
 allocations. Pass `--unsigned` only when an unsigned image is explicitly
 required.
+OperaFS performs ASCII case-insensitive filename lookup, so each directory
+must have unique child names under that comparison. `pack` rejects collisions
+such as `LaunchMe` with `launchme`, including file-versus-directory conflicts.
 
 Common options:
 - `--volume-label` / `--volume-commentary`: set label metadata
