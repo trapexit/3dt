@@ -57,6 +57,7 @@ public:
     Path        output;
     Path        layout;
     std::string format;
+    bool        include_system = true;
   };
 
   struct Pack

@@ -522,7 +522,7 @@ namespace Subcmd
 
         try
           {
-            unpacker->unpack(dstpath);
+            unpacker->unpack(dstpath,options_.include_system);
             if(options_.layout.empty() &&
                layout_writer->default_layout_payload_conflicts(dstpath,layout_path))
               {

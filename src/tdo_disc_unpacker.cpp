@@ -40,7 +40,8 @@ public:
        TDO::DiscUnpacker::Callback &cb_)
     : _cb(cb_),
       _walker(ios_,*this),
-      _dstpath()
+      _dstpath(),
+      _include_system(true)
   {
   }
 
@@ -50,9 +51,11 @@ public:
 
 public:
   void
-  unpack(const fs::path &dstpath_)
+  unpack(const fs::path &dstpath_,
+         const bool      include_system_)
   {
-    _dstpath = dstpath_;
+    _dstpath       = dstpath_;
+    _include_system = include_system_;
     _walker.walk();
   }
 
@@ -76,6 +79,9 @@ public:
              const TDO::DirectoryHeader  &header_,
              TDO::DevStream              &stream_)
   {
+    if(!_include_system && _is_system_path(path_))
+      return;
+
     // file_tell() returns s64; sizeof(TDO::DirectoryHeader) is size_t.
     // The DiscUnpacker::Callback::directory third parameter is u32.
     // With images that can exceed 4 GiB (the v2 walker permits
@@ -97,6 +103,9 @@ public:
              const std::uint32_t          dr_file_pos_,
              TDO::DevStream              &stream_)
   {
+    if(!_include_system && _is_system_path(path_))
+      return;
+
     fs::path fullpath = _dstpath / path_;
 
     {
@@ -183,6 +192,9 @@ public:
                    const Error                 &err_,
                    TDO::DevStream              &stream_)
   {
+    if(!_include_system && _is_system_path(parent_))
+      return Error();
+
     const fs::path path = TDO::display_path(parent_,filename_);
 
     _cb.before(path,record_,dr_file_pos_,stream_);
@@ -193,11 +205,40 @@ public:
   }
 
 private:
+  static
+  bool
+  _is_system_path(const fs::path &path_)
+  {
+    static constexpr char expected[] = "system";
+    const fs::path::iterator first = path_.begin();
+
+    if(first == path_.end())
+      return false;
+
+    const auto &name = first->native();
+    if(name.size() != (sizeof(expected) - 1))
+      return false;
+
+    for(std::size_t i = 0; i < name.size(); ++i)
+      {
+        fs::path::value_type c = name[i];
+
+        if((c >= 'A') && (c <= 'Z'))
+          c += 'a' - 'A';
+        if(c != expected[i])
+          return false;
+      }
+
+    return true;
+  }
+
+private:
   TDO::DiscUnpacker::Callback &_cb;
   TDO::FSWalker                _walker;
 
 private:
   fs::path _dstpath;
+  bool     _include_system;
 };
 
 namespace TDO
@@ -213,10 +254,11 @@ namespace TDO
   }
 
   void
-  DiscUnpacker::unpack(const fs::path &dstpath_)
+  DiscUnpacker::unpack(const fs::path &dstpath_,
+                       const bool      include_system_)
   {
     fs::create_directories(dstpath_);
 
-    _impl->unpack(dstpath_);
+    _impl->unpack(dstpath_,include_system_);
   }
 }
