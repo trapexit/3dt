@@ -22,6 +22,7 @@
 #include "tdo_directory_record.hpp"
 #include "tdo_disc_format.hpp"
 #include "tdo_disc_label.hpp"
+#include "tdo_file_stream.hpp"
 
 #include <algorithm>
 #include <array>
@@ -83,7 +84,10 @@ namespace
                      const std::string &str_,
                      u32                size_)
   {
-    const u32 len = std::min<u32>(str_.size(), size_ - 1);
+    // Reserve the final byte for the NUL terminator. Consumers read this
+    // fixed-width field as a C string (char dir_FileName[32]), so filling it
+    // end-to-end would run into last_avatar_index in the following field.
+    const u32 len = std::min<u32>(str_.size(),size_ - 1);
     os_.write(str_.c_str(), len);
     const u32 padding = size_ - len;
     if(padding > 0)
@@ -272,8 +276,9 @@ namespace
 
   static
   void
-  copy_file_data(std::ostream &os_,
-                 const Entry  &entry_)
+  copy_file_data(std::ostream    &os_,
+                 const Entry     &entry_,
+                 TDO::FileStream *source_)
   {
     std::ifstream is;
     u64 src_size;
@@ -282,6 +287,53 @@ namespace
       return;
     if(entry_.directory || (entry_.block_count == 0))
       return;
+    if(entry_.source_disc_image)
+      {
+        if(entry_.source_avatar_list.empty())
+          throw Error("source image file has no avatar: " + entry_.name);
+
+        if((source_ == nullptr) || (source_->filepath() != entry_.src_path))
+          throw Error("source image stream mismatch: " + entry_.src_path.string());
+        std::array<char,64*1024> buf;
+
+        TDO::FileStream &source = *source_;
+
+        auto write_one = [&](u32 block_)
+        {
+          u64 bytes_left = entry_.data_byte_count;
+          u64 byte_pos =
+            static_cast<u64>(entry_.source_avatar_list[0]) *
+            source.device_block_data_size();
+
+          seek_block(os_,block_);
+          if(!os_)
+            throw Error("failed to seek output image while writing " +
+                        entry_.name);
+
+          while(bytes_left > 0)
+            {
+              const u64 n = std::min<u64>(bytes_left,buf.size());
+
+              source.read_data_bytes(buf.data(),
+                                     static_cast<s64>(byte_pos),
+                                     static_cast<s64>(n));
+              os_.write(buf.data(),static_cast<std::streamsize>(n));
+              byte_pos += n;
+              bytes_left -= n;
+            }
+
+          if(os_.fail())
+            throw Error("failed to write file data for " + entry_.name);
+        };
+
+        if(entry_.avatar_list.empty())
+          write_one(entry_.start_block);
+        else
+          for(auto avatar : entry_.avatar_list)
+            write_one(avatar);
+        return;
+      }
+
 
     {
       std::error_code ec;
@@ -328,14 +380,31 @@ namespace
 
   static
   void
-  write_file_data(std::ostream &os_,
-                  const Entry  &entry_)
+  write_file_data(std::ostream    &os_,
+                  const Entry     &entry_,
+                  TDO::FileStream *source_)
   {
     if(!entry_.directory)
-      copy_file_data(os_,entry_);
+      copy_file_data(os_,entry_,source_);
 
     for(const auto &child : entry_.children)
-      write_file_data(os_,*child);
+      write_file_data(os_,*child,source_);
+  }
+  static
+  const Entry*
+  find_disc_image_source(const Entry &entry_)
+  {
+    if(entry_.source_disc_image)
+      return &entry_;
+
+    for(const auto &child : entry_.children)
+      {
+        const Entry *source = find_disc_image_source(*child);
+
+        if(source != nullptr)
+          return source;
+      }
+    return nullptr;
   }
 
   static
@@ -372,6 +441,15 @@ TDO::pack_disc_image(const TDO::DiscManifest &manifest_)
 {
   TDO::DiscLabel label;
   std::ofstream os;
+  TDO::FileStream source;
+  TDO::FileStream *source_ptr = nullptr;
+
+  const Entry *source_entry = find_disc_image_source(manifest_.root);
+  if(source_entry != nullptr)
+    {
+      source.open(source_entry->src_path);
+      source_ptr = &source;
+    }
 
   validate_manifest(manifest_);
   label = make_disc_label(manifest_);
@@ -383,7 +461,7 @@ TDO::pack_disc_image(const TDO::DiscManifest &manifest_)
   resize_output(os,manifest_.total_blocks);
   write_disc_label(os,label);
   write_directory(os,manifest_.root);
-  write_file_data(os,manifest_.root);
+  write_file_data(os,manifest_.root,source_ptr);
 
   os.flush();
   if(!os)

@@ -13,7 +13,7 @@ The 3DO Interactive Multiplayer uses a proprietary disc format called OperaFS (a
 | `DISC_LABEL_AVATAR_DELTA` | 32786 | Block offset between avatars |
 | `DISC_LABEL_HIGHEST_AVATAR` | 7 | Maximum avatar index (0-7, total 8 avatars) |
 | `DISC_TOTAL_BLOCKS` | 330000 | Maximum total blocks on disc |
-| `FILESYSTEM_MAX_NAME_LEN` | 32 | Maximum filename length |
+| `FILESYSTEM_MAX_NAME_LEN` | 32 | Filename field width in bytes, including the NUL terminator (max 31 characters) |
 
 ## Sector Formats
 

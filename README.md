@@ -165,6 +165,11 @@ the directory it unpacks to.
 Use `--format=human` or `--format=csv` to change logging output. A
 `layout.json` file is written in the unpacked root by default; use `--layout`
 to choose another path.
+OperaFS names that cannot be represented portably on the host filesystem
+(including `/`, `\`, Windows-reserved characters, and non-ASCII byte strings)
+are extracted under deterministic `__3dt_...` aliases. `layout.json` records
+both the host alias and the original name bytes; pass that layout to `pack` to
+restore the original OperaFS names.
 Use `--no-system` to omit a case-insensitive top-level `System` entry and all
 of its descendants from extracted files, command output, and layout metadata.
 Use `--no-metadata` to omit the case-insensitive top-level special files
@@ -330,6 +335,9 @@ Rebuild an image while compacting avatars and reclaiming free space.
 When `--output` is omitted, repack writes to the input basename with a `.iso`
 extension. For example, `3dt repack game.bin` writes `game.iso`.
 Repack supports multiple input images. `--output` requires exactly one input.
+Repack reads payloads directly from the source image, so OperaFS names that are
+not valid host filenames are preserved without using a temporary filesystem
+tree.
 Repack signs and verifies the compacted image by default. Use `--unsigned` for
 the legacy unsigned repack behavior. It also supports `--mark`,
 `--no-banner-romtag` /

@@ -67,6 +67,8 @@ public:
   {
     Path        input;
     Path        summary_input;
+    // Internal repack source. Empty for the public directory pack command.
+    Path        source_image;
     Path        output;
     Path        layout;
     std::string volume_commentary;

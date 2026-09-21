@@ -27,8 +27,11 @@
 #include "fmt.hpp"
 
 #include <array>
-#include <fstream>
 #include <cctype>
+#include <cstring>
+#include <fstream>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 
@@ -63,6 +66,9 @@ public:
     _include_metadata    = include_metadata_;
     _include_system      = include_system_;
     _include_executables = include_executables_;
+    _host_paths.clear();
+    _used_names.clear();
+    _host_paths.emplace(std::string(),fs::path());
     _walker.walk();
   }
 
@@ -82,50 +88,63 @@ public:
 
 public:
   void
-  operator()(const std::filesystem::path &path_,
-             const TDO::DirectoryHeader  &header_,
-             TDO::DevStream              &stream_)
+  raw_directory(const TDO::OperaPath      &path_,
+                const TDO::DirectoryHeader &header_,
+                TDO::DevStream            &stream_)
   {
     if(_should_skip_system(path_))
       return;
 
+    const auto host = _host_paths.find(_path_key(path_));
+    if(host == _host_paths.end())
+      throw Error("missing extraction path for directory: " + path_.display());
+
     // file_tell() returns s64; sizeof(TDO::DirectoryHeader) is size_t.
-    // The DiscUnpacker::Callback::directory third parameter is u32.
-    // With images that can exceed 4 GiB (the v2 walker permits
-    // intermediate positions up to s64), the implicit narrowing
-    // through unsigned arithmetic would silently wrap. Compute the
-    // header position in s64 and route through checked_narrow.
+    // The callback's directory position is u32, so reject overflow.
     const s64 header_pos =
       stream_.file_tell() - static_cast<s64>(sizeof(TDO::DirectoryHeader));
     _cb.directory(path_,
+                  host->second,
                   header_,
                   TDO::checked_narrow_s64_to_u32(header_pos,
                                                  "directory header position"),
                   stream_);
   }
 
-  void
-  operator()(const std::filesystem::path &path_,
-             const TDO::DirectoryRecord  &record_,
-             const std::uint32_t          dr_file_pos_,
-             TDO::DevStream              &stream_)
+  Error
+  raw_entry(const TDO::OperaPath      &parent_,
+            const std::string          &filename_,
+            const TDO::DirectoryRecord &record_,
+            const std::uint32_t         dr_file_pos_,
+            TDO::DevStream             &stream_)
   {
-    if(_should_skip_system(path_) ||
-       _should_skip_metadata(path_,record_) ||
-       _should_skip_executable(record_,stream_))
-      return;
+    const TDO::OperaPath path = parent_.child(filename_);
 
-    fs::path fullpath = _dstpath / path_;
+    if(_should_skip_system(path) ||
+       _should_skip_metadata(path,record_) ||
+       _should_skip_executable(record_,stream_))
+      return Error();
+
+    const std::string parent_key = _path_key(parent_);
+    const auto parent_host = _host_paths.find(parent_key);
+    if(parent_host == _host_paths.end())
+      throw Error("missing extraction parent path: " + parent_.display());
+
+    const fs::path host_path =
+      parent_host->second / _host_component(parent_key,
+                                            filename_,
+                                            dr_file_pos_);
+    if(record_.is_directory())
+      _host_paths.emplace(_path_key(path),host_path);
+
+    fs::path fullpath = _dstpath / host_path;
 
     {
       std::error_code ec_dst;
       std::error_code ec_full;
       const fs::path canonical_dst  = fs::weakly_canonical(_dstpath,ec_dst);
       const fs::path canonical_full = fs::weakly_canonical(fullpath,ec_full);
-      // Fail closed: a single shared error_code would let the second
-      // call's success silently clear a failure on the first, and the
-      // empty canonical_dst would then make every prefix comparison
-      // pass. Reject any case where we cannot determine containment.
+      // Fail closed: reject any case where containment cannot be determined.
       if(ec_dst || ec_full || canonical_dst.empty())
         throw Error("refusing to write: cannot canonicalize destination path: " +
                     fullpath.string());
@@ -141,7 +160,7 @@ public:
                     fullpath.string());
     }
 
-    _cb.before(path_,record_,dr_file_pos_,stream_);
+    _cb.before(path,host_path,record_,dr_file_pos_,stream_);
     if(record_.is_directory())
       {
         fs::create_directories(fullpath);
@@ -190,28 +209,29 @@ public:
         if(os.fail())
           throw Error("failed to close output file: " + fullpath.string());
       }
-    _cb.after(path_,record_,0);
+    _cb.after(path,host_path,record_,0);
+    return Error();
   }
 
   Error
   invalid_filename(const std::filesystem::path &parent_,
                    const std::string           &filename_,
                    const TDO::DirectoryRecord  &record_,
-                   const std::uint32_t          dr_file_pos_,
+                   const std::uint32_t          record_pos_,
                    const Error                 &err_,
                    TDO::DevStream              &stream_)
   {
-    if(_should_skip_system(parent_))
+    if(_should_skip_system(opera_path_from_display(TDO::display_path(parent_,filename_))))
       return Error();
 
     const fs::path path = TDO::display_path(parent_,filename_);
 
-    if(_should_skip_metadata(path,record_) ||
+    if(_should_skip_metadata(opera_path_from_display(path),record_) ||
        _should_skip_executable(record_,stream_))
       return Error();
 
-    _cb.before(path,record_,dr_file_pos_,stream_);
-    _cb.after(path,record_,1);
+    _cb.before(opera_path_from_display(path),path,record_,record_pos_,stream_);
+    _cb.after(opera_path_from_display(path),path,record_,1);
     fmt::print(stderr,"3dt: {} - {}\n",err_.str,path.generic_string());
 
     return Error();
@@ -219,19 +239,110 @@ public:
 
 private:
   static
-  bool
-  _name_matches(const fs::path &component_,
-                const char     *expected_,
-                const std::size_t expected_size_)
+  TDO::OperaPath
+  opera_path_from_display(const fs::path &path_)
   {
-    const auto &name = component_.native();
+    TDO::OperaPath path;
 
-    if(name.size() != expected_size_)
+    for(const auto &component : path_)
+      path.components.push_back(component.string());
+    return path;
+  }
+
+  static
+  std::string
+  _path_key(const TDO::OperaPath &path_)
+  {
+    std::string key;
+
+    for(const auto &component : path_.components)
+      {
+        key += std::to_string(component.size());
+        key += ":";
+        key += component;
+      }
+    return key;
+  }
+
+  static
+  std::string
+  _lowercase(const std::string &value_)
+  {
+    std::string value = value_;
+
+    for(char &c : value)
+      if((c >= 'A') && (c <= 'Z'))
+        c += 'a' - 'A';
+    return value;
+  }
+
+  static
+  bool
+  _portable_name(const std::string &name_)
+  {
+    if(name_.empty() ||
+       (name_ == ".") ||
+       (name_ == "..") ||
+       (_lowercase(name_).compare(0,6,"__3dt_") == 0))
+      return false;
+    if((name_.back() == ' ') || (name_.back() == '.'))
       return false;
 
-    for(std::size_t i = 0; i < name.size(); ++i)
+    for(const unsigned char c : name_)
       {
-        fs::path::value_type c = name[i];
+        if((c < 0x20) || (c > 0x7e) ||
+           (std::strchr("<>:\"/\\|?*",static_cast<char>(c)) != nullptr))
+          return false;
+      }
+
+    // Windows resolves console device names against the stem with trailing
+    // spaces stripped, so "CON .txt" reaches the same device as "CON".
+    std::string stem = name_.substr(0,name_.find('.'));
+    stem = _lowercase(stem);
+    while((stem.size() > 0) && (stem.back() == ' '))
+      stem.pop_back();
+    if((stem == "con") || (stem == "prn") || (stem == "aux") ||
+       (stem == "nul") || (stem == "conin$") || (stem == "conout$"))
+      return false;
+    if((stem.size() == 4) &&
+       ((stem.compare(0,3,"com") == 0) ||
+        (stem.compare(0,3,"lpt") == 0)) &&
+       (stem[3] >= '1') && (stem[3] <= '9'))
+      return false;
+
+    return true;
+  }
+
+  std::string
+  _host_component(const std::string &parent_key_,
+                  const std::string &name_,
+                  const std::uint32_t record_pos_)
+  {
+    auto &used = _used_names[parent_key_];
+    const std::string folded = _lowercase(name_);
+
+    if(_portable_name(name_) && used.emplace(folded).second)
+      return name_;
+
+    std::string alias = fmt::format("__3dt_{:08x}",record_pos_);
+    std::uint32_t suffix = 0;
+    while(!used.emplace(_lowercase(alias)).second)
+      alias = fmt::format("__3dt_{:08x}_{}",record_pos_,++suffix);
+    return alias;
+  }
+
+  static
+  bool
+  _name_matches(const std::string &name_,
+                const char        *expected_,
+                const std::size_t  expected_size_)
+  {
+    if(name_.size() != expected_size_)
+      return false;
+
+    for(std::size_t i = 0; i < name_.size(); ++i)
+      {
+        char c = name_[i];
 
         if((c >= 'A') && (c <= 'Z'))
           c += 'a' - 'A';
@@ -358,7 +469,10 @@ private:
   _should_skip_executable(const TDO::DirectoryRecord &record_,
                           TDO::DevStream              &stream_) const
   {
-    if(_include_executables)
+    // A directory record must never be dropped here: skipping it leaves the
+    // walker descending into a directory whose extraction path was never
+    // registered, which aborts the whole unpack.
+    if(_include_executables || record_.is_directory())
       return false;
 
     return ((record_.type == DR_TYPE_CATAPULT) ||
@@ -366,41 +480,30 @@ private:
   }
 
   bool
-  _should_skip_metadata(const fs::path             &path_,
+  _should_skip_metadata(const TDO::OperaPath      &path_,
                         const TDO::DirectoryRecord &record_) const
   {
-    fs::path::iterator first;
-    fs::path::iterator next;
-
-    if(_include_metadata || record_.is_directory())
+    if(_include_metadata ||
+       record_.is_directory() ||
+       (path_.components.size() != 1))
       return false;
 
-    first = path_.begin();
-    if(first == path_.end())
-      return false;
-
-    next = first;
-    ++next;
-    if(next != path_.end())
-      return false;
-
-    return (_name_matches(*first,"disc label",sizeof("disc label") - 1) ||
-            _name_matches(*first,"layout.json",sizeof("layout.json") - 1) ||
-            _name_matches(*first,"rom_tags",sizeof("rom_tags") - 1) ||
-            _name_matches(*first,"signatures",sizeof("signatures") - 1));
+    const std::string &name = path_.components[0];
+    return (_name_matches(name,"disc label",sizeof("disc label") - 1) ||
+            _name_matches(name,"layout.json",sizeof("layout.json") - 1) ||
+            _name_matches(name,"rom_tags",sizeof("rom_tags") - 1) ||
+            _name_matches(name,"signatures",sizeof("signatures") - 1));
   }
 
   bool
-  _should_skip_system(const fs::path &path_) const
+  _should_skip_system(const TDO::OperaPath &path_) const
   {
-    fs::path::iterator first;
-
-    if(_include_system)
+    if(_include_system || path_.components.empty())
       return false;
 
-    first = path_.begin();
-    return ((first != path_.end()) &&
-            _name_matches(*first,"system",sizeof("system") - 1));
+    return _name_matches(path_.components[0],
+                         "system",
+                         sizeof("system") - 1);
   }
 
 private:
@@ -409,6 +512,8 @@ private:
 
 private:
   fs::path _dstpath;
+  std::unordered_map<std::string,fs::path> _host_paths;
+  std::unordered_map<std::string,std::unordered_set<std::string>> _used_names;
   bool     _include_metadata;
   bool     _include_system;
   bool     _include_executables;

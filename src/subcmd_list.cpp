@@ -18,6 +18,7 @@
 
 #include "log.hpp"
 #include "options.hpp"
+#include "tdo_disc_format.hpp"
 #include "tdo_fs_walker.hpp"
 #include "tdo_safe_narrow.hpp"
 
@@ -68,23 +69,6 @@ printable_string(const std::string &value_)
   return printable;
 }
 
-static
-std::string
-display_path(const fs::path    &parent_,
-             const std::string &filename_)
-{
-  std::string path;
-
-  path = parent_.generic_string();
-  if(!path.empty() && !filename_.empty() && (filename_[0] != '/'))
-    path += "/";
-  if(filename_.empty())
-    path += "<invalid empty filename>";
-  else
-    path += filename_;
-
-  return printable_string(path);
-}
 
 static
 void
@@ -293,6 +277,25 @@ public:
   }
 
   Error
+  raw_entry(const TDO::OperaPath      &parent_,
+            const std::string          &filename_,
+            const TDO::DirectoryRecord &record_,
+            const uint32_t              record_pos_,
+            TDO::DevStream             &stream_)
+  {
+    const TDO::OperaPath path = parent_.child(filename_);
+
+    if(!starts_with(base_filter,fs::path(path.display())))
+      return Error();
+
+    _printer(printable_string(path.display()),
+             record_,
+             record_pos_,
+             stream_);
+    return Error();
+  }
+
+  Error
   invalid_filename(const std::filesystem::path &parent_,
                    const std::string           &filename_,
                    const TDO::DirectoryRecord  &record_,
@@ -300,12 +303,11 @@ public:
                    const Error                 &err_,
                    TDO::DevStream              &stream_)
   {
-    std::string filepath;
+    const std::string filepath = printable_string(TDO::display_path(parent_,filename_));
 
     if(!starts_with(base_filter,parent_))
       return Error();
 
-    filepath = display_path(parent_,filename_);
     _printer(filepath,record_,record_pos_,stream_);
     fmt::print(stderr,"3dt: {} - {}\n",err_.str,filepath);
 

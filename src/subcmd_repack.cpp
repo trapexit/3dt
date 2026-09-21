@@ -17,20 +17,15 @@
 */
 
 #include "subcmd.hpp"
-#include "tdo_disc_unpacker.hpp"
 #include "tdo_file_stream.hpp"
 
 #include "fmt.hpp"
 #include "options.hpp"
 
-#include <cstdint>
+#include <array>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
-#include <random>
-#include <stdexcept>
 #include <string>
-#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -63,26 +58,6 @@ namespace
   }
 
   static
-  fs::path
-  create_temp_dir(const fs::path &base_)
-  {
-    std::random_device rd;
-    const std::string stem = base_.stem().string();
-    for(std::uint32_t attempt = 0; attempt < 1000; attempt++)
-      {
-        fs::path tmp = fs::temp_directory_path() /
-          fmt::format("3dt-repack-{:08x}-{:08x}-{}",rd(),rd(),stem);
-        std::error_code ec;
-        if(fs::create_directory(tmp,ec))
-          return tmp;
-        if(ec && !fs::exists(tmp))
-          throw Error("failed to create temporary directory: " +
-                      tmp.string() + ": " + ec.message());
-      }
-    throw Error("failed to find a unique temporary directory name");
-  }
-
-  static
   void
   repack_one(const fs::path        &input_,
              const fs::path        &target_,
@@ -96,61 +71,31 @@ namespace
       disc_label = stream.disc_label();
       // The rom_tags directory record may have a zero byte_count even though
       // the authoritative table is present at block 1. Read it from the source
-      // image before extraction; only version/revision are applied later.
+      // image before rebuilding the filesystem.
       source_romtags = stream.romtags();
-      stream.close();
     }
 
-    fs::path temp_dir;
-    try
-      {
-        temp_dir = create_temp_dir(input_);
+    Options::Pack pack_opts{};
+    pack_opts.input = input_;
+    pack_opts.summary_input = input_;
+    pack_opts.source_image = input_;
+    pack_opts.output = target_;
+    // Repack deliberately rebuilds a compact, single-avatar filesystem.
+    pack_opts.banner_romtag = opts_.banner_romtag;
+    pack_opts.billstuff_romtag = opts_.billstuff_romtag;
+    pack_opts.mark = opts_.mark;
+    pack_opts.sign = opts_.sign;
+    pack_opts.source_romtags = source_romtags;
+    pack_opts.verbose = opts_.verbose;
 
-        {
-          std::fstream ifs;
-          ifs.open(input_,std::ios::binary|std::ios::in);
-          TDO::DiscUnpacker::Callback cb;
-          TDO::DiscUnpacker unpacker(ifs,cb);
-          unpacker.unpack(temp_dir);
-        }
+    pack_opts.volume_commentary = label_string(disc_label.volume_commentary);
+    pack_opts.volume_label = label_string(disc_label.volume_identifier);
+    pack_opts.volume_unique_identifier = disc_label.volume_unique_identifier;
+    pack_opts.volume_unique_identifier_set = true;
+    pack_opts.root_unique_identifier = disc_label.root_unique_identifier;
+    pack_opts.root_unique_identifier_set = true;
 
-        Options::Pack pack_opts{};
-        pack_opts.input = temp_dir;
-        pack_opts.summary_input = input_;
-        pack_opts.output = target_;
-        // Repack deliberately rebuilds a compact, single-avatar filesystem.
-        // It does not opt into replaying the extracted layout metadata.
-        pack_opts.banner_romtag = opts_.banner_romtag;
-        pack_opts.billstuff_romtag = opts_.billstuff_romtag;
-        pack_opts.mark = opts_.mark;
-        pack_opts.sign = opts_.sign;
-        pack_opts.source_romtags = source_romtags;
-        pack_opts.verbose = opts_.verbose;
-
-        pack_opts.volume_commentary = label_string(disc_label.volume_commentary);
-        pack_opts.volume_label = label_string(disc_label.volume_identifier);
-        pack_opts.volume_unique_identifier = disc_label.volume_unique_identifier;
-        pack_opts.volume_unique_identifier_set = true;
-        pack_opts.root_unique_identifier = disc_label.root_unique_identifier;
-        pack_opts.root_unique_identifier_set = true;
-
-        Subcmd::pack(pack_opts);
-      }
-    catch(...)
-      {
-        std::error_code ec;
-        fs::remove_all(temp_dir,ec);
-        throw;
-      }
-
-    {
-      std::error_code ec;
-      fs::remove_all(temp_dir,ec);
-      if(ec)
-        fmt::print(stderr,
-                   "3dt: warning: failed to clean up temp dir {}: {}\n",
-                   temp_dir.string(),ec.message());
-    }
+    Subcmd::pack(pack_opts);
   }
 }
 

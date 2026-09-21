@@ -44,6 +44,8 @@ namespace TDO
     typedef std::unique_ptr<DiscManifestEntry> Ptr;
 
     std::filesystem::path              src_path;
+    bool                               source_disc_image = false;
+    std::vector<u32>                   source_avatar_list;
     std::string                        name;
     DiscManifestEntryKind              kind;
     bool                               directory;
@@ -60,6 +62,7 @@ namespace TDO
     u32                                record_file_offset;
     u32                                record_size;
     std::vector<u32>                   avatar_list;
+    u32                                layout_order = static_cast<u32>(-1);
     std::vector<DiscManifestEntry::Ptr> children;
   };
 

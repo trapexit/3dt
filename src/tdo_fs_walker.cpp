@@ -26,10 +26,91 @@
 #include <limits>
 #include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 
 namespace fs = std::filesystem;
 typedef TDO::FSWalker::Callbacks Callbacks;
+TDO::OperaPath
+TDO::OperaPath::child(const std::string &name_) const
+{
+  OperaPath path = *this;
+
+  path.components.emplace_back(name_);
+  return path;
+}
+
+std::filesystem::path
+TDO::OperaPath::host_path() const
+{
+  fs::path path;
+
+  for(const auto &component : components)
+    path /= component;
+  return path;
+}
+
+std::string
+TDO::OperaPath::display() const
+{
+  std::string path;
+
+  for(const auto &component : components)
+    {
+      if(!path.empty())
+        path += "/";
+      path += component;
+    }
+  return path;
+}
+
+bool
+TDO::OperaPath::host_compatible() const
+{
+  for(const auto &component : components)
+    {
+      if(component.empty() ||
+         (component == ".") ||
+         (component == "..") ||
+         (component.find_first_of("/\\") != std::string::npos))
+        return false;
+    }
+  return true;
+}
+
+void
+TDO::FSWalker::Callbacks::raw_directory(const TDO::OperaPath       &path_,
+                                        const TDO::DirectoryHeader &header_,
+                                        TDO::DevStream             &stream_)
+{
+  if(path_.host_compatible())
+    (*this)(path_.host_path(),header_,stream_);
+}
+
+Error
+TDO::FSWalker::Callbacks::raw_entry(const TDO::OperaPath      &parent_,
+                                    const std::string          &filename_,
+                                    const TDO::DirectoryRecord &record_,
+                                    const uint32_t              record_pos_,
+                                    TDO::DevStream             &stream_)
+{
+  const TDO::OperaPath path = parent_.child(filename_);
+
+  if(path.host_compatible())
+    {
+      (*this)(path.host_path(),record_,record_pos_,stream_);
+      return Error();
+    }
+
+  return invalid_filename(fs::path(parent_.display()),
+                          filename_,
+                          record_,
+                          record_pos_,
+                          Error("invalid directory record filename"),
+                          stream_);
+}
+
 
 
 static
@@ -150,21 +231,17 @@ decode_v1_filename(const TDO::DirectoryRecord &dr_,
 
   if(filename_.empty())
     return "invalid empty directory record filename";
-  if(filename_ == "." || filename_ == "..")
-    return "invalid directory record filename";
-  if(filename_.find_first_of("/\\") != std::string::npos)
-    return "invalid directory record filename";
 
   return Error();
 }
 
 static
 std::string
-display_path(const fs::path &path_)
+display_path(const TDO::OperaPath &path_)
 {
-  if(path_.empty())
-    return "/";
-  return path_.generic_string();
+  const std::string path = path_.display();
+
+  return path.empty() ? std::string("/") : path;
 }
 
 static
@@ -172,7 +249,7 @@ Error
 validate_v1_dir_block_link(const char              *name_,
                            const std::int32_t      block_,
                            const std::uint32_t     block_count_,
-                           const fs::path         &path_)
+                           const TDO::OperaPath     &path_)
 {
   const std::string path = display_path(path_);
 
@@ -191,7 +268,7 @@ Error
 validate_v1_dir_block_prev(const TDO::DirectoryHeader &header_,
                            const std::int32_t         expected_prev_block_,
                            const std::uint32_t        block_count_,
-                           const fs::path            &path_)
+                           const TDO::OperaPath    &path_)
 {
   Error err;
   const std::string path = display_path(path_);
@@ -253,7 +330,7 @@ public:
                       const std::uint32_t   dir_block_size_,
                       const std::uint32_t   block_count_,
                       const std::int32_t    prev_block_,
-                      const fs::path       &path_,
+                      const TDO::OperaPath  &path_,
                       std::int32_t         &next_block_,
                       bool                 &last_in_dir_)
   {
@@ -276,7 +353,7 @@ public:
       return err;
     next_block_ = dh.next_block;
 
-    _callbacks(path_,dh,_stream);
+    _callbacks.raw_directory(path_,dh,_stream);
 
     data_byte_pos += dh.first_entry_offset;
     err = validate_v1_dir_block_bounds(dh_data_byte_pos_,dir_block_size_,data_byte_pos,"directory entry offset");
@@ -341,8 +418,11 @@ public:
         err = decode_v1_filename(dr,decoded_filename);
         if(err)
           {
+            // An unrepresentable filename (e.g. empty) is reported through
+            // invalid_filename and the walk continues, matching pre-alias
+            // behavior; raw_entry only handles decodable names.
             TDO::PosGuard guard(_stream);
-            err = _callbacks.invalid_filename(path_,
+            err = _callbacks.invalid_filename(fs::path(path_.display()),
                                               decoded_filename,
                                               dr,
                                               dr_file_pos,
@@ -353,20 +433,28 @@ public:
           }
         else
           {
-            {
-              TDO::PosGuard guard(_stream);
-              _callbacks(path_ / decoded_filename,dr,dr_file_pos,_stream);
-            }
+            TDO::PosGuard guard(_stream);
+            err = _callbacks.raw_entry(path_,
+                                       decoded_filename,
+                                       dr,
+                                       dr_file_pos,
+                                       _stream);
+            if(err)
+              return err;
 
+            // Recurse only through decodable names. An undecodable record was
+            // never registered with consumers, so descending into it surfaces
+            // as a missing-parent error instead of a clean skip.
             if(dr.is_directory())
               {
                 const std::int64_t child_dir_byte_pos =
                   static_cast<std::int64_t>(dr.avatar_list[0]) * label_.volume_block_size;
 
-                if((child_dir_byte_pos >= active_dir_byte_pos_) && (child_dir_byte_pos < active_dir_end_))
+                if((child_dir_byte_pos >= active_dir_byte_pos_) &&
+                   (child_dir_byte_pos < active_dir_end_))
                   return {"invalid OperaFS directory recursion target: non-advancing child directory block"};
 
-                err = walk_v1_dir(label_,romtags_,dr,path_ / decoded_filename);
+                err = walk_v1_dir(label_,romtags_,dr,path_.child(decoded_filename));
                 if(err)
                   return err;
               }
@@ -394,7 +482,7 @@ public:
               const std::uint32_t   dir_block_,
               const std::uint32_t   dir_block_size_,
               const std::uint32_t   dir_block_count_,
-              const fs::path       &path_)
+              const TDO::OperaPath &path_)
   {
     // u32 * u32 silently wraps in u32 before being widened to s64.
     // Compute in u64 first and reject if the start or end position
@@ -427,6 +515,22 @@ public:
       return {"invalid OperaFS directory metadata: zero directory block size"};
     if(dir_block_count_ == 0)
       return Error();
+    for(const auto &range : _active_v1_directories)
+      if((active_dir_byte_pos >= range.first) &&
+         (active_dir_byte_pos < range.second))
+        return {"invalid OperaFS directory recursion target: ancestor directory cycle for " +
+                display_path(path_)};
+    _active_v1_directories.emplace_back(active_dir_byte_pos,active_dir_end);
+    struct ActiveDirectoryGuard
+    {
+      std::vector<std::pair<std::int64_t,std::int64_t>> &directories;
+
+      ~ActiveDirectoryGuard()
+      {
+        directories.pop_back();
+      }
+    } active_guard{_active_v1_directories};
+
 
     block = 0;
     prev_block = -1;
@@ -481,7 +585,7 @@ public:
   walk_v1_dir(const TDO::DiscLabel       &label_,
               const TDO::ROMTagVec       &romtags_,
               const TDO::DirectoryRecord &parent_,
-              const fs::path             &path_)
+              const TDO::OperaPath       &path_)
   {
     return walk_v1_dir(label_,
                        romtags_,
@@ -494,7 +598,7 @@ public:
   Error
   walk_v1_root_dir(const TDO::DiscLabel &label_,
                    const TDO::ROMTagVec &romtags_,
-                   const fs::path       &path_)
+                   const TDO::OperaPath &path_)
   {
     return walk_v1_dir(label_,
                        romtags_,
@@ -506,7 +610,7 @@ public:
 
   Error
   walk_v2(const TDO::DiscLabel &label_,
-          const fs::path       &path_)
+          const TDO::OperaPath &path_)
   {
     s64 pos;
     s64 image_size;
@@ -586,7 +690,13 @@ public:
             }
 
             TDO::PosGuard guard(_stream);
-            _callbacks(path_ / decoded_filename,dr,static_cast<uint32_t>(pos),_stream);
+            Error err = _callbacks.raw_entry(path_,
+                                             decoded_filename,
+                                             dr,
+                                             static_cast<uint32_t>(pos),
+                                             _stream);
+            if(err)
+              return err;
           }
 
         next_pos = static_cast<s64>(lmfe.flink_offset);
@@ -604,7 +714,7 @@ public:
   walk()
   {
     Error err;
-    fs::path path;
+    TDO::OperaPath path;
     TDO::DiscLabel dl;
     TDO::ROMTagVec romtags;
 
@@ -635,6 +745,7 @@ public:
 private:
   Callbacks      &_callbacks;
   TDO::DevStream  _stream;
+  std::vector<std::pair<std::int64_t,std::int64_t>> _active_v1_directories;
   bool            _use_existing_romtags;
 };
 

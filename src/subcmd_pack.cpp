@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <initializer_list>
 #include <limits>
 #include <optional>
 #include <random>
@@ -61,6 +62,7 @@ namespace
   struct LayoutRecord
   {
     std::string path;
+    std::string name;
     u32         flags;
     u32         unique_identifier;
     u32         type;
@@ -119,16 +121,28 @@ namespace
     path = path_.generic_string();
     return path.empty() ? std::string("/") : path;
   }
-
   static
   std::string
-  special_key(const fs::path &path_)
+  display_path(const TDO::OperaPath &path_)
   {
-    std::string key;
+    const std::string path = path_.display();
 
-    key = path_key(path_);
-    if((key == "disc label") || (key == "rom_tags"))
-      return key;
+    return path.empty() ? std::string("/") : path;
+  }
+
+
+  // Identify the synthetic entries by kind, never by host path. Layout replay
+  // restores raw OperaFS names, and a payload whose components normalize to
+  // "disc label" or "rom_tags" must not inherit the synthetic entry's
+  // fixed-block placement rules.
+  static
+  std::string
+  special_key(const Entry &entry_)
+  {
+    if(entry_.kind == EntryKind::DiscLabel)
+      return "disc label";
+    if(entry_.kind == EntryKind::ROMTags)
+      return "rom_tags";
 
     return {};
   }
@@ -163,6 +177,48 @@ namespace
   {
     return (lowercase(entry_.name) == name_);
   }
+  static
+  bool
+  ascii_case_equal(const std::string &lhs_,
+                   const char        *rhs_)
+  {
+    const std::size_t rhs_size = std::strlen(rhs_);
+
+    if(lhs_.size() != rhs_size)
+      return false;
+    for(std::size_t i = 0; i < rhs_size; i++)
+      {
+        unsigned char lhs = static_cast<unsigned char>(lhs_[i]);
+        unsigned char rhs = static_cast<unsigned char>(rhs_[i]);
+
+        if((lhs >= 'A') && (lhs <= 'Z'))
+          lhs += 'a' - 'A';
+        if((rhs >= 'A') && (rhs <= 'Z'))
+          rhs += 'a' - 'A';
+        if(lhs != rhs)
+          return false;
+      }
+    return true;
+  }
+
+  static
+  bool
+  opera_path_is(const TDO::OperaPath             &path_,
+                std::initializer_list<const char*> components_)
+  {
+    if(path_.components.size() != components_.size())
+      return false;
+
+    auto component = path_.components.begin();
+    for(const char *expected : components_)
+      {
+        if(!ascii_case_equal(*component,expected))
+          return false;
+        ++component;
+      }
+    return true;
+  }
+
 
   static
   u32
@@ -493,6 +549,125 @@ namespace
         parent_.children.emplace_back(std::move(entry));
       }
   }
+  static
+  std::string
+  opera_path_key(const TDO::OperaPath &path_)
+  {
+    std::string key;
+
+    for(const auto &component : path_.components)
+      {
+        key += std::to_string(component.size());
+        key += ":";
+        key += component;
+      }
+    return key;
+  }
+
+  class ImageManifestCallbacks final : public TDO::FSWalker::Callbacks
+  {
+  public:
+    ImageManifestCallbacks(const fs::path &source_,
+                           Entry          &root_)
+      : _source(source_)
+    {
+      _directories.emplace(std::string(),&root_);
+    }
+
+    Error
+    raw_entry(const TDO::OperaPath      &parent_,
+              const std::string          &filename_,
+              const TDO::DirectoryRecord &record_,
+              const uint32_t,
+              TDO::DevStream&)
+    {
+      const std::string parent_key = opera_path_key(parent_);
+      const auto parent = _directories.find(parent_key);
+
+      if(parent == _directories.end())
+        return Error("missing source image manifest parent: " + parent_.display());
+
+      if(parent_.components.empty())
+        {
+          const std::string key = lowercase(filename_);
+
+          if((key == "disc label") ||
+             (key == "rom_tags") ||
+             (key == "signatures"))
+            return Error();
+        }
+
+      auto entry = std::make_unique<Entry>();
+
+      entry->src_path           = _source;
+      entry->source_disc_image  = !record_.is_directory();
+      entry->source_avatar_list = record_.avatar_list;
+      entry->name               = filename_;
+      entry->kind               = EntryKind::Normal;
+      entry->directory          = record_.is_directory();
+      entry->unique_identifier  = record_.unique_identifier;
+      entry->type               = record_.type;
+      entry->flags              = (record_.flags & ~DR_FLAG_LAST_IN_MASK);
+      entry->block_size         = TDO::BLOCK_SIZE;
+      entry->byte_count         = record_.byte_count;
+      entry->data_byte_count    = record_.byte_count;
+      entry->block_count        = (entry->directory ?
+                                   0 :
+                                   block_count_for_size(record_.byte_count));
+      entry->burst              = 0;
+      entry->gap                = 0;
+      entry->start_block        = 0;
+      entry->record_file_offset = 0;
+      entry->record_size        = 0;
+
+      Entry *const child = entry.get();
+      parent->second->children.emplace_back(std::move(entry));
+
+      if(child->directory)
+        _directories.emplace(opera_path_key(parent_.child(filename_)),child);
+
+      return Error();
+    }
+
+    Error
+    invalid_filename(const std::filesystem::path &parent_,
+                     const std::string           &filename_,
+                     const TDO::DirectoryRecord  &record_,
+                     const uint32_t,
+                     const Error                 &err_,
+                     TDO::DevStream&)
+    {
+      // The record cannot be represented in the rebuilt image, so it is
+      // dropped. Warn like the pre-alias unpack path did: this is silent
+      // data loss otherwise.
+      fmt::print(stderr,"3dt: warning: {} - {}\n",
+                 err_.str,
+                 TDO::display_path(parent_,filename_));
+      if(record_.is_directory())
+        fmt::print(stderr,"3dt: warning: dropping directory {} and its contents\n",
+                   TDO::display_path(parent_,filename_));
+
+      return Error();
+    }
+
+  private:
+    fs::path                               _source;
+    std::unordered_map<std::string,Entry*> _directories;
+  };
+
+  static
+  void
+  read_image(const fs::path &path_,
+             Entry          &root_)
+  {
+    TDO::FileStream stream;
+
+    stream.open(path_);
+    ImageManifestCallbacks callbacks(path_,root_);
+    TDO::FSWalker walker(stream,callbacks);
+    walker.walk();
+  }
+
 
   static
   void
@@ -885,7 +1060,23 @@ namespace
       return static_cast<unsigned char>(10 + (c_ - 'a'));
     if((c_ >= 'A') && (c_ <= 'F'))
       return static_cast<unsigned char>(10 + (c_ - 'A'));
-    throw Error("layout path_raw_hex contains a non-hex character");
+    throw Error("layout contains a non-hex character");
+  }
+
+  static
+  std::string
+  decode_hex_bytes(const std::string &hex_,
+                   const char        *label_)
+  {
+    std::string value;
+
+    if((hex_.size() % 2) != 0)
+      throw Error(std::string("layout ") + label_ + " has an odd length");
+    value.reserve(hex_.size() / 2);
+    for(std::size_t i = 0; i < hex_.size(); i += 2)
+      value.push_back(static_cast<char>((hex_nibble(hex_[i]) << 4) |
+                                        hex_nibble(hex_[i + 1])));
+    return value;
   }
 
   static
@@ -895,16 +1086,40 @@ namespace
     if(!entry_json_.contains("path_raw_hex"))
       return entry_json_.at("path").get<std::string>();
 
-    const std::string hex = entry_json_.at("path_raw_hex").get<std::string>();
-    std::string path;
+    return decode_hex_bytes(entry_json_.at("path_raw_hex").get<std::string>(),
+                            "path_raw_hex");
+  }
 
-    if((hex.size() % 2) != 0)
-      throw Error("layout path_raw_hex has an odd length");
-    path.reserve(hex.size() / 2);
-    for(std::size_t i = 0; i < hex.size(); i += 2)
-      path.push_back(static_cast<char>((hex_nibble(hex[i]) << 4) |
-                                      hex_nibble(hex[i + 1])));
-    return path;
+  static
+  std::string
+  decode_filename_bytes(const json &entry_json_)
+  {
+    std::string name;
+
+    if(entry_json_.contains("filename_raw_hex"))
+      {
+        name =
+          decode_hex_bytes(entry_json_.at("filename_raw_hex").get<std::string>(),
+                           "filename_raw_hex");
+        const std::size_t terminator = name.find('\0');
+        if(terminator != std::string::npos)
+          name.resize(terminator);
+      }
+    else
+      {
+        name = fs::path(decode_path_bytes(entry_json_)).filename().string();
+      }
+
+    if(name.empty())
+      throw Error("layout filename is empty");
+    // A 32-byte name would fill dir_FileName[] end-to-end with no room for
+    // the terminator. The on-disc limit is 31 bytes plus the NUL, matching the
+    // host-directory check above.
+    if(name.size() >= FILESYSTEM_MAX_NAME_LEN)
+      throw Error("layout filename exceeds the 31-byte OperaFS limit: " +
+                  printable_filename(name));
+
+    return name;
   }
 
   static
@@ -942,7 +1157,13 @@ namespace
       {
         LayoutRecord record;
 
-        record.path               = fs::path(decode_path_bytes(entry_json)).lexically_normal().generic_string();
+        if(entry_json.contains("host_path"))
+          record.path = fs::path(entry_json.at("host_path").get<std::string>())
+            .lexically_normal().generic_string();
+        else
+          record.path = fs::path(decode_path_bytes(entry_json))
+            .lexically_normal().generic_string();
+        record.name               = decode_filename_bytes(entry_json);
         record.flags              = json_u32(entry_json.at("flags"),"flags");
         record.unique_identifier  = json_u32(entry_json.at("unique_identifier"),"unique_identifier");
         record.type               = json_u32(entry_json.at("type"),"type");
@@ -961,7 +1182,8 @@ namespace
         record.start_block = record.avatar_list[0];
         record.order = order++;
 
-        records[path_key(record.path)] = record;
+        if(!records.emplace(path_key(record.path),record).second)
+          throw Error("duplicate layout host path: " + record.path);
       }
 
     return records;
@@ -985,6 +1207,8 @@ namespace
     entry_.record_file_offset = record_.record_file_offset;
     entry_.record_size        = record_.record_size;
     entry_.avatar_list        = record_.avatar_list;
+    entry_.name               = record_.name;
+    entry_.layout_order       = record_.order;
     if(entry_.directory)
       entry_.flags |= DR_FLAG_IS_DIRECTORY;
     else
@@ -993,20 +1217,12 @@ namespace
 
   static
   u32
-  layout_order(const Entry     &entry_,
-               const fs::path  &path_,
-               const LayoutMap &layout_)
+  layout_order(const Entry &entry_)
   {
-    u32 order;
-
-    order = std::numeric_limits<u32>::max();
-
-    auto it = layout_.find(path_key(path_));
-    if(it != layout_.end())
-      order = std::min(order,it->second.order);
+    u32 order = entry_.layout_order;
 
     for(const auto &child : entry_.children)
-      order = std::min(order,layout_order(*child,path_ / child->name,layout_));
+      order = std::min(order,layout_order(*child));
 
     return order;
   }
@@ -1028,11 +1244,12 @@ namespace
 
         auto it = layout_.find(path_key(child_path));
         keep = (it != layout_.end());
-        if(keep)
-          apply_layout_record(*child,it->second);
 
         if(child->directory)
           keep = (apply_layout(*child,child_path,layout_) || keep);
+
+        if(it != layout_.end())
+          apply_layout_record(*child,it->second);
 
         if(keep)
           children.emplace_back(std::move(child));
@@ -1041,8 +1258,7 @@ namespace
     std::vector<std::pair<u32,Entry::Ptr>> ordered;
     ordered.reserve(children.size());
     for(auto &child : children)
-      ordered.emplace_back(layout_order(*child,entry_path_ / child->name,layout_),
-                           std::move(child));
+      ordered.emplace_back(layout_order(*child),std::move(child));
 
     std::sort(ordered.begin(),
               ordered.end(),
@@ -1138,18 +1354,16 @@ namespace
 
   static
   u32
-  signed_romtag_type_for_path(const fs::path &path_,
-                              const bool      include_banner_)
+  signed_romtag_type_for_path(const TDO::OperaPath &path_,
+                              const bool             include_banner_)
   {
-    const std::string key = path_key(path_);
-
-    if(key == "system/kernel/boot_code")
+    if(opera_path_is(path_,{"system","kernel","boot_code"}))
       return RSA_NEWKNEWNEWGNUBOOT;
-    if(key == "system/kernel/os_code")
+    if(opera_path_is(path_,{"system","kernel","os_code"}))
       return RSA_OS;
-    if(key == "system/kernel/misc_code")
+    if(opera_path_is(path_,{"system","kernel","misc_code"}))
       return RSA_MISCCODE;
-    if(include_banner_ && (key == "bannerscreen"))
+    if(include_banner_ && opera_path_is(path_,{"bannerscreen"}))
       return RSA_APPSPLASH;
 
     return 0;
@@ -1173,15 +1387,32 @@ namespace
 
   static
   std::vector<char>
-  read_manifest_file(const Entry    &entry_,
-                     const fs::path &entry_path_,
-                     const u32       byte_count_)
+  read_manifest_file(const Entry          &entry_,
+                     const TDO::OperaPath &entry_path_,
+                     const u32             byte_count_)
   {
     std::ifstream is;
     std::vector<char> data(byte_count_);
 
     if(data.empty())
       throw Error("signed payload is empty: " + display_path(entry_path_));
+
+    if(entry_.source_disc_image)
+      {
+        if(entry_.source_avatar_list.empty())
+          throw Error("signed payload has no source avatar: " +
+                      display_path(entry_path_));
+
+        TDO::FileStream stream;
+        stream.open(entry_.src_path);
+        stream.setup();
+        stream.read_data_bytes(data.data(),
+                               static_cast<s64>(
+                                 static_cast<u64>(entry_.source_avatar_list[0]) *
+                                 stream.device_block_data_size()),
+                               static_cast<s64>(data.size()));
+        return data;
+      }
     is.open(entry_.src_path,std::ios::binary);
     if(!is)
       throw Error("failed to open signed payload: " + entry_.src_path.string());
@@ -1195,7 +1426,7 @@ namespace
   static
   void
   reserve_signed_payload_storage(Entry                 &entry_,
-                                 const fs::path        &entry_path_,
+                                 const TDO::OperaPath  &entry_path_,
                                  const bool             replay_layout_,
                                  const bool             include_banner_,
                                  const TDO::ROMTagVec  &source_romtags_)
@@ -1270,7 +1501,7 @@ namespace
 
     for(auto &child : entry_.children)
       reserve_signed_payload_storage(*child,
-                                     entry_path_ / child->name,
+                                     entry_path_.child(child->name),
                                      replay_layout_,
                                      include_banner_,
                                      source_romtags_);
@@ -1407,7 +1638,7 @@ namespace
   {
     std::string key;
 
-    key = special_key(entry_path_);
+    key = special_key(entry_);
     if(key.empty())
       return;
 
@@ -1460,7 +1691,7 @@ namespace
     std::string label;
     std::vector<u32> avatars;
 
-    key     = special_key(entry_path_);
+    key     = special_key(entry_);
     label   = display_path(entry_path_);
     avatars = allocated_avatars(entry_);
 
@@ -1565,15 +1796,13 @@ namespace
 
   static
   u32
-  bootstrap_allocation_order(const fs::path &entry_path_)
+  bootstrap_allocation_order(const TDO::OperaPath &entry_path_)
   {
-    const std::string key = path_key(entry_path_);
-
-    if(key == "system/kernel/boot_code")
+    if(opera_path_is(entry_path_,{"system","kernel","boot_code"}))
       return 1;
-    if(key == "system/kernel/os_code")
+    if(opera_path_is(entry_path_,{"system","kernel","os_code"}))
       return 2;
-    if(key == "system/kernel/misc_code")
+    if(opera_path_is(entry_path_,{"system","kernel","misc_code"}))
       return 3;
 
     return 0;
@@ -1581,10 +1810,10 @@ namespace
 
   static
   void
-  allocate_file_blocks(Entry          &entry_,
-                       const fs::path &entry_path_,
-                       u32             allocation_order_,
-                       u32            &next_block_)
+  allocate_file_blocks(Entry                &entry_,
+                       const TDO::OperaPath &entry_path_,
+                       u32                   allocation_order_,
+                       u32                  &next_block_)
   {
     if(!entry_.directory)
       {
@@ -1612,7 +1841,7 @@ namespace
 
     for(auto &child : entry_.children)
       allocate_file_blocks(*child,
-                           entry_path_ / child->name,
+                           entry_path_.child(child->name),
                            allocation_order_,
                            next_block_);
   }
@@ -1626,11 +1855,11 @@ namespace
     next_block = FIRST_FILE_BLOCK;
     // ROMTags occupy block 1. Place DIPIR's three payloads immediately after
     // them, in retail order, before directories and ordinary file data.
-    allocate_file_blocks(root_,fs::path(),1,next_block);
-    allocate_file_blocks(root_,fs::path(),2,next_block);
-    allocate_file_blocks(root_,fs::path(),3,next_block);
+    allocate_file_blocks(root_,TDO::OperaPath(),1,next_block);
+    allocate_file_blocks(root_,TDO::OperaPath(),2,next_block);
+    allocate_file_blocks(root_,TDO::OperaPath(),3,next_block);
     allocate_directory_blocks(root_,next_block);
-    allocate_file_blocks(root_,fs::path(),0,next_block);
+    allocate_file_blocks(root_,TDO::OperaPath(),0,next_block);
 
     return next_block;
   }
@@ -1669,7 +1898,8 @@ namespace
   static
   void
   validate_output_location(const fs::path &input_,
-                           const fs::path &output_)
+                           const fs::path &output_,
+                           const bool      allow_equal_)
   {
     fs::path input_abs;
     fs::path output_abs;
@@ -1688,7 +1918,11 @@ namespace
       }
 
     if(input_it == input_abs.end())
-      throw Error("output image cannot be inside the input directory");
+      {
+        if(allow_equal_ && (output_it == output_abs.end()))
+          return;
+        throw Error("output image cannot be inside the input directory");
+      }
   }
 
   static
@@ -1704,7 +1938,9 @@ namespace
   void
   preflight_input_files(const Entry &entry_)
   {
-    if(!entry_.directory && (entry_.kind == EntryKind::Normal))
+    if(!entry_.directory &&
+       (entry_.kind == EntryKind::Normal) &&
+       !entry_.source_disc_image)
       {
         std::ifstream is;
 
@@ -1717,11 +1953,25 @@ namespace
       preflight_input_files(*child);
   }
 
+  class StructureCallbacks final : public TDO::FSWalker::Callbacks
+  {
+  public:
+    Error
+    raw_entry(const TDO::OperaPath&,
+              const std::string&,
+              const TDO::DirectoryRecord&,
+              const uint32_t,
+              TDO::DevStream&)
+    {
+      return Error();
+    }
+  };
+
   static
   void
   verify_operafs_structure_file(const fs::path &path_)
   {
-    TDO::FSWalker::Callbacks callbacks;
+    StructureCallbacks callbacks;
     TDO::FileStream stream;
 
     stream.open(path_);
@@ -1775,18 +2025,25 @@ namespace
     }
 
     Error
+    raw_entry(const TDO::OperaPath      &parent_,
+              const std::string          &filename_,
+              const TDO::DirectoryRecord &record_,
+              const uint32_t,
+              TDO::DevStream&)
+    {
+      list_packed_file(parent_.child(filename_).display(),record_);
+      return Error();
+    }
+
+    Error
     invalid_filename(const std::filesystem::path &parent_,
                      const std::string           &filename_,
                      const TDO::DirectoryRecord  &record_,
                      const uint32_t,
                      const Error                 &,
-                     TDO::DevStream &)
+                     TDO::DevStream&)
     {
-      std::string filepath = display_path(parent_);
-      if(!filepath.empty() && filepath != "/")
-        filepath += "/";
-      filepath += filename_;
-      list_packed_file(filepath,record_);
+      list_packed_file(TDO::display_path(parent_,filename_),record_);
       return Error();
     }
   };
@@ -1815,8 +2072,14 @@ namespace
     fs::path layout_path;
     u32 next_id;
 
-    validate_output_location(options_.input,options_.output);
-    reject_symlink_path(options_.input);
+    const fs::path &source_path =
+      options_.source_image.empty() ? options_.input : options_.source_image;
+
+    validate_output_location(source_path,
+                             options_.output,
+                             !options_.source_image.empty());
+    if(options_.source_image.empty())
+      reject_symlink_path(source_path);
 
     manifest.output = options_.output;
     manifest.disc_label = {};
@@ -1856,11 +2119,17 @@ namespace
     manifest.root.record_file_offset = 0;
     manifest.root.record_size = 0;
 
-    layout_path = layout_path_for(options_);
-    if(!layout_path.empty())
-      layout = read_layout(layout_path,manifest);
+    if(options_.source_image.empty())
+      {
+        layout_path = layout_path_for(options_);
+        if(!layout_path.empty())
+          layout = read_layout(layout_path,manifest);
+      }
 
-    read_directory(options_.input,manifest.root);
+    if(options_.source_image.empty())
+      read_directory(options_.input,manifest.root);
+    else
+      read_image(options_.source_image,manifest.root);
     validate_operafs_namespace(manifest.root,fs::path());
     add_or_replace_synthetic_entries(manifest.root,true);
 
@@ -1891,7 +2160,7 @@ namespace
         refresh_replay_file_sizes(manifest.root,fs::path());
         if(options_.sign)
           reserve_signed_payload_storage(manifest.root,
-                                         fs::path(),
+                                         TDO::OperaPath(),
                                          true,
                                          options_.banner_romtag,
                                          manifest.source_romtags);
@@ -1902,7 +2171,7 @@ namespace
       {
         if(options_.sign)
           reserve_signed_payload_storage(manifest.root,
-                                         fs::path(),
+                                         TDO::OperaPath(),
                                          false,
                                          options_.banner_romtag,
                                          manifest.source_romtags);

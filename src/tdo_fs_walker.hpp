@@ -25,10 +25,20 @@
 #include <functional>
 #include <istream>
 #include <string>
-
+#include <vector>
 // TODO: Add way to exit walk
 namespace TDO
 {
+  struct OperaPath
+  {
+    std::vector<std::string> components;
+
+    OperaPath child(const std::string &name) const;
+    std::filesystem::path host_path() const;
+    std::string display() const;
+    bool host_compatible() const;
+  };
+
   class FSWalker
   {
   public:
@@ -45,6 +55,14 @@ namespace TDO
                               const TDO::DirectoryRecord&,
                               const uint32_t,
                               TDO::DevStream&) {};
+      virtual void raw_directory(const TDO::OperaPath&,
+                                 const TDO::DirectoryHeader&,
+                                 TDO::DevStream&);
+      virtual Error raw_entry(const TDO::OperaPath&,
+                              const std::string&,
+                              const TDO::DirectoryRecord&,
+                              const uint32_t,
+                              TDO::DevStream&);
       virtual Error invalid_filename(const std::filesystem::path&,
                                      const std::string&,
                                      const TDO::DirectoryRecord&,

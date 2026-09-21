@@ -142,6 +142,16 @@ class VerifyFSCallbacks final : public TDO::FSWalker::Callbacks
 {
 public:
   Error
+  raw_entry(const TDO::OperaPath&,
+            const std::string&,
+            const TDO::DirectoryRecord&,
+            const uint32_t,
+            TDO::DevStream&)
+  {
+    return {};
+  }
+
+  Error
   invalid_filename(const std::filesystem::path &parent_,
                    const std::string           &filename_,
                    const TDO::DirectoryRecord&,
@@ -184,18 +194,27 @@ public:
   }
 
   Error
-  invalid_filename(const std::filesystem::path &parent_,
-                   const std::string           &filename_,
+  raw_entry(const TDO::OperaPath      &parent_,
+            const std::string          &filename_,
+            const TDO::DirectoryRecord &record_,
+            const uint32_t,
+            TDO::DevStream&)
+  {
+    const TDO::OperaPath path = parent_.child(filename_);
+
+    if(path.host_compatible())
+      collect(path.host_path(),record_);
+    return {};
+  }
+
+  Error
+  invalid_filename(const std::filesystem::path&,
+                   const std::string&,
                    const TDO::DirectoryRecord&,
                    const uint32_t,
-                   const Error                 &err_,
+                   const Error&,
                    TDO::DevStream&)
   {
-    fmt::print(stderr,
-               "3dt: warning: {} - {}\n",
-               err_.str,
-               TDO::display_path(parent_,filename_));
-
     return {};
   }
 

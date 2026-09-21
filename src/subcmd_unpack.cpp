@@ -217,14 +217,15 @@ namespace
   struct CSVPrinter final : public TDO::DiscUnpacker::Callback
   {
     void
-    before(const fs::path             &path_,
+    before(const TDO::OperaPath      &path_,
+           const fs::path&,
            const TDO::DirectoryRecord &record_,
            const uint32_t,
            TDO::DevStream&)
     {
       CSVWriter csv(",");
 
-      csv << path_.string();
+      csv << path_.display();
       csv << fmt::format("0x{:08X}",record_.type);
       csv << fmt::format("{}",record_.type_str());
       csv << fmt::format("0x{:08X}",record_.unique_identifier);
@@ -235,7 +236,8 @@ namespace
     }
 
     void
-    after(const fs::path&,
+    after(const TDO::OperaPath&,
+          const fs::path&,
           const TDO::DirectoryRecord&,
           const int)
     {
@@ -251,7 +253,8 @@ namespace
     }
 
     void
-    before(const fs::path             &filepath_,
+    before(const TDO::OperaPath      &filepath_,
+           const fs::path&,
            const TDO::DirectoryRecord &record_,
            const uint32_t              record_pos_,
            TDO::DevStream             &stream_)
@@ -279,7 +282,7 @@ namespace
           if((file_offset < 0) ||
              (file_offset > static_cast<s64>(std::numeric_limits<std::uint32_t>::max())))
             throw Error("avatar file offset out of 32-bit range: " +
-                        filepath_.string());
+                        filepath_.display());
           avatar = static_cast<std::uint32_t>(file_offset);
         }
       fmt::print("{}{}{} {:11} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
@@ -291,11 +294,12 @@ namespace
                  record_.type_str(),
                  record_pos_,
                  avatar,
-                 filepath_);
+                 filepath_.display());
     }
 
     void
-    after(const fs::path&,
+    after(const TDO::OperaPath&,
+          const fs::path&,
           const TDO::DirectoryRecord&,
           const int)
     {
@@ -307,6 +311,8 @@ namespace
   {
     LayoutWriter(TDO::DiscUnpacker::Callback::Ptr printer_)
       : _printer(std::move(printer_)),
+        _pending_entry(0),
+        _pending_default_layout(false),
         _initialized(false)
     {
     }
@@ -320,7 +326,7 @@ namespace
       _initialized = true;
       _manifest = {
         {"format","3dt-operafs-layout"},
-        {"version",1},
+        {"version",2},
         {"image",{
           {"container",stream_.device_block_header() == 0 ? "iso2048" : "mode1_2352"},
           {"file_size",stream_.size_in_bytes()},
@@ -339,7 +345,8 @@ namespace
     }
 
     void
-    directory(const fs::path              &path_,
+    directory(const TDO::OperaPath       &path_,
+              const fs::path&,
               const TDO::DirectoryHeader &header_,
               const uint32_t              header_pos_,
               TDO::DevStream             &stream_)
@@ -351,19 +358,26 @@ namespace
     }
 
     void
-    before(const fs::path             &path_,
+    before(const TDO::OperaPath      &path_,
+           const fs::path             &host_path_,
            const TDO::DirectoryRecord &record_,
            const uint32_t              record_pos_,
            TDO::DevStream             &stream_)
     {
-      const std::string path = path_.generic_string();
+      const std::string path = path_.display();
       const std::string filename = fixed_string(record_.filename,
                                                 sizeof(record_.filename));
+      json path_components = json::array();
+      for(const auto &component : path_.components)
+        path_components.push_back(bytes_hex(component.data(),component.size()));
 
       init(stream_);
-      _printer->before(path_,record_,record_pos_,stream_);
-      if(!record_.is_directory() && is_default_layout_filename(path_))
-        _default_layout_payload_paths.emplace_back(path_);
+      _printer->before(path_,host_path_,record_,record_pos_,stream_);
+      if(!record_.is_directory() && is_default_layout_filename(host_path_))
+        _default_layout_payload_paths.emplace_back(host_path_);
+      _pending_entry          = _manifest["entries"].size();
+      _pending_default_layout = (!record_.is_directory() &&
+                                 is_default_layout_filename(host_path_));
       _manifest["entries"].push_back({
         // OperaFS filenames are byte strings, not guaranteed UTF-8 (for
         // example the retail SailorMoon disc contains Shift-JIS bytes).
@@ -373,6 +387,8 @@ namespace
         // makes an otherwise valid image impossible to repack.
         {"path",json_display_string(path)},
         {"path_raw_hex",bytes_hex(path.data(),path.size())},
+        {"path_components_raw_hex",path_components},
+        {"host_path",host_path_.generic_string()},
         {"kind",record_.is_directory() ? "directory" : "file"},
         {"record_file_offset",record_pos_},
         {"record_data_offset",stream_.data_byte_tell(record_pos_)},
@@ -394,11 +410,25 @@ namespace
     }
 
     void
-    after(const fs::path             &path_,
+    after(const TDO::OperaPath      &path_,
+          const fs::path             &host_path_,
           const TDO::DirectoryRecord &record_,
           const int                   err_)
     {
-      _printer->after(path_,record_,err_);
+      // before() and after() are adjacent per record, so the pending entry is
+      // the last one. A record that failed extraction was never written to the
+      // host tree, so keeping it would replay a payload that does not exist;
+      // its host path can also carry raw non-UTF-8 bytes, which nlohmann::json
+      // rejects while dumping and which would void the layout for every other
+      // successfully extracted file.
+      if(err_ != 0)
+        {
+          _manifest["entries"].erase(_manifest["entries"].begin() + _pending_entry);
+          if(_pending_default_layout)
+            _default_layout_payload_paths.pop_back();
+        }
+
+      _printer->after(path_,host_path_,record_,err_);
     }
 
     void
@@ -448,6 +478,8 @@ namespace
     TDO::DiscUnpacker::Callback::Ptr _printer;
     json                             _manifest;
     std::vector<fs::path>            _default_layout_payload_paths;
+    std::size_t                      _pending_entry;
+    bool                             _pending_default_layout;
     bool                             _initialized;
   };
 
