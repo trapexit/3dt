@@ -1739,7 +1739,7 @@ namespace
     char readonly_char = (record_.is_readonly() ? 'r' : '-');
     char for_fs_char   = (record_.is_for_fs() ? 'f' : '-');
 
-    fmt::print("{}{}{} {:11L} {:#010x} {:4s} {}\n",
+    fmt::print("{}{}{} {:11} {:#010x} {:4s} {}\n",
                dir_char,
                readonly_char,
                for_fs_char,

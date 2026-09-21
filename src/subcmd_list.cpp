@@ -107,7 +107,7 @@ default_printer(const std::string          &filepath_,
   dir_char      = (record_.is_directory() ? 'd' : '-');
   readonly_char = (record_.is_readonly() ? 'r' : '-');
   for_fs_char   = (record_.is_for_fs() ? 'f' : '-');
-  fmt::print("{}{}{} {:11L} {:#010x} {:4s} {}\n",
+  fmt::print("{}{}{} {:11} {:#010x} {:4s} {}\n",
              dir_char,
              readonly_char,
              for_fs_char,
@@ -165,7 +165,7 @@ file_offset_printer(const std::string          &filepath_,
           avatar = 0u;
         }
     }
-  fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
+  fmt::print("{}{}{} {:11} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
              dir_char,
              readonly_char,
              for_fs_char,
@@ -224,7 +224,7 @@ block_offset_printer(const std::string          &filepath_,
   else
     avatar = record_.avatar_list[0];
 
-  fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
+  fmt::print("{}{}{} {:11} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
              dir_char,
              readonly_char,
              for_fs_char,

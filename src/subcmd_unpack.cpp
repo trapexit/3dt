@@ -282,7 +282,7 @@ namespace
                         filepath_.string());
           avatar = static_cast<std::uint32_t>(file_offset);
         }
-      fmt::print("{}{}{} {:11L} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
+      fmt::print("{}{}{} {:11} {:#010x} {:4s} {:#010x} {:#010x} {}\n",
                  dir_char,
                  readonly_char,
                  for_fs_char,
