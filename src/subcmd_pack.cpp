@@ -448,8 +448,6 @@ namespace
         entry->byte_count      = TDO::checked_narrow_u64_to_u32(size,"file size");
         entry->data_byte_count = entry->byte_count;
         entry->block_count     = block_count_for_size(size);
-        if(lowercase(entry->name) == "launchme")
-          entry->type = DR_TYPE_CATAPULT;
       }
 
     return entry;
@@ -1566,9 +1564,27 @@ namespace
   }
 
   static
+  u32
+  bootstrap_allocation_order(const fs::path &entry_path_)
+  {
+    const std::string key = path_key(entry_path_);
+
+    if(key == "system/kernel/boot_code")
+      return 1;
+    if(key == "system/kernel/os_code")
+      return 2;
+    if(key == "system/kernel/misc_code")
+      return 3;
+
+    return 0;
+  }
+
+  static
   void
-  allocate_file_blocks(Entry &entry_,
-                       u32   &next_block_)
+  allocate_file_blocks(Entry          &entry_,
+                       const fs::path &entry_path_,
+                       u32             allocation_order_,
+                       u32            &next_block_)
   {
     if(!entry_.directory)
       {
@@ -1582,7 +1598,9 @@ namespace
             break;
           }
 
-        if(entry_.block_count > 0)
+        if((bootstrap_allocation_order(entry_path_) == allocation_order_) &&
+           entry_.avatar_list.empty() &&
+           (entry_.block_count > 0))
           {
             entry_.start_block = next_block_;
             entry_.avatar_list = {entry_.start_block};
@@ -1593,7 +1611,10 @@ namespace
       }
 
     for(auto &child : entry_.children)
-      allocate_file_blocks(*child,next_block_);
+      allocate_file_blocks(*child,
+                           entry_path_ / child->name,
+                           allocation_order_,
+                           next_block_);
   }
 
   static
@@ -1603,8 +1624,13 @@ namespace
     u32 next_block;
 
     next_block = FIRST_FILE_BLOCK;
+    // ROMTags occupy block 1. Place DIPIR's three payloads immediately after
+    // them, in retail order, before directories and ordinary file data.
+    allocate_file_blocks(root_,fs::path(),1,next_block);
+    allocate_file_blocks(root_,fs::path(),2,next_block);
+    allocate_file_blocks(root_,fs::path(),3,next_block);
     allocate_directory_blocks(root_,next_block);
-    allocate_file_blocks(root_,next_block);
+    allocate_file_blocks(root_,fs::path(),0,next_block);
 
     return next_block;
   }
