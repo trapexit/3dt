@@ -92,6 +92,10 @@ help:
 	@echo "  make release              Build all release targets with Zig"
 	@echo "  make TARGET=<zig-target>  Build one named output with custom CC/CXX"
 	@echo ""
+	@echo "GitHub release (commit all changes first):"
+	@echo "  tools/release-to-github             Build, tag, and upload a draft"
+	@echo "  tools/release-to-github --publish   Also publish as latest"
+	@echo ""
 	@echo "Output: $(OUTPUT)"
 
 all: $(OUTPUT)

@@ -1,0 +1,155 @@
+#!/bin/sh
+# Build committed sources and upload a versioned GitHub release.
+
+fail()
+{
+    printf '3dt release: %s\n' "$*" >&2
+    exit 1
+}
+
+usage()
+{
+    cat <<'EOF'
+Usage: tools/release-to-github [--publish]
+
+Build all four release binaries, create and push an annotated tag if needed,
+and upload a GitHub draft release. --publish also publishes it as latest.
+The version and tag come from src/version.hpp (for example, 1.6.0).
+
+Environment:
+  REMOTE   Git remote whose push URL selects the repository (default: origin)
+
+Requires git, make, awk, Zig (see make zig-venv), and authenticated GitHub CLI.
+Tracked changes and untracked build inputs must be committed first.
+Existing local or remote tags are reused only when they match the source commit;
+tags are never overwritten.
+EOF
+}
+
+check_source()
+{
+    git diff --quiet && git diff --cached --quiet \
+        || fail 'Commit tracked changes before releasing.'
+    untracked=$(git ls-files --others -- \
+        'src/*.c' 'src/*.cpp' 'src/*.h' 'src/*.hpp' \
+        'vendored/*.c' 'vendored/*.cpp' 'vendored/*.h' 'vendored/*.hpp' \
+        Makefile tools/release-to-github) \
+        || fail 'Could not inspect untracked build inputs.'
+    [ -z "$untracked" ] || fail "Commit untracked build inputs before releasing:
+$untracked"
+}
+
+main()
+{
+    set -eu
+    publish=0
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --publish) publish=1 ;;
+            --help|-h) usage; exit 0 ;;
+            *) fail "Unknown argument: $1 (use --help)." ;;
+        esac
+        shift
+    done
+
+    for tool in git make gh awk dirname; do
+        command -v "$tool" >/dev/null 2>&1 || fail "Required command not found: $tool"
+    done
+    script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) \
+        || fail 'Could not locate the tools directory.'
+    root=$(git -C "$script_dir/.." rev-parse --show-toplevel) \
+        || fail 'The script must be inside the 3dt Git checkout.'
+    cd -- "$root"
+    check_source
+    commit=$(git rev-parse --verify HEAD) || fail 'No source commit is available.'
+
+    version=$(awk '
+        $1 == "#define" && $2 == "VERSION_MAJOR" { major = $3 }
+        $1 == "#define" && $2 == "VERSION_MINOR" { minor = $3 }
+        $1 == "#define" && $2 == "VERSION_PATCH" { patch = $3 }
+        END {
+            if (major !~ /^[0-9]+$/ || minor !~ /^[0-9]+$/ || patch !~ /^[0-9]+$/)
+                exit 1
+            printf "%s.%s.%s\n", major, minor, patch
+        }
+    ' src/version.hpp) || fail 'Could not read the version from src/version.hpp.'
+    tag=$version
+    remote=${REMOTE:-origin}
+    url=$(git remote get-url --push "$remote") \
+        || fail "Could not find the push URL for remote $remote."
+    case "$url" in
+        https://github.com/*) repo=${url#https://github.com/} ;;
+        git@github.com:*) repo=${url#git@github.com:} ;;
+        ssh://git@github.com/*) repo=${url#ssh://git@github.com/} ;;
+        *) fail 'The selected push URL must be a github.com HTTPS or SSH URL.' ;;
+    esac
+    repo=${repo%/}
+    repo=${repo%.git}
+
+    if git show-ref --verify --quiet "refs/tags/$tag"; then
+        [ "$(git rev-parse --verify "refs/tags/$tag^{commit}")" = "$commit" ] \
+            || fail "Local tag $tag points to a different commit; update the version or correct the tag first."
+    fi
+    gh auth status --hostname github.com \
+        || fail 'Authenticate first with gh auth login --hostname github.com.'
+    repo=$(gh repo view "$repo" --json nameWithOwner --jq .nameWithOwner) \
+        || fail 'Could not resolve the release repository.'
+    [ -n "$repo" ] || fail 'GitHub returned an empty repository name.'
+    remote_tag_exists=0
+    if remote_tags=$(git ls-remote --exit-code --tags -- "$url" "refs/tags/$tag" "refs/tags/$tag^{}"); then
+        remote_commit=$(printf '%s\n' "$remote_tags" | awk '
+            $2 ~ /\^\{\}$/ { peeled = $1; next }
+            { direct = $1 }
+            END { print peeled ? peeled : direct }
+        ')
+        [ "$remote_commit" = "$commit" ] \
+            || fail "Remote tag $tag points to a different commit; update the version or correct the tag first."
+        remote_tag_exists=1
+    else
+        status=$?
+        [ "$status" -eq 2 ] || fail 'Could not check remote release tags.'
+    fi
+
+    printf 'Building %s from %s for %s...\n' "$tag" "$commit" "$repo"
+    make release || fail 'Build failed; no tag was created.'
+    check_source
+    [ "$(git rev-parse --verify HEAD)" = "$commit" ] \
+        || fail 'HEAD changed during the build; no tag was created.'
+
+    set -- build/3dt_x86_64-linux-musl \
+        build/3dt_aarch64-linux-musl \
+        build/3dt_x86_64-windows-gnu.exe \
+        build/3dt_aarch64-macos
+    for asset do
+        [ -s "$asset" ] && [ -x "$asset" ] \
+            || fail "Missing or non-executable release asset: $asset; no tag was created."
+    done
+
+    if ! git show-ref --verify --quiet "refs/tags/$tag"; then
+        if [ "$remote_tag_exists" -eq 1 ]; then
+            git fetch --no-tags -- "$url" "refs/tags/$tag:refs/tags/$tag" \
+                || fail "Could not fetch existing release tag $tag."
+        else
+            git tag -a "$tag" "$commit" -m "3dt $tag" \
+                || fail "Could not create local tag $tag."
+        fi
+    fi
+    if [ "$remote_tag_exists" -eq 0 ]; then
+        git push --no-follow-tags -- "$url" "refs/tags/$tag" \
+            || fail "Tag push failed; local tag $tag remains. No GitHub release was created."
+    fi
+    gh release create "$tag" --repo "$repo" --verify-tag --draft \
+        --generate-notes --title "3dt $tag" "$@" \
+        || fail "Release upload failed; tag $tag remains. Inspect any GitHub draft before retrying."
+
+    if [ "$publish" -eq 1 ]; then
+        gh release edit "$tag" --repo "$repo" --verify-tag --draft=false --latest \
+            || fail "Publication failed; inspect the draft for $tag."
+        printf 'Published %s as the latest release in %s.\n' "$tag" "$repo"
+    else
+        printf 'Uploaded draft %s in %s. Review its notes and four assets, then publish:\n' "$tag" "$repo"
+        printf '  gh release edit %s --repo %s --verify-tag --draft=false --latest\n' "$tag" "$repo"
+    fi
+}
+
+main "$@"

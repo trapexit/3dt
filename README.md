@@ -49,6 +49,32 @@ make release
 Override `PYTHON`, `ZIG_VENV`, or `ZIG` on the Make command line to use a
 different Python interpreter, virtual-environment directory, or Zig executable.
 
+### GitHub releases
+
+Commit the version bump and all build inputs, then run:
+
+```sh
+tools/release-to-github
+```
+
+The script builds all four binaries with `make release`, uses the version in
+`src/version.hpp` as the tag (for example, `1.6.0`), pushes that tag, and uploads
+a GitHub draft release with generated notes and the four binaries. A missing
+local tag is fetched from the remote if it exists there, otherwise created as
+an annotated tag. Existing local or remote tags are accepted only if they
+point to the source commit; the script never overwrites tags.
+
+Review the draft's notes and assets before publishing. To build, upload, and
+immediately publish as the latest release instead:
+
+```sh
+tools/release-to-github --publish
+```
+
+This requires an authenticated GitHub CLI (`gh auth login`) in addition to the
+release-build prerequisites above. `REMOTE` selects the Git remote whose push
+URL identifies the GitHub repository (default: `origin`).
+
 
 ## Usage
 
