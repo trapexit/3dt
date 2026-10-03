@@ -1,8 +1,0 @@
-FROM alpine:edge
-
-RUN apk update
-RUN apk add \
-        make \
-        g++ \
-        s6 \
-        zig

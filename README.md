@@ -17,6 +17,39 @@
 * encrypt or decrypt 3DO obfuscation payloads (primarily the boot file)
 
 
+## Build
+
+Local builds require GNU Make and a C++17-compatible C/C++ toolchain:
+
+```bash
+make
+make NDEBUG=1
+make SANITIZE=1
+make clean
+```
+
+Cross-release builds use an existing `zig` on `PATH` when available.
+Otherwise, `make zig-venv` installs the pinned `ziglang==0.16.0` PyPI
+package in `.venv`; virtual-environment activation is not required. The
+fallback requires Python 3 with `venv` support and access to PyPI.
+Podman is no longer required.
+
+```bash
+make zig-venv
+make release
+```
+
+`make release` cleans `build/` and produces:
+
+* `build/3dt_x86_64-linux-musl`
+* `build/3dt_aarch64-linux-musl`
+* `build/3dt_x86_64-windows-gnu.exe`
+* `build/3dt_aarch64-macos`
+
+Override `PYTHON`, `ZIG_VENV`, or `ZIG` on the Make command line to use a
+different Python interpreter, virtual-environment directory, or Zig executable.
+
+
 ## Usage
 
 ### --help

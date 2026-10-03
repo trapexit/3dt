@@ -7,8 +7,6 @@ else
 endif
 
 JOBS := $(shell nproc)
-PUID := $(shell id -u)
-PGID := $(shell id -g)
 
 OUTPUT = build/$(EXE)
 
@@ -17,6 +15,10 @@ OUTPUT = build/$(EXE)
 CC    ?= gcc
 CXX   ?= g++
 STRIP ?= strip
+PYTHON ?= python3
+ZIG_VENV ?= .venv
+SYSTEM_ZIG := $(shell command -v zig 2>/dev/null)
+ZIG ?= $(if $(SYSTEM_ZIG),$(SYSTEM_ZIG),$(abspath $(ZIG_VENV))/bin/python-zig)
 
 ifeq ($(NDEBUG),1)
 OPT := -Os -flto -ffunction-sections -fdata-sections
@@ -77,7 +79,8 @@ help:
 	@echo "  clean     Remove build/ directory"
 	@echo "  distclean Remove everything not in git"
 	@echo "  strip     Strip debug symbols from binary"
-	@echo "  release   Build containerized release binaries"
+	@echo "  zig-venv  Use Zig from PATH or install Zig in .venv"
+	@echo "  release   Cross-compile release binaries with Zig"
 	@echo "  help      Show this help message"
 	@echo ""
 	@echo "Variables:"
@@ -85,8 +88,8 @@ help:
 	@echo "  SANITIZE=1    Add -fsanitize=address,undefined"
 	@echo ""
 	@echo "Cross-compile:"
-	@echo "  make release              Build all release targets via Podman/Zig"
-	@echo "  make release-base         Build all release targets with local Zig"
+	@echo "  make zig-venv             Provision Zig if not already on PATH"
+	@echo "  make release              Build all release targets with Zig"
 	@echo "  make TARGET=<zig-target>  Build one named output with custom CC/CXX"
 	@echo ""
 	@echo "Output: $(OUTPUT)"
@@ -126,40 +129,45 @@ BINDIR ?= $(PREFIX)/bin/tools/linux
 install: $(OUTPUT)
 	install -Dm755 $(OUTPUT) $(DESTDIR)$(BINDIR)/$(EXE)
 
-release-base: clean
+zig-venv:
+ifneq ($(SYSTEM_ZIG),)
+	@echo "Using system Zig: $(SYSTEM_ZIG)"
+else
+	$(PYTHON) -m venv "$(ZIG_VENV)"
+	"$(ZIG_VENV)/bin/python" -m pip install "ziglang==0.16.0"
+endif
+
+release:
+	@"$(ZIG)" version >/dev/null 2>&1 || { \
+		echo "Zig not found; run 'make zig-venv' first." >&2; \
+		exit 1; \
+	}
+	$(MAKE) clean
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
-		CC="zig cc -target x86_64-linux-musl" \
-		CXX="zig c++ -target x86_64-linux-musl" \
-		STRIP="zig llvm-strip" \
+		CC="$(ZIG) cc -target x86_64-linux-musl" \
+		CXX="$(ZIG) c++ -target x86_64-linux-musl" \
+		STRIP="$(ZIG) llvm-strip" \
 		TARGET="x86_64-linux-musl" \
 		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
-		CC="zig cc -target aarch64-linux-musl" \
-		CXX="zig c++ -target aarch64-linux-musl" \
-		STRIP="zig llvm-strip" \
+		CC="$(ZIG) cc -target aarch64-linux-musl" \
+		CXX="$(ZIG) c++ -target aarch64-linux-musl" \
+		STRIP="$(ZIG) llvm-strip" \
 		TARGET="aarch64-linux-musl" \
 		OPT="-Oz -flto -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
-		CC="zig cc -target x86_64-windows-gnu" \
-		CXX="zig c++ -target x86_64-windows-gnu" \
-		STRIP="zig llvm-strip" \
+		CC="$(ZIG) cc -target x86_64-windows-gnu" \
+		CXX="$(ZIG) c++ -target x86_64-windows-gnu" \
+		STRIP="$(ZIG) llvm-strip" \
 		TARGET="x86_64-windows-gnu.exe" \
 		OPT="-Oz -ffunction-sections -fdata-sections -static"
 	$(MAKE) NDEBUG=1 -j$(JOBS) \
-		CC="zig cc -target aarch64-macos" \
-		CXX="zig c++ -target aarch64-macos" \
-		STRIP="zig llvm-strip" \
+		CC="$(ZIG) cc -target aarch64-macos" \
+		CXX="$(ZIG) c++ -target aarch64-macos" \
+		STRIP="$(ZIG) llvm-strip" \
 		TARGET="aarch64-macos" \
 		OPT="-Oz -ffunction-sections -fdata-sections"
 
-release:
-	podman build -t localhost/cxxbuilder buildtools/
-	podman run --rm --userns=keep-id \
-		-e HOME=/tmp \
-		-e ZIG_GLOBAL_CACHE_DIR=/src/.cache/zig-global \
-		-e ZIG_LOCAL_CACHE_DIR=/src/.cache/zig-local \
-		-v ${PWD}:/src:Z localhost/cxxbuilder "/src/buildtools/podman-make-release"
-
-.PHONY: all clean distclean release release-base strip install
+.PHONY: all clean distclean release zig-venv strip install
 
 -include $(DEPS)
