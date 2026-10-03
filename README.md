@@ -55,7 +55,7 @@ different Python interpreter, virtual-environment directory, or Zig executable.
 ### --help
 
 ```
-3dt: 3DO Disc Tool (v1.2.0)
+3dt: 3DO Disc Tool (v1.6.0)
 
 
 Usage: 3dt [OPTIONS] SUBCOMMANDS
